@@ -1,0 +1,18 @@
+export const NICKNAMES = [
+  'Brine Bucket',
+  'Little Margin',
+  'Tide Tax',
+  'Wet Ledger',
+  'Kelp Runner',
+  'Barnacle Bill',
+  'Slow Penny',
+  'Low Water',
+  'Saltcellar',
+  'Gannet',
+  'Second Wind',
+  'Copper Bottom',
+  'Ropeburn',
+  'Fogbound',
+  'Mackerel Sky',
+  'Odd Job',
+]
