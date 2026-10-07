@@ -1,8 +1,10 @@
-import type { GameState } from '../game/types'
+import type { GameState, Weather } from '../game/types'
 import { getBoatClass, getPort } from '../game/economy'
 import { getVoyage } from '../game/state'
 import { TIER_COLORS } from '../colors'
 import { HOME_PORT_ID, MAP_HEIGHT, MAP_WIDTH, PORTS } from '../game/data/ports'
+import { WEATHER } from '../game/data/weather'
+import { routeWeather } from '../game/weather'
 
 type Props = {
   game: GameState
@@ -14,7 +16,7 @@ type Props = {
 /** Where each port's demand chips sit relative to the port, to stay clear of routes and labels. */
 const DEFAULT_CHIP_OFFSET: [number, number] = [0, -75]
 const DEMAND_CHIP_OFFSET: Record<string, [number, number]> = {
-  brindle: [110, -40],
+  brindle: [110, -20],
 }
 
 function DemandChip({ y, track, demand }: { y: number; track: string; demand: number }) {
@@ -24,6 +26,17 @@ function DemandChip({ y, track, demand }: { y: number; track: string; demand: nu
       <rect x={-58} y={y} width={116} height={40} rx={8} className={`map-demand ${tone}`} />
       <text x={-50} y={y + 29} className="map-demand-text">
         <tspan className="map-demand-track">{track}</tspan> ×{demand.toFixed(2)}
+      </text>
+    </>
+  )
+}
+
+function WeatherChip({ y, weather }: { y: number; weather: Weather }) {
+  return (
+    <>
+      <rect x={-58} y={y} width={116} height={40} rx={8} className={`map-weather ${weather}`} />
+      <text x={0} y={y + 28} textAnchor="middle" className="map-weather-text">
+        {WEATHER[weather].name}
       </text>
     </>
   )
@@ -40,15 +53,17 @@ export function MapView({ game, now, selectedBoatId, onSelectBoat }: Props) {
       {game.routes.map((r) => {
         const a = getPort(r.portA)
         const b = getPort(r.portB)
-        return <line key={r.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="map-route" />
+        const w = routeWeather(game, r.id, now)
+        return <line key={r.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className={`map-route ${w}`} />
       })}
 
       {game.routes.map((r) => {
-        // Every route runs out of home, so its demand reads as the far port's demand.
+        // Every route runs out of home, so its weather and demand read as the far port's.
         const b = getPort(r.portB)
         const [dx, dy] = DEMAND_CHIP_OFFSET[b.id] ?? DEFAULT_CHIP_OFFSET
         return (
           <g key={r.id} transform={`translate(${b.x + dx} ${b.y + dy})`}>
+            <WeatherChip y={-86} weather={routeWeather(game, r.id, now)} />
             <DemandChip y={-42} track="C" demand={r.demandCargo} />
             <DemandChip y={2} track="P" demand={r.demandPassenger} />
           </g>

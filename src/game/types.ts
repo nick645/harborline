@@ -3,6 +3,8 @@
 
 export type Track = 'cargo' | 'passenger'
 export type Rarity = 'common' | 'rare' | 'legendary' | 'mythic'
+/** Parts have one extra, lowest rarity: standard fittings. */
+export type PartRarity = 'standard' | Exclude<Rarity, 'common'>
 export type SizeTier = 1 | 2 | 3 | 4 | 5 | 6
 export type PortTier = 1 | 2 | 3
 export type PartType = 'hull' | 'engine' | 'specialty'
@@ -64,6 +66,8 @@ export interface Boat {
   state: BoatState
   /** Absolute timestamp of the boat's next state change, or null when idle. */
   etaMs: number | null
+  /** While docked: when docked-time effects were last settled. Null at sea or sunk. */
+  dockedAt: number | null
 }
 
 /** One round trip. A boat sent on several trips runs them back to back, one Voyage each. */
@@ -82,15 +86,19 @@ export interface Voyage {
   payout: number
   /** True once the outbound leg has completed and the payout was credited. */
   paid: boolean
+  /** True if the trip was lost at sea: no payout, no parts, home at low condition. */
+  lost: boolean
   weatherAtStart: Weather | null
-  partRollResult: string | null
+  /** Part ids found on this trip, recorded when it docks. */
+  partRollResult: string[] | null
 }
 
 export interface Part {
   id: string
   type: PartType
+  /** The boat whose recipe this part belongs to, or `std-<track>` for standard fittings. */
   setId: string
-  rarity: Rarity
+  rarity: PartRarity
   track: Track
 }
 
@@ -120,6 +128,14 @@ export interface RngState {
   state: number
 }
 
+export type LogKind = 'part' | 'sunk' | 'lost' | 'craft' | 'info'
+
+export interface LogEntry {
+  at: number
+  kind: LogKind
+  text: string
+}
+
 export interface GameState {
   version: number
   player: Player
@@ -127,6 +143,8 @@ export interface GameState {
   voyages: Voyage[]
   rng: RngState
   nextBoatSeq: number
+  /** Newest first; capped at LOG_LIMIT entries. */
+  log: LogEntry[]
 }
 
 /** What happened while the player was away. */
@@ -136,4 +154,8 @@ export interface AwayReport {
   tripsCompleted: number
   /** Nicknames of boats that sank. */
   sunk: string[]
+  /** Nicknames of boats whose trip was lost to the weather. */
+  lost: string[]
+  /** Part ids found. */
+  parts: string[]
 }

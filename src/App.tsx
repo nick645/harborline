@@ -3,26 +3,37 @@ import type { AwayReport, GameState } from './game/types'
 import {
   assignRoute,
   buyBoat,
+  craftableClasses,
+  craftBoat,
   GameError,
+  meltSpares,
   newGame,
   recallBoat,
   repairBoat,
   salvageBoat,
+  scrapStandardParts,
   sellBoat,
   settle,
   settleAway,
 } from './game/state'
+import { getPart, partName } from './game/parts'
+import { seasonAt, seasonEndsAt } from './game/weather'
 import { randomSeed } from './game/rolls'
 import { advanceClock, clearSave, clock, DEBUG, loadGame, saveGame } from './storage'
 import { coins, duration } from './format'
 import { MapView } from './components/MapView'
 import { BoatCard } from './components/BoatCard'
 import { Shop } from './components/Shop'
+import { Workshop } from './components/Workshop'
+import { HarborLog } from './components/HarborLog'
 
 const TICK_MS = 250
 const AUTOSAVE_MS = 5000
 
-const worthReporting = (r: AwayReport) => r.tripsCompleted > 0 || r.sunk.length > 0
+const worthReporting = (r: AwayReport) => r.tripsCompleted > 0 || r.sunk.length > 0 || r.lost.length > 0
+
+/** Report-worthy finds: anything better than a standard fitting. */
+const notableParts = (r: AwayReport) => r.parts.filter((id) => getPart(id).rarity !== 'standard')
 
 function boot(): { game: GameState; report: AwayReport | null } {
   const saved = loadGame()
@@ -109,7 +120,13 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Harborline</h1>
+        <div>
+          <h1>Harborline</h1>
+          <span className="muted small">
+            {seasonAt(now)[0].toUpperCase() + seasonAt(now).slice(1)} · {duration(seasonEndsAt(now) - now)} left
+            {seasonAt(now) === 'winter' && ' · storm season'}
+          </span>
+        </div>
         <div className="stats">
           <span className="coins">{coins(game.player.coins)}c</span>
           <span className="muted">
@@ -121,10 +138,12 @@ export default function App() {
       </header>
 
       {report && (
-        <div className={`banner ${report.sunk.length > 0 ? 'error' : ''}`} onClick={() => setReport(null)}>
+        <div className={`banner ${report.sunk.length + report.lost.length > 0 ? 'error' : ''}`} onClick={() => setReport(null)}>
           <strong>Welcome back.</strong> While you were away ({duration(report.awayMs)}), your fleet finished{' '}
           {report.tripsCompleted} trip{report.tripsCompleted === 1 ? '' : 's'} for{' '}
           <strong>{coins(report.coinsEarned)}c</strong>.
+          {notableParts(report).length > 0 && <> Found: {notableParts(report).map(partName).join(', ')}.</>}
+          {report.lost.length > 0 && <strong className="bad"> Cargo lost: {report.lost.join(', ')}.</strong>}
           {report.sunk.length > 0 && <strong className="bad"> Sunk: {report.sunk.join(', ')}.</strong>}
           <span className="muted"> Tap to dismiss.</span>
         </div>
@@ -154,14 +173,23 @@ export default function App() {
                 onSelect={() => setSelected(b.id)}
                 onAssign={(routeId, trips) => act((g, t) => assignRoute(g, b.id, routeId, t, trips))}
                 onRecall={() => act((g) => recallBoat(g, b.id))}
-                onSalvage={() => act((g) => salvageBoat(g, b.id))}
+                onSalvage={() => act((g, t) => salvageBoat(g, b.id, t))}
                 onRepair={() => act((g) => repairBoat(g, b.id))}
-                onSell={() => act((g) => sellBoat(g, b.id))}
+                onSell={() => act((g, t) => sellBoat(g, b.id, t))}
               />
             ))}
           </section>
 
-          <Shop playerCoins={game.player.coins} onBuy={(id) => act((g) => buyBoat(g, id))} />
+          <Workshop
+            game={game}
+            onCraft={(id) => act((g, t) => craftBoat(g, id, t))}
+            onScrap={() => act((g) => scrapStandardParts(g))}
+            onMelt={(rarity, slot, track) => act((g, t) => meltSpares(g, rarity, slot, track, t))}
+          />
+
+          <Shop game={game} onBuy={(id) => act((g, t) => buyBoat(g, id, t))} />
+
+          <HarborLog log={game.log} now={now} />
 
           {DEBUG && (
             <section className="debug">
@@ -182,6 +210,19 @@ export default function App() {
                     Away {min >= 60 ? `${min / 60}h` : `${min}m`}
                   </button>
                 ))}
+                <button
+                  className="secondary"
+                  onClick={() =>
+                    act((g) => {
+                      // Debug: hand over every piece of a random set the player hasn't built.
+                      const sets = craftableClasses().filter((c) => !g.player.ownedBoats.some((b) => b.classId === c.id))
+                      const pick = sets[Math.floor(Math.random() * sets.length)]
+                      return { ...g, player: { ...g.player, partInventory: [...g.player.partInventory, ...pick.requiredParts] } }
+                    })
+                  }
+                >
+                  Grant a set
+                </button>
                 <button
                   className="danger"
                   onClick={() => {

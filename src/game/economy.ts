@@ -45,26 +45,45 @@ export function roundTripMs(boatClass: BoatClass, distance: number): number {
   return legDurationMs(boatClass, distance) * 2
 }
 
-/** Net payout for one round trip. Can be negative when fuel outweighs cargo. */
+/**
+ * Net payout for one round trip. Can be negative when fuel outweighs cargo.
+ * `grossMult` stacks weather, abilities and auras; it applies to cargo, never to fuel.
+ */
 export function voyagePayout(
   boatClass: BoatClass,
   demand: number,
   distance: number,
   condition: number,
+  { capacityMult = 1, grossMult = 1 }: { capacityMult?: number; grossMult?: number } = {},
 ): number {
-  let gross = boatClass.capacity * demand * distance * PAYOUT_FACTOR
+  let gross = boatClass.capacity * capacityMult * demand * distance * PAYOUT_FACTOR * grossMult
   if (condition < LOW_CONDITION_THRESHOLD) gross *= LOW_CONDITION_PAYOUT_MULT
   return Math.round(gross - boatClass.fuelPerLeg * 2)
+}
+
+/** Only boats bought with coins can be sold; crafted boats are kept (or traded, later). */
+export function canBeSold(boatClass: BoatClass): boolean {
+  return boatClass.rarity === 'common' || boatClass.rarity === 'rare'
 }
 
 export function sellPrice(boatClass: BoatClass): number {
   return Math.floor(boatClass.price * SELL_RATE)
 }
 
-export function repairCost(condition: number): number {
-  return Math.max(0, CONDITION_MAX - condition) * REPAIR_COST_PER_POINT
+export function repairCostPerPoint(mult = 1): number {
+  return REPAIR_COST_PER_POINT * mult
+}
+
+export function repairCost(condition: number, mult = 1): number {
+  return Math.ceil(Math.max(0, CONDITION_MAX - condition) * repairCostPerPoint(mult))
+}
+
+/** What a boat is worth for salvage: its price (starters: 0), or for crafted boats its tier's common price. */
+export function boatValue(boatClass: BoatClass): number {
+  if (boatClass.rarity === 'common' || boatClass.rarity === 'rare') return boatClass.price
+  return Math.max(0, ...BOAT_CLASSES.filter((c) => c.sizeTier === boatClass.sizeTier && c.rarity === 'common').map((c) => c.price))
 }
 
 export function salvageCost(boatClass: BoatClass): number {
-  return Math.max(SALVAGE_MIN, Math.round(boatClass.price * SALVAGE_RATE))
+  return Math.max(SALVAGE_MIN, Math.round(boatValue(boatClass) * SALVAGE_RATE))
 }

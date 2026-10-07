@@ -4,7 +4,7 @@ export const NICKNAMES = [
   'Tide Tax',
   'Wet Ledger',
   'Kelp Runner',
-  'Barnacle Bill',
+  'Limpet',
   'Slow Penny',
   'Low Water',
   'Saltcellar',

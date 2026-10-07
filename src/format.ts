@@ -10,3 +10,8 @@ export function duration(ms: number): string {
   if (h > 0) return `${h}h ${m}m`
   return `${m}:${String(s).padStart(2, '0')}`
 }
+
+export function percent(p: number): string {
+  const v = p * 100
+  return `${v < 1 ? v.toFixed(1) : Math.round(v)}%`
+}

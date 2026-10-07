@@ -17,6 +17,13 @@
   --port: #f4f1ea;
   --port-stroke: #1d2430;
   --home: #1f6fb2;
+  --w-calm: #4f8fbf;
+  --w-choppy: #3b9c8f;
+  --w-rough: #d07a1e;
+  --w-storm: #b3263a;
+  --rare: #2f7fd1;
+  --legendary: #c9861a;
+  --mythic: #8b3fc6;
 
   color-scheme: light;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -45,6 +52,13 @@
     --port: #e6e9ee;
     --port-stroke: #0b1520;
     --home: #4b9be0;
+    --w-calm: #3d7aa6;
+    --w-choppy: #2f8a7e;
+    --w-rough: #c46f16;
+    --w-storm: #c4344a;
+    --rare: #5aa2ea;
+    --legendary: #e6a53a;
+    --mythic: #b07be6;
     color-scheme: dark;
   }
 }
@@ -98,6 +112,15 @@ button.danger { background: transparent; color: var(--bad); border: 1px solid va
 .map { width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--border); }
 .map-sea { fill: var(--sea); }
 .map-route { stroke: var(--route); stroke-width: 5; stroke-dasharray: 14 10; }
+.map-route.choppy { stroke: var(--w-choppy); }
+.map-route.rough { stroke: var(--w-rough); stroke-width: 7; }
+.map-route.storm { stroke: var(--w-storm); stroke-width: 9; stroke-dasharray: 6 8; }
+.map-weather { stroke-width: 0; }
+.map-weather.calm { fill: var(--w-calm); }
+.map-weather.choppy { fill: var(--w-choppy); }
+.map-weather.rough { fill: var(--w-rough); }
+.map-weather.storm { fill: var(--w-storm); }
+.map-weather-text { font-size: 22px; font-weight: 800; fill: #fff; letter-spacing: 0.02em; }
 .map-demand { fill: var(--surface); stroke: var(--border); stroke-width: 2; }
 .map-demand.hot { stroke: var(--good); stroke-width: 4; }
 .map-demand.cold { stroke: var(--bad); stroke-width: 4; }
@@ -170,3 +193,62 @@ button.danger { background: transparent; color: var(--bad); border: 1px solid va
 
 .debug { border: 1px dashed var(--border); border-radius: 12px; padding: 12px; }
 .debug p { margin: 0; font-size: 13px; }
+
+/* ---------- phase 2: weather, rarity, parts ---------- */
+.good { color: var(--good); }
+h3 { font-size: 13px; margin: 12px 0 6px; color: var(--muted); font-weight: 600; }
+
+.weather-tag {
+  display: inline-block; font-size: 11px; font-weight: 700; color: #fff;
+  padding: 1px 6px; border-radius: 4px; vertical-align: 1px;
+}
+.weather-tag.calm { background: var(--w-calm); }
+.weather-tag.choppy { background: var(--w-choppy); }
+.weather-tag.rough { background: var(--w-rough); }
+.weather-tag.storm { background: var(--w-storm); }
+
+.rarity-badge {
+  display: inline-block; margin-left: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.06em; padding: 1px 6px; border-radius: 4px; color: #fff; vertical-align: 2px;
+}
+.rarity-badge.rare { background: var(--rare); }
+.rarity-badge.legendary { background: var(--legendary); }
+.rarity-badge.mythic { background: var(--mythic); }
+.rarity-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.rarity-dot.rare { background: var(--rare); }
+
+.ability { margin: 6px 0 0; font-size: 13px; }
+.ability.inactive { opacity: 0.6; }
+
+.route-risk { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.route-sink { font-size: 12px; font-weight: 700; color: var(--bad); }
+.route-btn.danger-route { border-color: var(--bad); }
+
+.shop-tier h3 { margin-top: 4px; }
+.shop-row.rare { border-left: 3px solid var(--rare); }
+.shop-info .small { font-size: 12px; }
+
+.workshop, .harbor-log { display: grid; gap: 8px; }
+.workshop-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px;
+}
+.parts-list, .sets, .melts { display: grid; gap: 6px; }
+.part-line { font-size: 14px; }
+.set-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px;
+  display: grid; gap: 6px;
+}
+.set-card.legendary { border-left: 4px solid var(--legendary); }
+.set-card.mythic { border-left: 4px solid var(--mythic); }
+.set-card.complete { box-shadow: 0 0 0 2px var(--legendary); }
+.set-card.mythic.complete { box-shadow: 0 0 0 2px var(--mythic); }
+.set-head { display: flex; align-items: center; gap: 4px; }
+.set-count { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.set-pieces { display: flex; gap: 6px; flex-wrap: wrap; }
+.set-piece { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.set-piece.have { color: var(--text); font-weight: 600; }
+
+.harbor-log ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.harbor-log li.sunk, .harbor-log li.lost { color: var(--bad); }
+.harbor-log li.craft { font-weight: 600; }
