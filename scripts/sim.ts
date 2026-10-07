@@ -1,8 +1,8 @@
 // Balance harness: simulates N minutes of attentive play with a few buying strategies
 // and reports pacing milestones against the spec's targets.
 //
-//   npm run sim                       # defaults: 20 min, 200 seeds, 2s reaction time
-//   npm run sim -- --minutes 40 --seeds 500 --reaction 5
+//   npm run sim                       # defaults: 6h, 100 seeds, 5s reaction time
+//   npm run sim -- --minutes 600 --seeds 300 --reaction 15
 //
 // Event-driven: time jumps straight to the next boat event, so a run takes milliseconds.
 
@@ -19,12 +19,12 @@ import {
 } from '../src/game/state'
 import { getBoatClass } from '../src/game/economy'
 import { ROUTES } from '../src/game/data/routes'
-import { LOW_CONDITION_THRESHOLD, OFFLINE_CAP_MS } from '../src/game/data/economy'
+import { LOW_CONDITION_THRESHOLD, OFFLINE_CAP_MS, STARTING_COINS } from '../src/game/data/economy'
 
 const args = parseArgs(process.argv.slice(2))
-const MINUTES = Number(args.minutes ?? 20)
-const SEEDS = Number(args.seeds ?? 200)
-const REACTION_MS = Number(args.reaction ?? 2) * 1000
+const MINUTES = Number(args.minutes ?? 360)
+const SEEDS = Number(args.seeds ?? 100)
+const REACTION_MS = Number(args.reaction ?? 5) * 1000
 const T0 = 0
 
 type Strategy = { name: string; describe: string; pickPurchase: (s: GameState) => string | null }
@@ -32,36 +32,47 @@ type Strategy = { name: string; describe: string; pickPurchase: (s: GameState) =
 const byPriceDesc = () => [...shopClasses()].sort((a, b) => b.price - a.price)
 const maxTier = (s: GameState) => Math.max(...s.player.ownedBoats.map((b) => getBoatClass(b.classId).sizeTier))
 
+const nextTierClass = (s: GameState) =>
+  shopClasses()
+    .filter((c) => c.sizeTier > maxTier(s))
+    .sort((a, b) => a.price - b.price)[0]
+const fleetTierCount = (s: GameState, tier: number) =>
+  s.player.ownedBoats.filter((b) => getBoatClass(b.classId).sizeTier === tier).length
+
+/** Fill the current top tier up to `width` boats, then save for the next tier. */
+function buyWideThenClimb(s: GameState, width: number): string | null {
+  const tier = maxTier(s)
+  if (fleetTierCount(s, tier) < width) {
+    const sameTier = shopClasses().filter((c) => c.sizeTier === tier).sort((a, b) => a.price - b.price)[0]
+    if (sameTier) return s.player.coins >= sameTier.price ? sameTier.id : null
+  }
+  const target = nextTierClass(s) ?? byPriceDesc()[0]
+  return s.player.coins >= target.price ? target.id : null
+}
+
 const STRATEGIES: Strategy[] = [
   {
+    name: 'settle-in',
+    describe: 'buy tier-1 boats up to a fleet of 4, then save for the next tier',
+    pickPurchase: (s) => buyWideThenClimb(s, 4),
+  },
+  {
     name: 'climb',
-    describe: 'save for the next tier up; once at the top, buy more of the best',
+    describe: 'never buy sideways; save straight for the next tier',
     pickPurchase: (s) => {
-      const next = shopClasses()
-        .filter((c) => c.sizeTier > maxTier(s))
-        .sort((a, b) => a.price - b.price)[0]
-      const target = next ?? byPriceDesc()[0]
+      const target = nextTierClass(s) ?? byPriceDesc()[0]
       return s.player.coins >= target.price ? target.id : null
     },
   },
   {
-    name: 'greedy',
-    describe: 'buy the most expensive boat affordable right now',
-    pickPurchase: (s) => byPriceDesc().find((c) => c.price <= s.player.coins)?.id ?? null,
-  },
-  {
     name: 'wide',
-    describe: 'fill to 4 boats with Skiffs first, then climb',
-    pickPurchase: (s) => {
-      if (s.player.ownedBoats.length < 4) return s.player.coins >= 400 ? 'harbor-skiff' : null
-      return STRATEGIES[0].pickPurchase(s)
-    },
+    describe: 'buy tier-1 boats up to a fleet of 8, then save for the next tier',
+    pickPurchase: (s) => buyWideThenClimb(s, 8),
   },
 ]
 
 type RunResult = {
   firstPurchaseMin: number | null
-  fourBoatsMin: number | null
   tierReachedMin: Record<number, number | null>
   finalTier: number
   finalBoats: number
@@ -90,7 +101,6 @@ function run(seed: number, strat: Strategy): RunResult {
   const end = T0 + MINUTES * 60_000
   const res: RunResult = {
     firstPurchaseMin: null,
-    fourBoatsMin: null,
     tierReachedMin: { 1: 0, 2: null, 3: null, 4: null },
     finalTier: 1,
     finalBoats: 1,
@@ -109,7 +119,6 @@ function run(seed: number, strat: Strategy): RunResult {
 
     const min = (t - T0) / 60_000
     if (res.firstPurchaseMin === null && s.player.ownedBoats.length > boatsBefore) res.firstPurchaseMin = min
-    if (res.fourBoatsMin === null && s.player.ownedBoats.length >= 4) res.fourBoatsMin = min
     const tier = maxTier(s)
     for (let k = 2; k <= tier; k++) res.tierReachedMin[k] ??= min
 
@@ -121,7 +130,7 @@ function run(seed: number, strat: Strategy): RunResult {
   res.finalTier = maxTier(s)
   res.finalBoats = s.player.ownedBoats.length
   res.finalCoins = s.player.coins
-  res.earnedActive = s.player.coins + spent - 500
+  res.earnedActive = s.player.coins + spent - STARTING_COINS
 
   // Player closes the app at the end of the session, then comes back after 8h.
   res.offlineEarned8h = settleOffline(s, end + OFFLINE_CAP_MS).report.coinsEarned
@@ -146,18 +155,15 @@ function row(label: string, xs: (number | null)[], unit = 'min') {
   console.log(`  ${label.padEnd(26)} p10 ${pct(xs, 0.1)}  med ${pct(xs, 0.5)}  p90 ${pct(xs, 0.9)} ${unit}  hit ${hitRate(xs)}`)
 }
 
-console.log(`\nHarborline balance harness — ${MINUTES} min active play, ${SEEDS} seeds, ${REACTION_MS / 1000}s reaction\n`)
-console.log('Spec targets: first purchase ~4 min · 4-boat fleet ~20 min · ~1.5 tiers per 20 min session')
-console.log('              offline pays 50%, capped 8h\n')
+console.log(`\nHarborline balance harness — ${MINUTES} min (${(MINUTES / 60).toFixed(1)} h) active play, ${SEEDS} seeds, ${REACTION_MS / 1000}s reaction\n`)
+console.log('Targets: first purchase (a tier-1 boat) at 30–60 min · first tier-2 boat at 4–5 h (240–300 min)\n')
 
 for (const strat of STRATEGIES) {
   const results = Array.from({ length: SEEDS }, (_, i) => run(i + 1, strat))
   console.log(`${strat.name} — ${strat.describe}`)
   row('first purchase', results.map((r) => r.firstPurchaseMin))
-  row('4-boat fleet', results.map((r) => r.fourBoatsMin))
   for (const k of [2, 3, 4]) {
-    const name = shopClasses().find((c) => c.sizeTier === k)?.name ?? `tier ${k}`
-    row(`tier ${k} (${name})`, results.map((r) => r.tierReachedMin[k]))
+    row(`first tier ${k} boat`, results.map((r) => r.tierReachedMin[k]))
   }
   row('tier at end', results.map((r) => r.finalTier), 'tier')
   row('boats at end', results.map((r) => r.finalBoats), 'boats')

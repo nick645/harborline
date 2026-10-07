@@ -10,10 +10,10 @@ Single-player, offline, no network calls. Plain web app (Vite + React + TypeScri
 npm install
 npm run dev        # play at http://localhost:5173  (add ?debug for time-skip + reset)
 npm test           # unit tests for the game logic
-npm run sim        # balance harness: 20 min of simulated play × 200 seeds
+npm run sim        # balance harness: 6 h of simulated play × 100 seeds
 ```
 
-`npm run sim -- --minutes 40 --seeds 500 --reaction 5` changes session length, seed count, and the bot's reaction time in seconds.
+`npm run sim -- --minutes 600 --seeds 300 --reaction 15` changes session length, seed count, and the bot's reaction time in seconds.
 
 ## Layout
 
@@ -32,10 +32,22 @@ scripts/sim.ts       balance harness
 
 ## Phase 1 rules as built
 
+- You start with 500 coins, one small cargo boat (Dinghy Hauler) and one small passenger boat (Water Taxi).
 - 5 ports. Every route is a round trip out of the home port, Saltmarsh Quay (distances 6, 10.1, 14.1, 20.2).
-- `payout = capacity × demand × distance × 0.8 − fuelPerLeg × 2`. The payout is locked in at departure and credited when the boat reaches the far port. That route's demand (0.5–1.5) rerolls on arrival.
+- `payout = capacity × demand × distance × 0.8 − fuelPerLeg × 2`. Cargo boats use the route's cargo demand and passenger boats its passenger demand; both are 0.5–1.5 and reroll when a boat arrives. The payout is locked in at departure and credited when the boat reaches the far port.
 - Each voyage costs 1–3 condition. Below 50, cargo pays 20% less. Repair costs 2c per point, is instant, and works only for docked boats.
-- Sell for 50%. The starter Dinghy isn't sold in the shop, and you can't sell your last boat.
+- Sell for 50%. The two starter boats aren't sold in the shop, and you can't sell your last boat.
 - All timers are absolute timestamps. Settling is one event-ordered pass with no tick loop.
 - **Offline:** voyages already under way finish at full pay. After that, each boat re-runs its last route at 50% until 8h after you left. Hiding the tab counts as leaving.
 - The RNG seed and state are stored in the save, so a session can be replayed.
+
+## Pacing targets
+
+Prices are tuned against these targets with `npm run sim`:
+
+| Milestone | Target | Simulated (5s reaction) |
+|---|---|---|
+| First purchase (a tier-1 Skiff or Launch, 2,000c) | 30–60 min | ~42 min |
+| First tier-2 boat (Harbor Skiff / Harbor Ferry, 22,000c) | 4–5 h | ~4.0 h with 8 tier-1 boats, ~5.2 h with 4 |
+
+Tiers 3–4 keep the spec's ~3.5× price step and are not tuned yet.

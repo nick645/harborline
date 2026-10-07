@@ -99,6 +99,7 @@ button.danger { background: transparent; color: var(--bad); border: 1px solid va
 .map-demand.hot { stroke: var(--good); stroke-width: 4; }
 .map-demand.cold { stroke: var(--bad); stroke-width: 4; }
 .map-demand-text { font-size: 24px; font-weight: 700; fill: var(--text); font-variant-numeric: tabular-nums; }
+.map-demand-track { fill: var(--muted); font-weight: 600; }
 .map-port { fill: var(--port); stroke: var(--port-stroke); stroke-width: 4; }
 .map-port.home { fill: var(--home); }
 .map-port-label { font-size: 26px; font-weight: 600; fill: var(--text); }

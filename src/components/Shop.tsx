@@ -16,7 +16,7 @@ export function Shop({ playerCoins, onBuy }: Props) {
             <div className="shop-info">
               <strong>{c.name}</strong>
               <span className="muted">
-                T{c.sizeTier} · cap {c.capacity} · fuel {c.fuelPerLeg}/leg · speed {c.speed.toFixed(1)}
+                {c.track === 'cargo' ? 'Cargo' : 'Passenger'} · T{c.sizeTier} · cap {c.capacity} · fuel {c.fuelPerLeg}/leg · speed {c.speed.toFixed(1)}
               </span>
             </div>
             <button disabled={!affordable} onClick={() => onBuy(c.id)}>

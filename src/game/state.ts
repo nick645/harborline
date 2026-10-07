@@ -11,13 +11,13 @@ import {
   OFFLINE_CAP_MS,
   OFFLINE_RATE,
   REPAIR_COST_PER_POINT,
-  STARTING_BOAT_CLASS,
+  STARTING_BOAT_CLASSES,
   STARTING_COINS,
 } from './data/economy'
 import { getBoatClass, roundTripMs, routeDistance, sellPrice, voyagePayout } from './economy'
 import { createRng, rollConditionLoss, rollDemand, rollPick } from './rolls'
 
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 export class GameError extends Error {}
 
@@ -44,7 +44,7 @@ export function newGame(seed: number, now: number): GameState {
     rng,
     nextBoatSeq: 1,
   }
-  addBoat(state, STARTING_BOAT_CLASS)
+  for (const classId of STARTING_BOAT_CLASSES) addBoat(state, classId)
   return state
 }
 

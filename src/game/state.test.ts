@@ -70,20 +70,34 @@ describe('voyage lifecycle', () => {
 })
 
 describe('fleet actions', () => {
-  it('buys and sells at 50%', () => {
-    let s = newGame(3, T0)
-    s = buyBoat(s, 'harbor-skiff')
-    expect(s.player.coins).toBe(100)
-    expect(s.player.ownedBoats).toHaveLength(2)
-    s = sellBoat(s, s.player.ownedBoats[1].id)
-    expect(s.player.coins).toBe(300)
+  it('starts with one small cargo and one small passenger boat', () => {
+    const s = newGame(3, T0)
+    expect(s.player.ownedBoats.map((b) => b.classId)).toEqual(['dinghy-hauler', 'water-taxi'])
   })
 
-  it('refuses to sell the last boat or buy the starter', () => {
-    const s = newGame(3, T0)
+  it('buys and sells at 50%', () => {
+    let s = newGame(3, T0)
+    s.player.coins = 2500
+    s = buyBoat(s, 'skiff')
+    expect(s.player.coins).toBe(500)
+    expect(s.player.ownedBoats).toHaveLength(3)
+    s = sellBoat(s, s.player.ownedBoats[2].id)
+    expect(s.player.coins).toBe(1500)
+  })
+
+  it('refuses to sell the last boat, buy a starter, or overspend', () => {
+    let s = newGame(3, T0)
+    s = sellBoat(s, s.player.ownedBoats[1].id)
     expect(() => sellBoat(s, s.player.ownedBoats[0].id)).toThrow()
     expect(() => buyBoat(s, 'dinghy-hauler')).toThrow()
-    expect(() => buyBoat(s, 'coastal-trawler')).toThrow()
+    expect(() => buyBoat(s, 'skiff')).toThrow()
+  })
+
+  it('passenger boats sell into passenger demand', () => {
+    const s = newGame(3, T0)
+    const taxi = s.player.ownedBoats[1]
+    const q = quoteVoyage(s, taxi.id, ROUTES[0].id)
+    expect(q.demand).toBe(s.routes[0].demandPassenger)
   })
 
   it('repairs at 2 coins per point', () => {

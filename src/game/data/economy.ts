@@ -1,7 +1,7 @@
 // First-pass economy values from the build spec. All of these are meant to be tuned.
 
 export const STARTING_COINS = 500
-export const STARTING_BOAT_CLASS = 'dinghy-hauler'
+export const STARTING_BOAT_CLASSES = ['dinghy-hauler', 'water-taxi']
 
 /** payout = capacity × demand × distance × PAYOUT_FACTOR − fuelPerLeg × 2 */
 export const PAYOUT_FACTOR = 0.8

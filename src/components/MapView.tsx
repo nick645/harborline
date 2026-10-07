@@ -11,6 +11,24 @@ type Props = {
   onSelectBoat: (id: string) => void
 }
 
+/** Where each port's demand chips sit relative to the port, to stay clear of routes and labels. */
+const DEFAULT_CHIP_OFFSET: [number, number] = [0, -75]
+const DEMAND_CHIP_OFFSET: Record<string, [number, number]> = {
+  brindle: [110, -40],
+}
+
+function DemandChip({ y, track, demand }: { y: number; track: string; demand: number }) {
+  const tone = demand >= 1.15 ? 'hot' : demand < 0.85 ? 'cold' : ''
+  return (
+    <>
+      <rect x={-58} y={y} width={116} height={40} rx={8} className={`map-demand ${tone}`} />
+      <text x={-50} y={y + 29} className="map-demand-text">
+        <tspan className="map-demand-track">{track}</tspan> ×{demand.toFixed(2)}
+      </text>
+    </>
+  )
+}
+
 export function MapView({ game, now, selectedBoatId, onSelectBoat }: Props) {
   const home = getPort(HOME_PORT_ID)
   const boatsAtSea = game.player.ownedBoats.filter((b) => b.state === 'sailing' || b.state === 'returning')
@@ -22,20 +40,17 @@ export function MapView({ game, now, selectedBoatId, onSelectBoat }: Props) {
       {game.routes.map((r) => {
         const a = getPort(r.portA)
         const b = getPort(r.portB)
-        // Demand chip sits just short of the midpoint, clear of port labels.
-        const mx = a.x + (b.x - a.x) * 0.45
-        const my = a.y + (b.y - a.y) * 0.45
-        const hot = r.demandCargo >= 1.15
-        const cold = r.demandCargo < 0.85
+        return <line key={r.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="map-route" />
+      })}
+
+      {game.routes.map((r) => {
+        // Every route runs out of home, so its demand reads as the far port's demand.
+        const b = getPort(r.portB)
+        const [dx, dy] = DEMAND_CHIP_OFFSET[b.id] ?? DEFAULT_CHIP_OFFSET
         return (
-          <g key={r.id}>
-            <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} className="map-route" />
-            <g transform={`translate(${mx} ${my})`}>
-              <rect x={-44} y={-20} width={88} height={40} rx={8} className={`map-demand ${hot ? 'hot' : cold ? 'cold' : ''}`} />
-              <text textAnchor="middle" dy={9} className="map-demand-text">
-                ×{r.demandCargo.toFixed(2)}
-              </text>
-            </g>
+          <g key={r.id} transform={`translate(${b.x + dx} ${b.y + dy})`}>
+            <DemandChip y={-42} track="C" demand={r.demandCargo} />
+            <DemandChip y={2} track="P" demand={r.demandPassenger} />
           </g>
         )
       })}

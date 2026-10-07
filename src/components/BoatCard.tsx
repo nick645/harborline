@@ -42,7 +42,7 @@ export function BoatCard({ game, boat, now, selected, canSell, onSelect, onAssig
         <div className="boat-names">
           <strong>{boat.nickname}</strong>
           <span className="muted">
-            {cls.name} · T{cls.sizeTier} · cap {cls.capacity}
+            {cls.name} · {cls.track === 'cargo' ? 'Cargo' : 'Passenger'} · T{cls.sizeTier} · cap {cls.capacity}
           </span>
         </div>
         <div className={`condition ${lowCondition ? 'low' : ''}`} title="Condition">
