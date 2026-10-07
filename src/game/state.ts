@@ -163,7 +163,7 @@ export function salvageQuote(state: GameState, boatId: string): number {
 
 export function repairQuote(state: GameState, boatId: string): number {
   const boat = getBoat(state, boatId)
-  return Math.ceil((CONDITION_MAX - boat.condition) * repairCostPerPoint(hooksOf(boat).repairCostMult))
+  return Math.ceil((CONDITION_MAX - boat.condition) * repairCostPerPoint(getBoatClass(boat.classId), hooksOf(boat).repairCostMult))
 }
 
 /** Spare copies (beyond the first) of rare-or-better parts, grouped by rarity, slot and track. */
@@ -249,7 +249,7 @@ export function sellBoat(state: GameState, boatId: string, now: number): GameSta
 export function repairBoat(state: GameState, boatId: string): GameState {
   const boat = getBoat(state, boatId)
   if (boat.state !== 'idle') throw new GameError('Only docked boats can be repaired')
-  const perPoint = repairCostPerPoint(hooksOf(boat).repairCostMult)
+  const perPoint = repairCostPerPoint(getBoatClass(boat.classId), hooksOf(boat).repairCostMult)
   const affordable = Math.floor(Math.max(0, state.player.coins) / perPoint)
   const points = Math.min(CONDITION_MAX - boat.condition, affordable)
   if (points <= 0) return state
@@ -330,7 +330,7 @@ function addBoat(s: GameState, classId: string, now: number): Boat {
   const boat: Boat = {
     id: `b${s.nextBoatSeq++}`,
     classId,
-    nickname: rollPick(s.rng, NICKNAMES),
+    nickname: pickNickname(s),
     condition: CONDITION_MAX,
     captainId: null,
     currentRoute: null,
@@ -340,6 +340,17 @@ function addBoat(s: GameState, classId: string, now: number): Boat {
   }
   s.player.ownedBoats.push(boat)
   return boat
+}
+
+/** A nickname nobody in the fleet has yet; once the list runs out, numbered repeats. */
+function pickNickname(s: GameState): string {
+  const used = new Set(s.player.ownedBoats.map((b) => b.nickname))
+  const free = NICKNAMES.filter((n) => !used.has(n))
+  if (free.length) return rollPick(s.rng, free)
+  const base = rollPick(s.rng, NICKNAMES)
+  let n = 2
+  while (used.has(`${base} ${n}`)) n++
+  return `${base} ${n}`
 }
 
 /** Pay out docked-time earnings (abilities like the Cormorant's) up to time t. */

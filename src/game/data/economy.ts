@@ -22,7 +22,10 @@ export const WEATHER_DAMAGE_SPREAD = [0.5, 1.5] as const
 /** Below this condition, payout is multiplied by LOW_CONDITION_PAYOUT_MULT. */
 export const LOW_CONDITION_THRESHOLD = 50
 export const LOW_CONDITION_PAYOUT_MULT = 0.8
-export const REPAIR_COST_PER_POINT = 2
+/** Repairs cost a share of the boat's value per condition point, never less than the minimum.
+ * Damage therefore costs more on big boats, which is what makes cheap boats the storm runners. */
+export const REPAIR_COST_PER_POINT_MIN = 2
+export const REPAIR_COST_VALUE_SHARE = 0.001
 
 /** A boat at 0 condition sinks. Raising it costs this share of its price, at least the minimum. */
 export const SALVAGE_RATE = 0.25

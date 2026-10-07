@@ -45,3 +45,29 @@ export function routeWeather(state: GameState, routeId: string, t: number): Weat
   )
   return stormBringer ? 'storm' : naturalWeather(state.rng.seed, routeId, t)
 }
+
+export interface StormAlert {
+  routeId: string
+  weather: Weather
+  /** Boats with trips still queued on this route, which will sail into it unless called home. */
+  boatIds: string[]
+}
+
+const SEVERITY: Record<Weather, number> = { calm: 0, choppy: 1, rough: 2, storm: 3 }
+
+/**
+ * Routes whose weather turned rough or stormy at the slot starting at `at` (worse than the
+ * slot before), with boats that still have trips queued there. Only weather that has
+ * actually arrived is reported; seeing it coming is a later upgrade.
+ */
+export function stormAlerts(state: GameState, at: number): StormAlert[] {
+  const alerts: StormAlert[] = []
+  for (const route of state.routes) {
+    const now = routeWeather(state, route.id, at)
+    const before = routeWeather(state, route.id, at - 1)
+    if (SEVERITY[now] < SEVERITY.rough || SEVERITY[now] <= SEVERITY[before]) continue
+    const boatIds = state.voyages.filter((v) => v.routeId === route.id && v.tripIndex < v.tripsTotal).map((v) => v.boatId)
+    if (boatIds.length) alerts.push({ routeId: route.id, weather: now, boatIds })
+  }
+  return alerts
+}

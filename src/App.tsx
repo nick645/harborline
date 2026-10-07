@@ -17,7 +17,10 @@ import {
   settleAway,
 } from './game/state'
 import { getPart, partName } from './game/parts'
-import { seasonAt, seasonEndsAt } from './game/weather'
+import { seasonAt, seasonEndsAt, stormAlerts, weatherChangesAt, type StormAlert } from './game/weather'
+import { getPort } from './game/economy'
+import { WEATHER } from './game/data/weather'
+import { alertsWanted, notificationsSupported, requestPermission, setAlertsWanted, systemNotify } from './notify'
 import { randomSeed } from './game/rolls'
 import { advanceClock, clearSave, clock, DEBUG, loadGame, saveGame } from './storage'
 import { coins, duration } from './format'
@@ -49,6 +52,8 @@ export default function App() {
   const [now, setNow] = useState(clock)
   const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [alerts, setAlerts] = useState<StormAlert[]>([])
+  const [alertsOn, setAlertsOn] = useState(alertsWanted)
 
   const gameRef = useRef(game)
   useEffect(() => {
@@ -113,6 +118,47 @@ export default function App() {
     }
   }, [])
 
+  // Storm alerts: check each time the weather turns. Works in a background tab; a closed
+  // app can't be woken without a server, so the Expo build will use local notifications.
+  const checkAlerts = useCallback(
+    (at: number) => {
+      // Check against a settled copy without committing it, so away reports stay intact.
+      const found = stormAlerts(settle(gameRef.current, at), at)
+      if (!found.length) return
+      setAlerts(found)
+      if (document.hidden && alertsOn) {
+        const first = found[0]
+        const names = first.boatIds.map((id) => gameRef.current.player.ownedBoats.find((b) => b.id === id)?.nickname)
+        systemNotify(
+          `${WEATHER[first.weather].name} over ${getPort(gameRef.current.routes.find((r) => r.id === first.routeId)!.portB).name}`,
+          `${names.join(', ')} ${names.length === 1 ? 'has' : 'have'} trips queued there. Open Harborline to bring them home.`,
+        )
+      }
+    },
+    [alertsOn],
+  )
+
+  useEffect(() => {
+    let timer = 0
+    const schedule = () => {
+      const t = clock()
+      const at = weatherChangesAt(t)
+      timer = window.setTimeout(() => {
+        checkAlerts(at)
+        schedule()
+      }, Math.max(0, at - t) + 500)
+    }
+    schedule()
+    return () => clearTimeout(timer)
+  }, [checkAlerts])
+
+  const toggleAlerts = async () => {
+    const on = !alertsOn
+    if (on) await requestPermission()
+    setAlertsWanted(on)
+    setAlertsOn(on)
+  }
+
   const boats = game.player.ownedBoats
   const idleCount = boats.filter((b) => b.state === 'idle').length
   const sunkCount = boats.filter((b) => b.state === 'sunk').length
@@ -125,6 +171,7 @@ export default function App() {
           <span className="muted small">
             {seasonAt(now)[0].toUpperCase() + seasonAt(now).slice(1)} · {duration(seasonEndsAt(now) - now)} left
             {seasonAt(now) === 'winter' && ' · storm season'}
+            {seasonAt(seasonEndsAt(now)) === 'winter' && ' · storm season next'}
           </span>
         </div>
         <div className="stats">
@@ -134,6 +181,11 @@ export default function App() {
             {idleCount > 0 && ` · ${idleCount} docked`}
             {sunkCount > 0 && ` · ${sunkCount} sunk`}
           </span>
+          {notificationsSupported() && (
+            <button className="secondary small alert-toggle" onClick={toggleAlerts}>
+              Storm alerts: {alertsOn ? (Notification.permission === 'granted' ? 'on' : 'in-app') : 'off'}
+            </button>
+          )}
         </div>
       </header>
 
@@ -148,6 +200,34 @@ export default function App() {
           <span className="muted"> Tap to dismiss.</span>
         </div>
       )}
+      {alerts.map((a) => {
+        const port = getPort(game.routes.find((r) => r.id === a.routeId)!.portB).name
+        const stillQueued = a.boatIds.filter((id) => {
+          const v = game.voyages.find((x) => x.boatId === id)
+          return v && v.tripIndex < v.tripsTotal
+        })
+        if (stillQueued.length === 0) return null
+        const names = stillQueued.map((id) => boats.find((b) => b.id === id)?.nickname).join(', ')
+        return (
+          <div key={a.routeId} className="banner storm">
+            <strong>
+              {WEATHER[a.weather].name} over {port}.
+            </strong>{' '}
+            {names} {stillQueued.length === 1 ? 'has' : 'have'} more trips queued there.{' '}
+            <button
+              onClick={() => {
+                act((g) => stillQueued.reduce((acc, id) => recallBoat(acc, id), g))
+                setAlerts((xs) => xs.filter((x) => x !== a))
+              }}
+            >
+              Bring {stillQueued.length === 1 ? 'her' : 'them'} home after this trip
+            </button>{' '}
+            <button className="secondary" onClick={() => setAlerts((xs) => xs.filter((x) => x !== a))}>
+              Keep sailing
+            </button>
+          </div>
+        )
+      })}
       {error && (
         <div className="banner error" onClick={() => setError(null)}>
           {error}
@@ -210,6 +290,22 @@ export default function App() {
                     Away {min >= 60 ? `${min / 60}h` : `${min}m`}
                   </button>
                 ))}
+                <button
+                  className="secondary"
+                  onClick={() => {
+                    // Debug: jump to the next weather change while present, and check alerts there.
+                    const at = weatherChangesAt(clock())
+                    advanceClock(at - clock() + 1000)
+                    const t = clock()
+                    const g = settle(gameRef.current, t)
+                    gameRef.current = g
+                    setGame(g)
+                    setNow(t)
+                    checkAlerts(at)
+                  }}
+                >
+                  Next weather
+                </button>
                 <button
                   className="secondary"
                   onClick={() =>

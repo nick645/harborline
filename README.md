@@ -2,7 +2,7 @@
 
 A cozy boat-shipping tycoon about risk at sea: storms pay, storms sink, and the rarest hulls only come out of bad weather.
 
-**Built so far:** Phase 1 (core loop) and Phase 2 (full catalog, parts, set crafting), with Phase 3's weather pulled forward because it is where rare parts come from.
+**Built so far:** Phase 1 (core loop), Phase 2 (full catalog, parts, set crafting) and Phase 3 (weather, seasons, storm alerts, storm balance).
 
 Single-player, offline, no network calls. Plain web app (Vite + React + TypeScript) so the loop can be iterated without device builds; the game logic is framework-free and moves to Expo unchanged.
 
@@ -13,6 +13,7 @@ npm install
 npm run dev        # play at http://localhost:5173  (add ?debug for time-skip + reset)
 npm test           # unit tests for the game logic
 npm run sim        # balance harness: 6 h of simulated play × 100 seeds
+npm run sim -- --mode storms --minutes 1200   # how play styles fare against the weather
 ```
 
 `npm run sim -- --minutes 600 --seeds 300 --reaction 15` changes session length, seed count, and the bot's reaction time in seconds.
@@ -31,7 +32,8 @@ src/game/            pure game logic — no React imports
   state.ts           actions (send, buy, craft, scrap, melt, repair, salvage) and time settlement
   save.ts            save (de)serialization
 src/components/      map, boat card, shipyard, workshop, harbor log
-src/storage.ts       localStorage + game clock (the only browser-specific game code)
+src/storage.ts       localStorage + game clock
+src/notify.ts        browser notifications for storm alerts
 scripts/sim.ts       balance harness
 ```
 
@@ -51,7 +53,8 @@ scripts/sim.ts       balance harness
   | Storm | ×1.6 | 20 | 8% |
 
   Seasons last a week each; storms roughly double in winter.
-- **Wear:** the weather's damage ±50%, ×1.5 below 50 condition and ×2 below 25. Below 50, cargo pays 20% less. Repair costs 2c per point, is instant, and works only for docked boats.
+- **Wear:** the weather's damage ±50%, ×1.5 below 50 condition and ×2 below 25. Below 50, cargo pays 20% less. Repair is instant, only for docked boats, and costs 0.1% of the boat's value per point (2c minimum): cheap on a skiff, a real bill on a freighter, so cheap boats make the natural storm runners.
+- **Storm alerts:** when a route turns rough or stormy and a boat still has trips queued there, the game says so, with a button to bring it home after the current trip. In a background tab this is a system notification (opt in from the header). Only weather that has arrived is reported; seeing it coming is the Weather Radar upgrade's job.
 - **Lost cargo:** no pay, no parts, the rest of the queue is cancelled, and the boat limps home at 10 condition.
 - **Sinking:** a boat that reaches 0 sinks on the outbound leg. That trip pays nothing, the rest of the queue is cancelled, and the wreck stays on the map until salvaged for 25% of its price (minimum 100c). It comes back at 10 condition. If nothing else is afloat, salvage never costs more than you have.
 - **Catalog:** 6 tiers × 2 tracks × 4 rarities. Common boats cost coins; rare boats cost coins plus their own rare part; legendary boats are built from their own 3-piece set; mythic boats come from mythic sets that only drop in storms, and are never sold for any amount. Abilities whose system doesn't exist yet are shown as not active.
@@ -71,3 +74,16 @@ Prices are tuned against these targets with `npm run sim`:
 | First tier-2 boat (Harbor Skiff / Harbor Ferry, 22,000c) | 4–5 h | ~3.9 h with 8 tier-1 boats, ~5.2 h with 4 |
 
 Tiers 3–6 keep the spec's ~3.5× price step and are not tuned yet. Over 6 h the bot finds ~10–20 rare parts and 1–2 legendary pieces.
+
+## Storm balance
+
+`npm run sim -- --mode storms --minutes 1200 --seeds 30`: 20 h of play, all buying wide, differing only in how they treat the weather (the bot heeds storm alerts unless it is chasing storms):
+
+| Style | Median coins | Legendary pieces | Sets built | Sinkings |
+|---|---|---|---|---|
+| Avoid rough water | 590k | 0 | 0 | 0 |
+| Best risk-adjusted pay | 636k | 4 | 0 | 0 |
+| Storm-bait (starters only) | 514k | 10 | 1 | 0 |
+| Everything into storms | 365k | 35 | 6 | 23 |
+
+Storms trade coins and progress for parts: the spec's "viable but slow" cheap-boat strategy sits in the middle.

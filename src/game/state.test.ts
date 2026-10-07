@@ -19,9 +19,9 @@ import {
   settleAway,
 } from './state'
 import { createRng, rollConditionLoss } from './rolls'
-import { getBoatClass, routeDistance, voyagePayout } from './economy'
+import { getBoatClass, repairCostPerPoint, routeDistance, voyagePayout } from './economy'
 import { missingAbilityIds } from './abilities'
-import { naturalWeather, seasonAt } from './weather'
+import { naturalWeather, seasonAt, stormAlerts } from './weather'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
 import { PARTS } from './data/parts'
@@ -143,6 +143,26 @@ describe('weather', () => {
     // Worn hulls wear faster in the same weather.
     expect(avg('rough', 20)).toBeGreaterThan(avg('rough', 40))
     expect(avg('rough', 40)).toBeGreaterThan(avg('rough', 90))
+  })
+})
+
+describe('storm alerts', () => {
+  it('fires when a route with queued trips turns rough, and only then', () => {
+    let s = newGame(5, T0)
+    const route = ROUTES[3].id
+    // Find a slot boundary where this route worsens into rough or storm.
+    let at = 0
+    for (let t = Math.ceil(T0 / WEATHER_SLOT_MS) * WEATHER_SLOT_MS; !at; t += WEATHER_SLOT_MS) {
+      const now = naturalWeather(s.rng.seed, route, t)
+      const before = naturalWeather(s.rng.seed, route, t - 1)
+      const sev = { calm: 0, choppy: 1, rough: 2, storm: 3 }
+      if (sev[now] >= 2 && sev[now] > sev[before]) at = t
+    }
+    expect(stormAlerts(s, at)).toEqual([]) // nobody queued there
+    s = assignRoute(s, s.player.ownedBoats[0].id, route, at - 60_000, 4)
+    expect(stormAlerts(s, at)).toEqual([{ routeId: route, weather: naturalWeather(s.rng.seed, route, at), boatIds: [s.player.ownedBoats[0].id] }])
+    // A boat on its last trip won't sail again, so there's nothing to warn about.
+    expect(stormAlerts(recallBoat(s, s.player.ownedBoats[0].id), at)).toEqual([])
   })
 })
 
@@ -346,11 +366,21 @@ describe('abilities', () => {
 
   it('Tin Pail repairs at half cost', () => {
     const s = newGame(1, T0)
+    s.player.coins = 100_000
     const pail = give(s, 'tin-pail')
-    const skiff = give(s, 'harbor-skiff')
-    for (const b of s.player.ownedBoats) b.condition = 50
-    expect(repairQuote(s, pail)).toBe(repairQuote(s, skiff) / 2)
-    expect(repairBoat(s, pail).player.coins).toBe(STARTING_COINS - 50)
+    s.player.ownedBoats.find((b) => b.id === pail)!.condition = 50
+    const full = 50 * repairCostPerPoint(getBoatClass('tin-pail'))
+    expect(repairQuote(s, pail)).toBe(full / 2)
+    expect(repairBoat(s, pail).player.coins).toBe(100_000 - full / 2)
+  })
+
+  it('repairs cost more per point on bigger boats', () => {
+    expect(repairCostPerPoint(getBoatClass('dinghy-hauler'))).toBe(2)
+    expect(repairCostPerPoint(getBoatClass('skiff'))).toBe(2)
+    expect(repairCostPerPoint(getBoatClass('harbor-skiff'))).toBe(22)
+    expect(repairCostPerPoint(getBoatClass('container-ship'))).toBe(3300)
+    // Crafted boats are valued at their tier's common price.
+    expect(repairCostPerPoint(getBoatClass('grand-dame'))).toBe(3300)
   })
 
   it('Grand Dame lifts payouts while docked; Pageant lifts fleet demand', () => {
@@ -391,6 +421,14 @@ describe('abilities', () => {
 })
 
 describe('fleet actions', () => {
+  it('gives every new boat a nickname nobody else in the fleet has', () => {
+    let s = newGame(3, T0)
+    s.player.coins = 1e6
+    for (let i = 0; i < 30; i++) s = buyBoat(s, 'skiff', T0)
+    const names = s.player.ownedBoats.map((b) => b.nickname)
+    expect(new Set(names).size).toBe(names.length)
+  })
+
   it('starts with one small cargo and one small passenger boat', () => {
     const s = newGame(3, T0)
     expect(s.player.ownedBoats.map((b) => b.classId)).toEqual(['dinghy-hauler', 'water-taxi'])

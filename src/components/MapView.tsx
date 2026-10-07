@@ -4,7 +4,8 @@ import { getVoyage } from '../game/state'
 import { TIER_COLORS } from '../colors'
 import { HOME_PORT_ID, MAP_HEIGHT, MAP_WIDTH, PORTS } from '../game/data/ports'
 import { WEATHER } from '../game/data/weather'
-import { routeWeather } from '../game/weather'
+import { routeWeather, weatherChangesAt } from '../game/weather'
+import { duration } from '../format'
 
 type Props = {
   game: GameState
@@ -49,6 +50,9 @@ export function MapView({ game, now, selectedBoatId, onSelectBoat }: Props) {
   return (
     <svg className="map" viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} role="img" aria-label="Harbor map">
       <rect width={MAP_WIDTH} height={MAP_HEIGHT} className="map-sea" />
+      <text x={MAP_WIDTH - 24} y={44} textAnchor="end" className="map-clock">
+        Weather turns in {duration(weatherChangesAt(now) - now)}
+      </text>
 
       {game.routes.map((r) => {
         const a = getPort(r.portA)
@@ -87,15 +91,17 @@ export function MapView({ game, now, selectedBoatId, onSelectBoat }: Props) {
 
       {game.player.ownedBoats
         .filter((b) => b.state === 'sunk' && b.currentRoute)
-        .map((boat) => {
-          // Wrecks rest midway along the route they went down on.
+        .map((boat, i, wrecks) => {
+          // Wrecks rest along the route they went down on, spaced out if there are several.
           const route = game.routes.find((r) => r.id === boat.currentRoute)!
           const a = getPort(route.portA)
           const b = getPort(route.portB)
+          const k = wrecks.filter((w, j) => j < i && w.currentRoute === boat.currentRoute).length
+          const f = 0.5 - 0.12 * k
           return (
             <g
               key={boat.id}
-              transform={`translate(${(a.x + b.x) / 2} ${(a.y + b.y) / 2})`}
+              transform={`translate(${a.x + (b.x - a.x) * f} ${a.y + (b.y - a.y) * f})`}
               className="map-boat map-wreck"
               onClick={() => onSelectBoat(boat.id)}
             >

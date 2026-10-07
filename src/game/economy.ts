@@ -7,9 +7,9 @@ import {
   LOW_CONDITION_PAYOUT_MULT,
   LOW_CONDITION_THRESHOLD,
   PAYOUT_FACTOR,
-  REPAIR_COST_PER_POINT,
+  REPAIR_COST_PER_POINT_MIN,
+  REPAIR_COST_VALUE_SHARE,
   SELL_RATE,
-  CONDITION_MAX,
   SALVAGE_MIN,
   SALVAGE_RATE,
 } from './data/economy'
@@ -70,12 +70,9 @@ export function sellPrice(boatClass: BoatClass): number {
   return Math.floor(boatClass.price * SELL_RATE)
 }
 
-export function repairCostPerPoint(mult = 1): number {
-  return REPAIR_COST_PER_POINT * mult
-}
-
-export function repairCost(condition: number, mult = 1): number {
-  return Math.ceil(Math.max(0, CONDITION_MAX - condition) * repairCostPerPoint(mult))
+/** Coins per condition point: 0.1% of the boat's value (2c minimum), times any ability discount. */
+export function repairCostPerPoint(boatClass: BoatClass, mult = 1): number {
+  return Math.max(REPAIR_COST_PER_POINT_MIN, Math.round(boatValue(boatClass) * REPAIR_COST_VALUE_SHARE)) * mult
 }
 
 /** What a boat is worth for salvage: its price (starters: 0), or for crafted boats its tier's common price. */
