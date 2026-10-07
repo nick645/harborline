@@ -2,7 +2,16 @@
 // so any bug report can be replayed exactly.
 
 import type { RngState } from './types'
-import { CONDITION_LOSS_MAX, CONDITION_LOSS_MIN, DEMAND_MAX, DEMAND_MIN } from './data/economy'
+import {
+  CONDITION_LOSS_MAX,
+  CONDITION_LOSS_MIN,
+  DEMAND_MAX,
+  DEMAND_MIN,
+  HEAVY_HIT_CHANCE,
+  HEAVY_HIT_MAX,
+  HEAVY_HIT_MIN,
+  WEAR_MULTIPLIERS,
+} from './data/economy'
 
 export function createRng(seed: number): RngState {
   const s = seed >>> 0
@@ -33,8 +42,12 @@ export function rollDemand(rng: RngState): number {
   return Math.round(d * 100) / 100
 }
 
-export function rollConditionLoss(rng: RngState): number {
-  return nextInt(rng, CONDITION_LOSS_MIN, CONDITION_LOSS_MAX)
+/** Condition lost on one round trip. Wear accelerates on worn hulls, plus a rare heavy hit. */
+export function rollConditionLoss(rng: RngState, condition: number): number {
+  const mult = WEAR_MULTIPLIERS.find((w) => condition < w.below)?.mult ?? 1
+  let loss = Math.ceil(nextInt(rng, CONDITION_LOSS_MIN, CONDITION_LOSS_MAX) * mult)
+  if (nextFloat(rng) < HEAVY_HIT_CHANCE) loss += nextInt(rng, HEAVY_HIT_MIN, HEAVY_HIT_MAX)
+  return loss
 }
 
 export function rollPick<T>(rng: RngState, items: readonly T[]): T {

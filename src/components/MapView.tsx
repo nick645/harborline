@@ -70,6 +70,28 @@ export function MapView({ game, now, selectedBoatId, onSelectBoat }: Props) {
         </g>
       ))}
 
+      {game.player.ownedBoats
+        .filter((b) => b.state === 'sunk' && b.currentRoute)
+        .map((boat) => {
+          // Wrecks rest midway along the route they went down on.
+          const route = game.routes.find((r) => r.id === boat.currentRoute)!
+          const a = getPort(route.portA)
+          const b = getPort(route.portB)
+          return (
+            <g
+              key={boat.id}
+              transform={`translate(${(a.x + b.x) / 2} ${(a.y + b.y) / 2})`}
+              className="map-boat map-wreck"
+              onClick={() => onSelectBoat(boat.id)}
+            >
+              <path d="M-14 -14 L14 14 M14 -14 L-14 14" />
+              <text y={-22} textAnchor="middle" className="map-boat-label">
+                {boat.nickname} (sunk)
+              </text>
+            </g>
+          )
+        })}
+
       {boatsAtSea.map((boat, i) => {
         const v = getVoyage(game, boat.id)
         if (!v) return null

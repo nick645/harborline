@@ -54,6 +54,8 @@ body { margin: 0; background: var(--bg); }
 h1, h2 { margin: 0; }
 h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; }
 .muted { color: var(--muted); }
+.small { font-size: 13px; }
+.bad { color: var(--bad); }
 
 button {
   font: inherit;
@@ -66,6 +68,7 @@ button {
   touch-action: manipulation;
 }
 button:disabled { opacity: 0.4; cursor: default; }
+button.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
 button.danger { background: transparent; color: var(--bad); border: 1px solid var(--border); }
 
 .app { max-width: 1280px; margin: 0 auto; padding: 0 16px 32px; }
@@ -106,6 +109,7 @@ button.danger { background: transparent; color: var(--bad); border: 1px solid va
 .map-boat { cursor: pointer; }
 .map-boat rect { stroke: var(--port-stroke); stroke-width: 2; }
 .map-boat rect.selected { stroke: var(--text); stroke-width: 5; }
+.map-wreck path { stroke: var(--bad); stroke-width: 7; stroke-linecap: round; }
 .map-boat-label { font-size: 18px; fill: var(--text); paint-order: stroke; stroke: var(--sea); stroke-width: 5px; }
 
 /* ---------- panel ---------- */
@@ -129,6 +133,16 @@ button.danger { background: transparent; color: var(--bad); border: 1px solid va
 .condition.low span { color: var(--warn); font-weight: 600; }
 
 .boat-status { margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+.trip-count { font-weight: 600; }
+.boat-card.sunk { border-left: 4px solid var(--bad); }
+.condition.risk .condition-bar > div { background: var(--bad); }
+.condition.risk span { color: var(--bad); font-weight: 700; }
+.risk-note { margin: 4px 0 0; color: var(--bad); font-size: 13px; font-weight: 600; }
+
+.trips-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.stepper { display: flex; align-items: center; gap: 4px; }
+.stepper button { width: 36px; padding: 6px 0; font-weight: 700; }
+.stepper-value { min-width: 28px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .warn { margin: 4px 0 0; color: var(--warn); font-size: 13px; }
 
 .route-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
@@ -140,9 +154,10 @@ button.danger { background: transparent; color: var(--bad); border: 1px solid va
 .route-name { font-weight: 600; }
 .route-pay { font-size: 18px; font-weight: 700; color: var(--good); font-variant-numeric: tabular-nums; }
 .route-btn.loss .route-pay { color: var(--bad); }
+.route-per { font-size: 12px; font-weight: 400; color: var(--muted); }
 .route-meta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-.boat-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.boat-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
 
 .shop-row {
   display: flex; align-items: center; gap: 10px;

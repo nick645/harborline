@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { assignRoute, buyBoat, newGame, quoteVoyage, repairBoat, sellBoat, settle, settleOffline } from './state'
+import {
+  assignRoute,
+  buyBoat,
+  newGame,
+  quoteVoyage,
+  recallBoat,
+  repairBoat,
+  salvageBoat,
+  salvageQuote,
+  sellBoat,
+  settle,
+  settleAway,
+} from './state'
+import { createRng, rollConditionLoss } from './rolls'
 import { routeDistance, voyagePayout } from './economy'
 import { BOAT_CLASSES } from './data/boats'
 import { ROUTES } from './data/routes'
-import { OFFLINE_CAP_MS, STARTING_COINS } from './data/economy'
+import { SALVAGE_CONDITION, STARTING_COINS } from './data/economy'
 import { deserialize, serialize } from './save'
 
 const T0 = 1_000_000
@@ -109,24 +122,80 @@ describe('fleet actions', () => {
   })
 })
 
-describe('offline progression', () => {
-  it('pays half rate, capped at 8 hours', () => {
+describe('queued trips', () => {
+  it('runs back to back and then docks for the player', () => {
     let s = newGame(5, T0)
-    s = assignRoute(s, s.player.ownedBoats[0].id, ROUTES[1].id, T0)
-    s = settle(s, T0)
-    const a = settleOffline(s, T0 + OFFLINE_CAP_MS)
-    const b = settleOffline(s, T0 + 3 * OFFLINE_CAP_MS)
-    expect(a.report.voyages).toBeGreaterThan(100)
-    expect(b.report.voyages).toBe(a.report.voyages)
-    expect(b.report.creditedMs).toBe(OFFLINE_CAP_MS)
-    expect(a.state.player.ownedBoats[0].state).toBe('idle')
-    expect(a.state.player.ownedBoats[0].condition).toBeLessThan(100)
+    const id = s.player.ownedBoats[0].id
+    s = assignRoute(s, id, ROUTES[1].id, T0, 3)
+    s = settleAway(s, T0 + 24 * 3600_000).state
+    expect(s.player.ownedBoats[0].state).toBe('idle')
+    expect(s.voyages).toHaveLength(0)
+    // Nothing keeps running once the queue is done: no auto-pilot.
+    const later = settleAway(s, T0 + 48 * 3600_000)
+    expect(later.report.coinsEarned).toBe(0)
   })
 
-  it('pays nothing extra for boats that never had a route', () => {
+  it('reports trips completed while away, at full rate', () => {
+    let s = newGame(5, T0)
+    s = assignRoute(s, s.player.ownedBoats[0].id, ROUTES[1].id, T0, 4)
+    const { report } = settleAway(s, T0 + 24 * 3600_000)
+    expect(report.tripsCompleted + report.sunk.length).toBeGreaterThanOrEqual(1)
+    if (report.sunk.length === 0) expect(report.tripsCompleted).toBe(4)
+  })
+
+  it('caps the run at one tank of fuel', () => {
     const s = newGame(5, T0)
-    const { report } = settleOffline(s, T0 + OFFLINE_CAP_MS)
-    expect(report.coinsEarned).toBe(0)
+    const id = s.player.ownedBoats[0].id
+    expect(() => assignRoute(s, id, ROUTES[0].id, T0, 5)).toThrow()
+    expect(() => assignRoute(s, id, ROUTES[0].id, T0, 0)).toThrow()
+  })
+
+  it('recall finishes the current trip and comes home', () => {
+    let s = newGame(5, T0)
+    const id = s.player.ownedBoats[0].id
+    s = assignRoute(s, id, ROUTES[1].id, T0, 4)
+    s = recallBoat(s, id)
+    s = settle(s, T0 + 3600_000)
+    expect(s.player.ownedBoats[0].state).toBe('idle')
+  })
+})
+
+describe('wear and sinking', () => {
+  it('wears faster on a worn hull', () => {
+    const avg = (condition: number) => {
+      const rng = createRng(1)
+      let total = 0
+      for (let i = 0; i < 5000; i++) total += rollConditionLoss(rng, condition)
+      return total / 5000
+    }
+    expect(avg(20)).toBeGreaterThan(avg(40))
+    expect(avg(40)).toBeGreaterThan(avg(90))
+  })
+
+  it('sinks at 0, pays nothing for that trip, and can be salvaged', () => {
+    let s = newGame(5, T0)
+    const id = s.player.ownedBoats[0].id
+    s.player.ownedBoats[0].condition = 1
+    s = assignRoute(s, id, ROUTES[1].id, T0, 4)
+    const { state, report } = settleAway(s, T0 + 3600_000)
+    expect(report.sunk).toEqual([s.player.ownedBoats[0].nickname])
+    expect(state.player.coins).toBe(STARTING_COINS)
+    expect(state.player.ownedBoats[0].state).toBe('sunk')
+    expect(() => assignRoute(state, id, ROUTES[0].id, T0)).toThrow()
+
+    const fee = salvageQuote(state, id)
+    expect(fee).toBe(100)
+    const raised = salvageBoat(state, id)
+    expect(raised.player.ownedBoats[0].state).toBe('idle')
+    expect(raised.player.ownedBoats[0].condition).toBe(SALVAGE_CONDITION)
+    expect(raised.player.coins).toBe(STARTING_COINS - fee)
+  })
+
+  it('never leaves a fleet stuck on the seabed', () => {
+    const s = newGame(5, T0)
+    for (const b of s.player.ownedBoats) b.state = 'sunk'
+    s.player.coins = 30
+    expect(salvageQuote(s, s.player.ownedBoats[0].id)).toBe(30)
   })
 })
 

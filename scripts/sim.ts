@@ -2,7 +2,10 @@
 // and reports pacing milestones against the spec's targets.
 //
 //   npm run sim                       # defaults: 6h, 100 seeds, 5s reaction time
-//   npm run sim -- --minutes 600 --seeds 300 --reaction 15
+//   npm run sim -- --minutes 600 --seeds 300 --reaction 15 --trips 2
+//
+// --reaction is how long the player takes to notice a docked boat (seconds); --trips is how
+// many trips they queue per send ('tank' = as many as the fuel tank allows).
 //
 // Event-driven: time jumps straight to the next boat event, so a run takes milliseconds.
 
@@ -13,18 +16,20 @@ import {
   newGame,
   quoteVoyage,
   repairBoat,
+  salvageBoat,
   settle,
-  settleOffline,
   shopClasses,
 } from '../src/game/state'
 import { getBoatClass } from '../src/game/economy'
 import { ROUTES } from '../src/game/data/routes'
-import { LOW_CONDITION_THRESHOLD, OFFLINE_CAP_MS, STARTING_COINS } from '../src/game/data/economy'
+import { LOW_CONDITION_THRESHOLD, STARTING_COINS } from '../src/game/data/economy'
 
 const args = parseArgs(process.argv.slice(2))
 const MINUTES = Number(args.minutes ?? 360)
 const SEEDS = Number(args.seeds ?? 100)
 const REACTION_MS = Number(args.reaction ?? 5) * 1000
+/** Trips queued per send: a number, or 'tank' for a full tank. */
+const TRIPS = args.trips ?? 'tank'
 const T0 = 0
 
 type Strategy = { name: string; describe: string; pickPurchase: (s: GameState) => string | null }
@@ -78,7 +83,7 @@ type RunResult = {
   finalBoats: number
   finalCoins: number
   earnedActive: number
-  offlineEarned8h: number
+  sinkings: number
 }
 
 function playOneTurn(s: GameState, strat: Strategy, t: number): GameState {
@@ -86,12 +91,17 @@ function playOneTurn(s: GameState, strat: Strategy, t: number): GameState {
   for (let id = strat.pickPurchase(s); id; id = strat.pickPurchase(s)) s = buyBoat(s, id)
 
   for (const boat of s.player.ownedBoats) {
+    if (boat.state === 'sunk') s = salvageBoat(s, boat.id)
+  }
+  for (const boat of s.player.ownedBoats) {
     if (boat.state !== 'idle') continue
     if (boat.condition < LOW_CONDITION_THRESHOLD) s = repairBoat(s, boat.id)
     const best = ROUTES.map((r) => ({ r, q: quoteVoyage(s, boat.id, r.id) })).sort(
       (a, b) => b.q.perMinute - a.q.perMinute,
     )[0]
-    if (best.q.payout > 0) s = assignRoute(s, boat.id, best.r.id, t)
+    const tank = getBoatClass(boat.classId).fuelTankTrips
+    const trips = TRIPS === 'tank' ? tank : Math.min(tank, Number(TRIPS))
+    if (best.q.payout > 0) s = assignRoute(s, boat.id, best.r.id, t, trips)
   }
   return s
 }
@@ -106,12 +116,14 @@ function run(seed: number, strat: Strategy): RunResult {
     finalBoats: 1,
     finalCoins: 0,
     earnedActive: 0,
-    offlineEarned8h: 0,
+    sinkings: 0,
   }
   let spent = 0
   let t = T0
   while (t <= end) {
+    const sunkBefore = s.player.ownedBoats.filter((b) => b.state === 'sunk').length
     s = settle(s, t)
+    res.sinkings += Math.max(0, s.player.ownedBoats.filter((b) => b.state === 'sunk').length - sunkBefore)
     const before = s.player.coins
     const boatsBefore = s.player.ownedBoats.length
     s = playOneTurn(s, strat, t)
@@ -131,9 +143,6 @@ function run(seed: number, strat: Strategy): RunResult {
   res.finalBoats = s.player.ownedBoats.length
   res.finalCoins = s.player.coins
   res.earnedActive = s.player.coins + spent - STARTING_COINS
-
-  // Player closes the app at the end of the session, then comes back after 8h.
-  res.offlineEarned8h = settleOffline(s, end + OFFLINE_CAP_MS).report.coinsEarned
   return res
 }
 
@@ -155,7 +164,7 @@ function row(label: string, xs: (number | null)[], unit = 'min') {
   console.log(`  ${label.padEnd(26)} p10 ${pct(xs, 0.1)}  med ${pct(xs, 0.5)}  p90 ${pct(xs, 0.9)} ${unit}  hit ${hitRate(xs)}`)
 }
 
-console.log(`\nHarborline balance harness — ${MINUTES} min (${(MINUTES / 60).toFixed(1)} h) active play, ${SEEDS} seeds, ${REACTION_MS / 1000}s reaction\n`)
+console.log(`\nHarborline balance harness — ${MINUTES} min (${(MINUTES / 60).toFixed(1)} h) of play, ${SEEDS} seeds, ${REACTION_MS / 1000}s reaction, trips per send: ${TRIPS}\n`)
 console.log('Targets: first purchase (a tier-1 boat) at 30–60 min · first tier-2 boat at 4–5 h (240–300 min)\n')
 
 for (const strat of STRATEGIES) {
@@ -168,7 +177,7 @@ for (const strat of STRATEGIES) {
   row('tier at end', results.map((r) => r.finalTier), 'tier')
   row('boats at end', results.map((r) => r.finalBoats), 'boats')
   row('coins earned (active)', results.map((r) => r.earnedActive), 'c')
-  row('offline 8h earnings', results.map((r) => r.offlineEarned8h), 'c')
+  row('sinkings', results.map((r) => r.sinkings), '  ')
   console.log()
 }
 

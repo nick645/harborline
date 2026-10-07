@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GameState, OfflineReport } from './game/types'
-import { assignRoute, buyBoat, GameError, newGame, repairBoat, sellBoat, settle, settleOffline } from './game/state'
+import type { AwayReport, GameState } from './game/types'
+import {
+  assignRoute,
+  buyBoat,
+  GameError,
+  newGame,
+  recallBoat,
+  repairBoat,
+  salvageBoat,
+  sellBoat,
+  settle,
+  settleAway,
+} from './game/state'
 import { randomSeed } from './game/rolls'
 import { advanceClock, clearSave, clock, DEBUG, loadGame, saveGame } from './storage'
 import { coins, duration } from './format'
@@ -11,17 +22,19 @@ import { Shop } from './components/Shop'
 const TICK_MS = 250
 const AUTOSAVE_MS = 5000
 
-function boot(): { game: GameState; report: OfflineReport | null } {
+const worthReporting = (r: AwayReport) => r.tripsCompleted > 0 || r.sunk.length > 0
+
+function boot(): { game: GameState; report: AwayReport | null } {
   const saved = loadGame()
   if (!saved) return { game: newGame(randomSeed(), clock()), report: null }
-  const { state, report } = settleOffline(saved, clock())
-  return { game: state, report: report.voyages > 0 ? report : null }
+  const { state, report } = settleAway(saved, clock())
+  return { game: state, report: worthReporting(report) ? report : null }
 }
 
 export default function App() {
   const [initial] = useState(boot)
   const [game, setGame] = useState<GameState>(initial.game)
-  const [report, setReport] = useState<OfflineReport | null>(initial.report)
+  const [report, setReport] = useState<AwayReport | null>(initial.report)
   const [now, setNow] = useState(clock)
   const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -33,16 +46,16 @@ export default function App() {
 
   const comeBack = useCallback(() => {
     const t = clock()
-    const { state, report } = settleOffline(gameRef.current, t)
+    const { state, report } = settleAway(gameRef.current, t)
     gameRef.current = state
     setGame(state)
     setNow(t)
     saveGame(state)
-    if (report.voyages > 0) setReport(report)
+    if (worthReporting(report)) setReport(report)
   }, [])
 
-  // Present-time clock: settle in-flight voyages. Paused while hidden; the return is
-  // handled as offline time so it earns at the offline rate.
+  // Present-time clock: settle in-flight voyages. Paused while hidden, so coming back
+  // settles the whole gap at once and can report what happened while away.
   useEffect(() => {
     const id = setInterval(() => {
       if (document.hidden) return
@@ -91,6 +104,7 @@ export default function App() {
 
   const boats = game.player.ownedBoats
   const idleCount = boats.filter((b) => b.state === 'idle').length
+  const sunkCount = boats.filter((b) => b.state === 'sunk').length
 
   return (
     <div className="app">
@@ -101,15 +115,17 @@ export default function App() {
           <span className="muted">
             {boats.length} boat{boats.length === 1 ? '' : 's'}
             {idleCount > 0 && ` · ${idleCount} docked`}
+            {sunkCount > 0 && ` · ${sunkCount} sunk`}
           </span>
         </div>
       </header>
 
       {report && (
-        <div className="banner" onClick={() => setReport(null)}>
-          <strong>Welcome back.</strong> While you were away ({duration(report.awayMs)}
-          {report.creditedMs < report.awayMs ? `, ${duration(report.creditedMs)} counted` : ''}), your fleet ran{' '}
-          {report.voyages} voyages for <strong>{coins(report.coinsEarned)}c</strong>.
+        <div className={`banner ${report.sunk.length > 0 ? 'error' : ''}`} onClick={() => setReport(null)}>
+          <strong>Welcome back.</strong> While you were away ({duration(report.awayMs)}), your fleet finished{' '}
+          {report.tripsCompleted} trip{report.tripsCompleted === 1 ? '' : 's'} for{' '}
+          <strong>{coins(report.coinsEarned)}c</strong>.
+          {report.sunk.length > 0 && <strong className="bad"> Sunk: {report.sunk.join(', ')}.</strong>}
           <span className="muted"> Tap to dismiss.</span>
         </div>
       )}
@@ -136,7 +152,9 @@ export default function App() {
                 selected={b.id === selected}
                 canSell={boats.length > 1}
                 onSelect={() => setSelected(b.id)}
-                onAssign={(routeId) => act((g, t) => assignRoute(g, b.id, routeId, t))}
+                onAssign={(routeId, trips) => act((g, t) => assignRoute(g, b.id, routeId, t, trips))}
+                onRecall={() => act((g) => recallBoat(g, b.id))}
+                onSalvage={() => act((g) => salvageBoat(g, b.id))}
                 onRepair={() => act((g) => repairBoat(g, b.id))}
                 onSell={() => act((g) => sellBoat(g, b.id))}
               />

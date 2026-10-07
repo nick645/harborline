@@ -10,6 +10,8 @@ import {
   REPAIR_COST_PER_POINT,
   SELL_RATE,
   CONDITION_MAX,
+  SALVAGE_MIN,
+  SALVAGE_RATE,
 } from './data/economy'
 
 const portsById = new Map(PORTS.map((p) => [p.id, p]))
@@ -61,4 +63,8 @@ export function sellPrice(boatClass: BoatClass): number {
 
 export function repairCost(condition: number): number {
   return Math.max(0, CONDITION_MAX - condition) * REPAIR_COST_PER_POINT
+}
+
+export function salvageCost(boatClass: BoatClass): number {
+  return Math.max(SALVAGE_MIN, Math.round(boatClass.price * SALVAGE_RATE))
 }

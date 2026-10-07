@@ -8,8 +8,8 @@ export type PortTier = 1 | 2 | 3
 export type PartType = 'hull' | 'engine' | 'specialty'
 export type Weather = 'calm' | 'choppy' | 'rough' | 'storm'
 
-/** A boat is in exactly one of these states. */
-export type BoatState = 'idle' | 'sailing' | 'returning' | 'repairing'
+/** A boat is in exactly one of these states. 'sunk' boats wait for salvage. */
+export type BoatState = 'idle' | 'sailing' | 'returning' | 'repairing' | 'sunk'
 
 export interface Port {
   id: string
@@ -45,6 +45,8 @@ export interface BoatClass {
   /** Distance units per minute. */
   speed: number
   fuelPerLeg: number
+  /** Round trips one tank of fuel covers: the most trips a boat can be sent on at once. */
+  fuelTankTrips: number
   abilityId: string | null
   /** Exact part ids required to craft (a set, not a count). Empty for purchasable boats. */
   requiredParts: string[]
@@ -57,21 +59,26 @@ export interface Boat {
   /** 0–100 */
   condition: number
   captainId: string | null
-  /** Route currently being run, or the last route run while idle. */
+  /** Route currently being run, the last route run while idle, or where it sank. */
   currentRoute: string | null
   state: BoatState
   /** Absolute timestamp of the boat's next state change, or null when idle. */
   etaMs: number | null
 }
 
+/** One round trip. A boat sent on several trips runs them back to back, one Voyage each. */
 export interface Voyage {
   boatId: string
   routeId: string
+  /** 1-based position of this trip in the boat's run. */
+  tripIndex: number
+  /** Trips in the whole run; the boat docks for good after trip `tripsTotal`. */
+  tripsTotal: number
   /** Absolute timestamp. */
   startedAt: number
   /** Full round trip: outbound leg + return leg. */
   durationMs: number
-  /** Net payout, locked in at departure, credited on arrival at the far port. */
+  /** Net payout, locked in at departure, credited on arrival at the far port if still afloat. */
   payout: number
   /** True once the outbound leg has completed and the payout was credited. */
   paid: boolean
@@ -122,10 +129,11 @@ export interface GameState {
   nextBoatSeq: number
 }
 
-export interface OfflineReport {
+/** What happened while the player was away. */
+export interface AwayReport {
   awayMs: number
-  /** Away time that actually earned (capped). */
-  creditedMs: number
   coinsEarned: number
-  voyages: number
+  tripsCompleted: number
+  /** Nicknames of boats that sank. */
+  sunk: string[]
 }

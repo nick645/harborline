@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import type { Boat, GameState } from '../game/types'
 import { getBoatClass, getPort, repairCost, sellPrice } from '../game/economy'
-import { getVoyage, quoteVoyage } from '../game/state'
-import { LOW_CONDITION_THRESHOLD } from '../game/data/economy'
+import { getVoyage, quoteVoyage, salvageQuote } from '../game/state'
+import { HEAVY_HIT_MAX, LOW_CONDITION_THRESHOLD, SALVAGE_CONDITION } from '../game/data/economy'
 import { coins, duration } from '../format'
 import { TIER_COLORS } from '../colors'
 
@@ -12,28 +13,25 @@ type Props = {
   selected: boolean
   canSell: boolean
   onSelect: () => void
-  onAssign: (routeId: string) => void
+  onAssign: (routeId: string, trips: number) => void
+  onRecall: () => void
   onRepair: () => void
   onSell: () => void
+  onSalvage: () => void
 }
 
-export function BoatCard({ game, boat, now, selected, canSell, onSelect, onAssign, onRepair, onSell }: Props) {
-  const cls = getBoatClass(boat.classId)
-  const voyage = getVoyage(game, boat.id)
-  const lowCondition = boat.condition < LOW_CONDITION_THRESHOLD
-  const fixCost = repairCost(boat.condition)
+/** Runs a click handler without also selecting the card underneath. */
+const only = (fn: () => void) => (e: React.MouseEvent) => {
+  e.stopPropagation()
+  fn()
+}
 
-  let status: string
-  if (boat.state === 'idle') status = 'Docked at home'
-  else {
-    const route = game.routes.find((r) => r.id === voyage?.routeId)
-    const dest = route ? getPort(route.portB).name : '?'
-    const eta = duration((boat.etaMs ?? now) - now)
-    status =
-      boat.state === 'sailing'
-        ? `Sailing to ${dest} · ${eta} · pays ${coins(voyage?.payout ?? 0)}`
-        : `Returning from ${dest} · ${eta}`
-  }
+export function BoatCard(props: Props) {
+  const { boat, selected, onSelect } = props
+  const cls = getBoatClass(boat.classId)
+  const lowCondition = boat.condition < LOW_CONDITION_THRESHOLD
+  // A single rough-water hit could take the boat to 0 on the way out.
+  const atRisk = boat.condition <= HEAVY_HIT_MAX
 
   return (
     <article className={`boat-card ${selected ? 'selected' : ''} ${boat.state}`} onClick={onSelect}>
@@ -45,7 +43,7 @@ export function BoatCard({ game, boat, now, selected, canSell, onSelect, onAssig
             {cls.name} · {cls.track === 'cargo' ? 'Cargo' : 'Passenger'} · T{cls.sizeTier} · cap {cls.capacity}
           </span>
         </div>
-        <div className={`condition ${lowCondition ? 'low' : ''}`} title="Condition">
+        <div className={`condition ${atRisk ? 'risk' : lowCondition ? 'low' : ''}`} title="Condition">
           <div className="condition-bar">
             <div style={{ width: `${boat.condition}%` }} />
           </div>
@@ -53,56 +51,137 @@ export function BoatCard({ game, boat, now, selected, canSell, onSelect, onAssig
         </div>
       </header>
 
-      <p className="boat-status">{status}</p>
-      {lowCondition && <p className="warn">Below {LOW_CONDITION_THRESHOLD} condition: payouts −20%</p>}
-
-      {boat.state === 'idle' && (
-        <>
-          <div className="route-buttons">
-            {game.routes.map((r) => {
-              const q = quoteVoyage(game, boat.id, r.id)
-              const isLast = boat.currentRoute === r.id
-              return (
-                <button
-                  key={r.id}
-                  className={`route-btn ${q.payout <= 0 ? 'loss' : ''} ${isLast ? 'last' : ''}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onAssign(r.id)
-                  }}
-                >
-                  <span className="route-name">{getPort(r.portB).name}</span>
-                  <span className="route-pay">{coins(q.payout)}c</span>
-                  <span className="route-meta">
-                    {duration(q.durationMs)} · {coins(q.perMinute)}/min
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-          <div className="boat-actions">
-            <button
-              disabled={fixCost === 0 || game.player.coins < 2}
-              onClick={(e) => {
-                e.stopPropagation()
-                onRepair()
-              }}
-            >
-              Repair {fixCost > 0 ? `${coins(fixCost)}c` : ''}
-            </button>
-            <button
-              className="danger"
-              disabled={!canSell}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (confirm(`Sell ${boat.nickname} for ${coins(sellPrice(cls))} coins?`)) onSell()
-              }}
-            >
-              Sell {coins(sellPrice(cls))}c
-            </button>
-          </div>
-        </>
+      {boat.state === 'sunk' ? (
+        <SunkBody {...props} />
+      ) : boat.state === 'idle' ? (
+        <DockedBody {...props} lowCondition={lowCondition} atRisk={atRisk} />
+      ) : (
+        <AtSeaBody {...props} />
       )}
     </article>
+  )
+}
+
+function AtSeaBody({ game, boat, now, onRecall }: Props) {
+  const v = getVoyage(game, boat.id)
+  if (!v) return null
+  const dest = getPort(game.routes.find((r) => r.id === v.routeId)!.portB).name
+  const eta = duration((boat.etaMs ?? now) - now)
+  const tripsLeft = v.tripsTotal - v.tripIndex
+  return (
+    <>
+      <p className="boat-status">
+        <span className="trip-count">
+          Trip {v.tripIndex}/{v.tripsTotal}
+        </span>{' '}
+        {boat.state === 'sailing'
+          ? `Sailing to ${dest} · ${eta} · pays ${coins(v.payout)}`
+          : `Returning from ${dest} · ${eta}`}
+      </p>
+      {tripsLeft > 0 ? (
+        <div className="boat-actions">
+          <button className="secondary" onClick={only(onRecall)}>
+            Return after this trip
+          </button>
+          <span className="muted small">
+            {tripsLeft} more trip{tripsLeft === 1 ? '' : 's'} queued
+          </span>
+        </div>
+      ) : (
+        <p className="muted small">Last trip: docks when it gets home.</p>
+      )}
+    </>
+  )
+}
+
+function DockedBody({
+  game,
+  boat,
+  canSell,
+  onAssign,
+  onRepair,
+  onSell,
+  lowCondition,
+  atRisk,
+}: Props & { lowCondition: boolean; atRisk: boolean }) {
+  const cls = getBoatClass(boat.classId)
+  const tank = cls.fuelTankTrips
+  const [trips, setTrips] = useState(tank)
+  const fixCost = repairCost(boat.condition)
+
+  return (
+    <>
+      <p className="boat-status">Docked at home</p>
+      {atRisk ? (
+        <p className="risk-note">Badly damaged: one rough hit at sea could sink her.</p>
+      ) : (
+        lowCondition && <p className="warn">Below {LOW_CONDITION_THRESHOLD} condition: payouts −20%, wears faster</p>
+      )}
+
+      <div className="trips-row">
+        <span className="muted small">Trips · fuel for {tank}</span>
+        <div className="stepper">
+          <button className="secondary" disabled={trips <= 1} onClick={only(() => setTrips(trips - 1))} aria-label="Fewer trips">
+            −
+          </button>
+          <span className="stepper-value">{trips}</span>
+          <button className="secondary" disabled={trips >= tank} onClick={only(() => setTrips(trips + 1))} aria-label="More trips">
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="route-buttons">
+        {game.routes.map((r) => {
+          const q = quoteVoyage(game, boat.id, r.id)
+          return (
+            <button
+              key={r.id}
+              className={`route-btn ${q.payout <= 0 ? 'loss' : ''} ${boat.currentRoute === r.id ? 'last' : ''}`}
+              onClick={only(() => onAssign(r.id, trips))}
+            >
+              <span className="route-name">{getPort(r.portB).name}</span>
+              <span className="route-pay">
+                {coins(q.payout)}c<span className="route-per"> /trip now</span>
+              </span>
+              <span className="route-meta">
+                {trips} × {duration(q.durationMs)} = {duration(q.durationMs * trips)}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="boat-actions">
+        <button disabled={fixCost === 0 || game.player.coins < 2} onClick={only(onRepair)}>
+          Repair {fixCost > 0 ? `${coins(fixCost)}c` : ''}
+        </button>
+        <button
+          className="danger"
+          disabled={!canSell}
+          onClick={only(() => {
+            if (confirm(`Sell ${boat.nickname} for ${coins(sellPrice(cls))} coins?`)) onSell()
+          })}
+        >
+          Sell {coins(sellPrice(cls))}c
+        </button>
+      </div>
+    </>
+  )
+}
+
+function SunkBody({ game, boat, onSalvage }: Props) {
+  const route = game.routes.find((r) => r.id === boat.currentRoute)
+  const cost = salvageQuote(game, boat.id)
+  return (
+    <>
+      <p className="boat-status bad">Sunk{route ? ` on the way to ${getPort(route.portB).name}` : ''}.</p>
+      <div className="boat-actions">
+        <button disabled={game.player.coins < cost} onClick={only(onSalvage)}>
+          Salvage {coins(cost)}c
+        </button>
+        <span className="muted small">Comes back at {SALVAGE_CONDITION} condition</span>
+      </div>
+    </>
   )
 }
