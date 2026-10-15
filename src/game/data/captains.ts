@@ -66,9 +66,6 @@ export const GROWTH: Record<DevelopmentStyle, { startAfter: number; every: numbe
 export const SKILL_PAY_PER_POINT = 0.004 // 100 → +20%, 1 → −20%
 export const SKILL_DAMAGE_PER_POINT = 0.003 // 100 → −15%, 1 → +15%
 
-/** True skill drawn from a bell curve, clamped. */
-export const SKILL_MEAN = 45
-export const SKILL_SD = 18
 export const SKILL_MIN = 5
 export const SKILL_MAX = 95
 /** Ceiling sits this far above starting skill, at most. */
@@ -79,6 +76,20 @@ export const skillToAnchors = (skill: number) => Math.min(5, Math.max(1, Math.ce
 /** How often reputation is off by one anchor each way. */
 export const REPUTATION_UNDERVALUED = 0.15
 export const REPUTATION_OVERRATED = 0.15
+/** Relative odds of each reputation turning up on the quay (within the range on offer). */
+export const REPUTATION_WEIGHTS = [0, 5, 4, 3, 2, 1]
+
+/** Reputations the quay offers, by the highest tier you've reached (1–6). */
+export const QUAY_REPUTATION: [number, number][] = [[1, 1], [1, 2], [1, 3], [2, 4], [2, 5], [3, 5], [3, 5]]
+
+/**
+ * Boat tiers a captain of this reputation will sail: nobody above their standing,
+ * and nothing beneath it either. Reputation grows (or slips) with voyages.
+ */
+export const captainTiers = (reputation: number): [number, number] => [Math.max(1, reputation - 1), Math.min(6, reputation + 1)]
+
+/** Every this many voyages, reputation moves one anchor toward the captain's true ability. */
+export const REPUTATION_REVIEW_EVERY = 10
 
 // ---------- recruiting ----------
 

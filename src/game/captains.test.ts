@@ -108,14 +108,15 @@ describe('hiring and firing', () => {
     const r = s.recruitPool.recruits[0]
     s = hireCaptain(s, r.id, T0)
     expect(s.player.coins).toBe(1e6 - r.fee)
-    expect(s.player.roster.map((c) => c.id)).toEqual([r.id])
-    const fresh = captainView(s.player.roster[0]).severance
-    s.player.roster[0].voyageCount = 50
-    expect(captainView(s.player.roster[0]).severance).toBeGreaterThan(fresh)
+    const hired = () => s.player.roster.find((c) => c.id === r.id)!
+    expect(hired()).toBeDefined()
+    const fresh = captainView(hired()).severance
+    hired().voyageCount = 50
+    expect(captainView(hired()).severance).toBeGreaterThan(fresh)
     const before = s.player.coins
     s = fireCaptain(s, r.id, T0)
     expect(s.player.coins).toBe(before - Math.round(Math.min(r.fee * 0.2 + 50 * r.fee * 0.01, r.fee * 1.5)))
-    expect(s.player.roster).toHaveLength(0)
+    expect(s.player.roster.find((c) => c.id === r.id)).toBeUndefined()
   })
 })
 
@@ -187,6 +188,39 @@ describe('captains at sea', () => {
     s = assignRoute(s, s.player.ownedBoats[0].id, ROUTES[0].id, timeWith(s, ROUTES[0].id, 'calm'), 3)
     s = settle(s, T0 + 30 * 24 * 3600_000)
     expect(s.player.roster.find((x) => x.id === c.id)!.voyageCount).toBeGreaterThan(0)
+  })
+})
+
+describe('reputation and boat size', () => {
+  it('the quay offers captains around your level', () => {
+    const s = newGame(1, T0)
+    expect(s.recruitPool.recruits.every((c) => c.reputation <= 2)).toBe(true)
+    s.player.maxTierReached = 5
+    const later = settle(s, T0 + 6 * 3600_000)
+    expect(later.recruitPool.recruits.every((c) => c.reputation >= 3)).toBe(true)
+  })
+
+  it("captains only take boats that suit their standing", () => {
+    const s = newGame(1, T0)
+    s.player.ownedBoats.push({ ...s.player.ownedBoats[1], id: 'big', classId: 'cruise-ship', nickname: 'Big', captainId: null })
+    const rookie = captain(3, { id: 'rookie', reputation: 1 })
+    const star = captain(4, { id: 'star', reputation: 5 })
+    s.player.roster.push(rookie, star)
+    expect(() => assignCaptain(s, 'rookie', 'big')).toThrow(/tier 1–2/)
+    expect(() => assignCaptain(s, 'star', s.player.ownedBoats[1].id)).toThrow(/tier 4–6/)
+    expect(assignCaptain(s, 'star', 'big').player.ownedBoats.find((b) => b.id === 'big')!.captainId).toBe('star')
+  })
+
+  it('a good captain earns a bigger reputation at sea; an overrated one slips', () => {
+    const rng = createRng(8)
+    const sleeper = captain(8, { reputation: 1, trueSkill: 75, ceiling: 75, development: 'steady' })
+    const allTalk = captain(9, { reputation: 4, trueSkill: 30, ceiling: 30, development: 'steady' })
+    for (let i = 0; i < 40; i++) {
+      recordVoyage(rng, sleeper, { track: 'cargo', weather: 'calm', t: T0 })
+      recordVoyage(rng, allTalk, { track: 'cargo', weather: 'calm', t: T0 })
+    }
+    expect(sleeper.reputation).toBe(4)
+    expect(allTalk.reputation).toBe(2)
   })
 })
 
@@ -268,11 +302,11 @@ describe('delegation', () => {
     const c = crew(s, 0, { voyageCount: 99 })
     s.player.maxTierReached = 4
     expect(() => promoteCaptain(s, c.id, 'dockhand', T0)).toThrow()
-    s.player.roster[0].voyageCount = 100
+    c.voyageCount = 100
     s.player.maxTierReached = 2
     expect(() => promoteCaptain(s, c.id, 'dockhand', T0)).toThrow()
     s.player.maxTierReached = 3
-    expect(promoteCaptain(s, c.id, 'dockhand', T0).player.roster[0].role).toBe('dockhand')
+    expect(promoteCaptain(s, c.id, 'dockhand', T0).player.roster.find((x) => x.id === c.id)!.role).toBe('dockhand')
   })
 
   it("a managed boat keeps working while you're away, at reduced pay, never in storms or for rare parts", () => {

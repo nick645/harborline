@@ -19,6 +19,7 @@ import {
   settleAway,
 } from './state'
 import { createRng, rollConditionLoss } from './rolls'
+import { generateCaptain } from './captains'
 import { getBoatClass, repairCostPerPoint, routeDistance, voyagePayout } from './economy'
 import { missingAbilityIds } from './abilities'
 import { naturalWeather, seasonAt, stormAlerts } from './weather'
@@ -40,15 +41,18 @@ function timeWith(s: GameState, routeId: string, weather: Weather, from = T0): n
   throw new Error(`no ${weather} found`)
 }
 
-/** Add a boat of any class directly, bypassing shop and crafting rules. */
+/** Add a boat of any class directly, bypassing shop and crafting rules, with a captain who fits it. */
 function give(s: GameState, classId: string): string {
   const id = `t${s.player.ownedBoats.length + 1}`
+  const tier = getBoatClass(classId).sizeTier
+  const captain = generateCaptain(createRng(s.player.roster.length + 50), `cap-${id}`, [Math.min(5, tier), Math.min(5, tier)])
+  s.player.roster.push(captain)
   s.player.ownedBoats.push({
     id,
     classId,
     nickname: id,
     condition: 100,
-    captainId: null,
+    captainId: captain.id,
     mateId: null,
     managedBy: null,
     currentRoute: null,
@@ -176,7 +180,7 @@ describe('voyage lifecycle', () => {
     let s = newGame(42, T0)
     const t = timeWith(s, ROUTES[1].id, 'calm')
     const boat = s.player.ownedBoats[0]
-    const quote = quoteVoyage(s, boat.id, ROUTES[1].id, t)
+    const quote = quoteVoyage(s, boat.id, ROUTES[1].id, t, 'true')
     s = assignRoute(s, boat.id, ROUTES[1].id, t)
     expect(s.player.ownedBoats[0].state).toBe('sailing')
     s = settle(s, t + quote.durationMs / 2 - 1)
@@ -266,6 +270,8 @@ describe('sinking and lost trips', () => {
     for (let seed = 1; seed <= 60 && lostSeen === 0; seed++) {
       let s = newGame(seed, T0)
       const id = give(s, 'kingfisher') // control: never loses a trip
+      // Neutral captains: a superstitious one would (rightly) refuse the storm.
+      for (const c of s.player.roster) c.hiddenTraits = ['haggler']
       const t = timeWith(s, ROUTES[3].id, 'storm')
       s = assignRoute(s, s.player.ownedBoats[0].id, ROUTES[3].id, t, 1)
       s = assignRoute(s, id, ROUTES[3].id, t, 1)
@@ -435,9 +441,15 @@ describe('fleet actions', () => {
     expect(new Set(names).size).toBe(names.length)
   })
 
-  it('starts with one small cargo and one small passenger boat', () => {
+  it('starts with one small cargo and one small passenger boat, and one captain', () => {
     const s = newGame(3, T0)
     expect(s.player.ownedBoats.map((b) => b.classId)).toEqual(['dinghy-hauler', 'water-taxi'])
+    expect(s.player.roster).toHaveLength(1)
+    expect(s.player.roster[0].reputation).toBe(1)
+    expect(s.player.ownedBoats[0].captainId).toBe(s.player.roster[0].id)
+    // The second boat can't sail until someone is hired.
+    expect(quoteVoyage(s, s.player.ownedBoats[1].id, ROUTES[0].id, T0).blocked).toBe('No captain aboard')
+    expect(() => assignRoute(s, s.player.ownedBoats[1].id, ROUTES[0].id, T0)).toThrow(/captain/)
   })
 
   it('buys and sells commons at 50%', () => {

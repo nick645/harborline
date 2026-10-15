@@ -37,6 +37,7 @@ import {
   captainMods,
   combineMods,
   generateBondedCaptain,
+  generateCaptain,
   getTrait,
   proveTrait,
   recordVoyage,
@@ -45,7 +46,7 @@ import {
 } from './captains'
 import { fleetCap, scoutLevel, upgradeValue } from './upgrades'
 
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 
 export class GameError extends Error {
   /** Some refusals still change the game (a captain shows who they are); this carries that state. */
@@ -84,6 +85,10 @@ export function newGame(seed: number, now: number): GameState {
     log: [],
   }
   for (const classId of STARTING_BOAT_CLASSES) addBoat(state, classId, now)
+  // One green captain to start, aboard the first boat; the second boat waits for a hire.
+  const first = generateCaptain(rng, `c${state.nextCaptainSeq++}`, [1, 1])
+  state.player.roster.push(first)
+  state.player.ownedBoats[0].captainId = first.id
   refreshRecruitPool(state, now, scoutLevel(state))
   return state
 }
@@ -210,7 +215,11 @@ export function quoteVoyage(state: GameState, boatId: string, routeId: string, t
   const wear = WEAR_MULTIPLIERS.find((w) => boat.condition < w.below)?.mult ?? 1
   const rawWorst = Math.round(weather.conditionCost * WEATHER_DAMAGE_SPREAD[1] * wear * mods.damageMult)
   const worstDamage = Math.max(0, Math.round(h.damage?.(rawWorst, ctx) ?? rawWorst))
-  const refusal = mods.refusesStorm && ctx.weather === 'storm' ? 'The captain refuses to sail into a storm' : null
+  const refusal = !boat.captainId
+    ? 'No captain aboard'
+    : mods.refusesStorm && ctx.weather === 'storm'
+      ? 'The captain refuses to sail into a storm'
+      : null
   return {
     payout,
     worstDamage,
@@ -684,6 +693,8 @@ function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number) 
     for (const id of news.proven) log(s, at, 'captain', `${c.name} showed what they're made of: ${getTrait(id).name}`)
     for (const id of news.disproven) log(s, at, 'captain', `Turns out ${c.name} isn't ${getTrait(id).name.toLowerCase()} after all`)
     if (news.developmentRevealed) log(s, at, 'captain', `You're getting the measure of ${c.name}`)
+    if (news.reputationChange > 0) log(s, at, 'captain', `Word is getting round about ${c.name}: reputation up to ${c.reputation} anchors`)
+    if (news.reputationChange < 0) log(s, at, 'captain', `${c.name}'s reputation has slipped to ${c.reputation} anchor${c.reputation === 1 ? '' : 's'}`)
   }
 }
 

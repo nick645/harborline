@@ -184,7 +184,9 @@ function CaptainHead({ c }: { c: CaptainView }) {
     <header className="captain-head">
       <div>
         <strong>{c.name}</strong> <VerdictBadge verdict={c.verdict} />
-        <div className="muted small">from {c.homePort}</div>
+        <div className="muted small">
+          from {c.homePort} · sails tier {c.sailsTiers[0]}–{c.sailsTiers[1]} boats
+        </div>
       </div>
       <Anchors n={c.reputation} />
     </header>

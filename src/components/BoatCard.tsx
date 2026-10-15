@@ -227,7 +227,7 @@ function CrewLine({ game, boat, now, onCaptain, onManage }: Props) {
   const effect = knownCrewEffect(game, boat.id, now)
   const manager = managerOf(game, boat)
   const docked = boat.state === 'idle'
-  const spare = availableCaptains(game).filter((c) => c.id !== boat.captainId && c.id !== boat.mateId)
+  const spare = availableCaptains(game, boat.id).filter((c) => c.id !== boat.captainId && c.id !== boat.mateId)
   const managers = docked && !manager ? managersFor(game, boat.id) : []
 
   const parts = effect
@@ -254,8 +254,11 @@ function CrewLine({ game, boat, now, onCaptain, onManage }: Props) {
           )}
           <span className="muted"> · best guess: {parts.length ? parts.join(', ') : 'no effect known yet'}</span>
         </span>
-      ) : (
-        <span className="muted">No captain aboard</span>
+      ) : boat.state === 'sunk' ? null : (
+        <span className="bad">
+          <strong>No captain aboard: she can’t sail.</strong>
+          {spare.length === 0 && ' Hire one on the quay.'}
+        </span>
       )}
       {docked && spare.length > 0 && (
         <select value="" onChange={(e) => e.target.value && onCaptain(e.target.value)} aria-label="Put a captain aboard">

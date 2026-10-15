@@ -2,10 +2,10 @@
 // Like state.ts, every action takes a state and returns a new one.
 
 import type { Boat, Captain, CaptainRole, GameState, Track } from './types'
-import { SCOUT_ACCURACY, SCOUT_ACTIONS, SCOUT_BAND_WIDTH, PROMOTION_VOYAGES, type ScoutAction } from './data/captains'
+import { captainTiers, SCOUT_ACCURACY, SCOUT_ACTIONS, SCOUT_BAND_WIDTH, PROMOTION_VOYAGES, type ScoutAction } from './data/captains'
 import { MANAGER_ROLES, type ManagerRoleDef } from './data/managers'
 import { UPGRADES, type UpgradeId } from './data/upgrades'
-import { addRumour, captainMods, captainView, combineMods, makeBand, poolRefreshesAt, severance, verdictFor, type CaptainView } from './captains'
+import { addRumour, captainMods, captainView, combineMods, makeBand, poolRefreshesAt, severance, verdictFor, willSail, type CaptainView } from './captains'
 import { getBoatClass } from './economy'
 import { hooksOf } from './abilities'
 import { captainsAboard, GameError, getBoat, getCaptain, log, managerOf, topTier } from './state'
@@ -26,10 +26,12 @@ export function captainViewById(state: GameState, captainId: string | null): Cap
   return c ? captainView(c) : null
 }
 
-/** Captains on the roster who could be put aboard a boat now. */
-export function availableCaptains(state: GameState): CaptainView[] {
+/** Captains on the roster who could be put aboard this boat now. */
+export function availableCaptains(state: GameState, boatId: string): CaptainView[] {
+  const tier = getBoatClass(getBoat(state, boatId).classId).sizeTier
   return state.player.roster
-    .filter((c) => c.role === 'sailing' && !c.bonded && !state.player.ownedBoats.some((b) => b.state !== 'idle' && (b.captainId === c.id || b.mateId === c.id)))
+    .filter((c) => c.role === 'sailing' && !c.bonded && willSail(c, tier))
+    .filter((c) => !state.player.ownedBoats.some((b) => b.state !== 'idle' && (b.captainId === c.id || b.mateId === c.id)))
     .map(captainView)
 }
 
@@ -182,6 +184,11 @@ export function assignCaptain(state: GameState, captainId: string, boatId: strin
   if (c.role !== 'sailing') throw new GameError(`${c.name} has a desk job now`)
   const boat = getBoat(state, boatId)
   if (boat.state !== 'idle') throw new GameError('Captains can only change at the dock')
+  const tier = getBoatClass(boat.classId).sizeTier
+  if (!willSail(c, tier)) {
+    const [lo, hi] = captainTiers(c.reputation)
+    throw new GameError(`${c.name} only takes tier ${lo}–${hi} boats at their reputation`)
+  }
   const current = boatOfCaptain(state, captainId)
   if (current && current.state !== 'idle') throw new GameError(`${c.name} is at sea`)
   if (current?.id === boatId) return state

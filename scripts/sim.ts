@@ -16,6 +16,7 @@ import {
   buyBoat,
   craftableClasses,
   craftBoat,
+  GameError,
   newGame,
   quoteVoyage,
   recallBoat,
@@ -29,6 +30,8 @@ import {
 import { getBoatClass, repairCostPerPoint } from '../src/game/economy'
 import { getPart, hasParts } from '../src/game/parts'
 import { fleetCap } from '../src/game/upgrades'
+import { assignCaptain, hireCaptain } from '../src/game/crew'
+import { willSail } from '../src/game/captains'
 import { ROUTES } from '../src/game/data/routes'
 import { LOW_CONDITION_THRESHOLD, STARTING_COINS, WEAR_MULTIPLIERS } from '../src/game/data/economy'
 import { WEATHER, WEATHER_SLOT_MS } from '../src/game/data/weather'
@@ -119,6 +122,7 @@ type RunResult = {
   mythicParts: number
   crafted: number
   firstCraftMin: number | null
+  captainsHired: number
 }
 
 /** Worst plausible damage for one trip in this weather at this condition (top of the ±50% roll). */
@@ -131,7 +135,7 @@ const isCrafted = (classId: string) => ['legendary', 'mythic'].includes(getBoatC
 const isStarter = (classId: string) => getBoatClass(classId).price === 0 && getBoatClass(classId).rarity === 'common'
 const roughWater = (w: string) => w === 'rough' || w === 'storm'
 
-function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPolicy): GameState {
+function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPolicy, res: RunResult): GameState {
   s = scrapStandardParts(s)
   for (const cls of craftableClasses()) {
     if (hasParts(s.player.partInventory, cls.requiredParts) && s.player.ownedBoats.length < fleetCap(s, cls.sizeTier)) s = craftBoat(s, cls.id, t)
@@ -141,6 +145,25 @@ function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPo
 
   for (const boat of s.player.ownedBoats) {
     if (boat.state === 'sunk' && s.player.coins >= salvageQuote(s, boat.id)) s = salvageBoat(s, boat.id, t)
+  }
+  // Every boat needs a captain: reuse one ashore, else hire the cheapest who'll take her.
+  for (const boat of s.player.ownedBoats) {
+    if (boat.state !== 'idle' || boat.captainId) continue
+    const tier = getBoatClass(boat.classId).sizeTier
+    const aboard = new Set(s.player.ownedBoats.map((b) => b.captainId))
+    const ashore = s.player.roster.find((c) => c.role === 'sailing' && !aboard.has(c.id) && willSail(c, tier))
+    if (ashore) {
+      s = assignCaptain(s, ashore.id, boat.id)
+      continue
+    }
+    const hire = s.recruitPool.recruits
+      .filter((c) => willSail(c, tier) && c.fee <= s.player.coins)
+      .sort((a, b) => a.fee - b.fee)[0]
+    if (hire) {
+      s = hireCaptain(s, hire.id, t)
+      s = assignCaptain(s, hire.id, boat.id)
+      res.captainsHired++
+    }
   }
   // Heeding storm alerts: careful players call boats home when their route turns rough.
   if (policy !== 'all-in') {
@@ -177,7 +200,13 @@ function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPo
     const tank = getBoatClass(boat.classId).fuelTankTrips
     // Storm chasers go one trip at a time: the weather changes every 10 minutes.
     const trips = chaser ? 1 : TRIPS === 'tank' ? tank : Math.min(tank, Number(TRIPS))
-    s = assignRoute(s, boat.id, pick.r.id, t, trips)
+    try {
+      s = assignRoute(s, boat.id, pick.r.id, t, trips)
+    } catch (e) {
+      // A captain refusing at the gangway (as a player would see it): keep what came to light.
+      if (!(e instanceof GameError)) throw e
+      if (e.state) s = e.state
+    }
   }
   return s
 }
@@ -201,6 +230,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     mythicParts: 0,
     crafted: 0,
     firstCraftMin: null,
+    captainsHired: 0,
   }
   let spent = 0
   let t = T0
@@ -218,7 +248,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     const before = s.player.coins
     const boatsBefore = s.player.ownedBoats.length
     const craftedBefore = s.player.ownedBoats.filter((b) => isCrafted(b.classId)).length
-    s = playOneTurn(s, strat, t, policy)
+    s = playOneTurn(s, strat, t, policy, res)
     if (res.firstCraftMin === null && s.player.ownedBoats.filter((b) => isCrafted(b.classId)).length > craftedBefore) {
       res.firstCraftMin = (t - T0) / 60_000
     }
@@ -291,6 +321,7 @@ if (MODE === 'storms') {
     }
     row('tier at end', results.map((r) => r.finalTier), 'tier')
     row('boats at end', results.map((r) => r.finalBoats), 'boats')
+    row('captains hired', results.map((r) => r.captainsHired), '  ')
     row('coins earned (active)', results.map((r) => r.earnedActive), 'c')
     row('sinkings', results.map((r) => r.sinkings), '  ')
     row('trips lost to weather', results.map((r) => r.lostTrips), '  ')

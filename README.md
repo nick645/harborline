@@ -42,7 +42,7 @@ scripts/sim.ts       balance harness
 
 ## Rules as built
 
-- You start with 500 coins, one small cargo boat (Dinghy Hauler) and one small passenger boat (Water Taxi).
+- You start with 500 coins, one small cargo boat (Dinghy Hauler), one small passenger boat (Water Taxi), and one green 1-anchor captain. **Every boat needs a captain to sail**, managed boats included, so the second boat waits for your first hire.
 - 5 ports. Every route is a round trip out of the home port, Saltmarsh Quay (distances 6, 10.1, 14.1, 20.2).
 - `payout = capacity × demand × distance × 0.8 − fuelPerLeg × 2`. Cargo boats use the route's cargo demand and passenger boats its passenger demand; both are 0.5–1.5 and reroll when a boat arrives. The payout is locked in at departure and credited when the boat reaches the far port.
 - **Queued trips:** send a docked boat on 1–N back-to-back round trips on one route. N is its fuel tank (4 for starters, rising with size). Each trip re-quotes at departure against current demand. When the queue is done the boat docks and waits; there is no auto-pilot. "Return after this trip" cuts a run short.
@@ -71,7 +71,8 @@ scripts/sim.ts       balance harness
 
 Every captain starts mostly unknown. Only the sea tells you who they really are.
 
-- **On the quay** (5 recruits, new faces every 6 hours) you see a name, a home port, a **Reputation** of 1–5 anchors, an asking fee, and one dockside rumour. Reputation is right about 70% of the time; the rest are under- or oversold by an anchor.
+- **On the quay** (5 recruits, new faces every 6 hours) you see a name, a home port, a **Reputation** of 1–5 anchors, an asking fee, and one dockside rumour. Reputation is right about 70% of the time; the rest are under- or oversold by an anchor. The quay offers captains around your level: 1–2 anchors at tier 1, rising to 3–5 at tier 5+.
+- **Reputation decides which boats a captain will take:** 1 anchor sails tiers 1–2, 2 → 1–3, 3 → 2–4, 4 → 3–5, 5 → 4–6. A cruise director won't captain a dinghy, and a deckhand can't take a liner. Every 10 voyages reputation moves an anchor toward the captain's true ability, so a Sleeper works their way up to bigger ships and an overrated captain slips down.
 - **Hidden underneath:** skill (1–100), 2–4 traits, a ceiling, and a development style (Steady learner, Quick study, Late bloomer, Peaked). None of these ever reach the UI directly; a test enforces it.
 - **Scouting spends watches** (6 per pool at scout level 1, +2 per level): *Ask around the docks* (1) adds a trait rumour that's right 60–85% of the time by scout level; *Read their logbook* (2) gives a skill range 60→10 points wide, never exact; *Take them out on a run* (3) gives a verdict — **Sleeper**, **All talk**, or **True to form** — and another rumour.
 - **Fees follow reputation, not skill**, so Sleepers are bargains. Letting a captain go costs severance that grows with voyages served.
@@ -89,8 +90,8 @@ Prices are tuned against these targets with `npm run sim`:
 
 | Milestone | Target | Simulated (risk-aware bot, full-tank sends) |
 |---|---|---|
-| First purchase (a tier-1 Skiff or Launch, 2,000c) | 30–60 min | ~39 min |
-| First tier-2 boat (Harbor Skiff / Harbor Ferry, 22,000c) | 4–5 h | ~4.0 h building wide (harbour full at 6), ~4.9 h with 4 |
+| First purchase (a tier-1 Skiff or Launch, 2,000c) | 30–60 min | ~48 min |
+| First tier-2 boat (Harbor Skiff / Harbor Ferry, 22,000c) | 4–5 h | ~4.9 h building wide, ~5.4 h with 4 (captain fees now part of the cost) |
 
 Tiers 3–6 keep the spec's ~3.5× price step and are not tuned yet. Over 6 h the bot finds ~10–20 rare parts and 1–2 legendary pieces.
 

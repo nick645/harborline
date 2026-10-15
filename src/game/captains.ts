@@ -30,11 +30,13 @@ import {
   SEVERANCE_PER_VOYAGE_SHARE,
   SKILL_DAMAGE_PER_POINT,
   SKILL_MAX,
-  SKILL_MEAN,
   SKILL_MIN,
   SKILL_PAY_PER_POINT,
-  SKILL_SD,
   skillToAnchors,
+  QUAY_REPUTATION,
+  REPUTATION_REVIEW_EVERY,
+  REPUTATION_WEIGHTS,
+  captainTiers,
   TRAIT_COUNT,
   TRAIT_REVEAL_CHANCE,
   TRAITS,
@@ -61,8 +63,22 @@ export function makeBand(rng: RngState, skill: number, width: number): [number, 
   return [lo, lo + width]
 }
 
-export function generateCaptain(rng: RngState, id: string): Captain {
-  const trueSkill = rollNormal(rng, SKILL_MEAN, SKILL_SD, SKILL_MIN, SKILL_MAX)
+/**
+ * A new captain. Reputation is drawn from `repRange` (the quay offers captains around your
+ * level); the truth behind it is usually the same, sometimes an anchor better (a Sleeper) or
+ * worse (All talk).
+ */
+export function generateCaptain(rng: RngState, id: string, repRange: [number, number] = [1, 5]): Captain {
+  const reps = Array.from({ length: repRange[1] - repRange[0] + 1 }, (_, i) => repRange[0] + i)
+  const reputation = rollWeighted(rng, reps.map((r) => ({ item: r, weight: REPUTATION_WEIGHTS[r] })))
+  const r = nextFloat(rng)
+  const trueAnchors =
+    r < REPUTATION_UNDERVALUED
+      ? Math.min(5, reputation + 1)
+      : r < REPUTATION_UNDERVALUED + REPUTATION_OVERRATED
+        ? Math.max(1, reputation - 1)
+        : reputation
+  const trueSkill = Math.min(SKILL_MAX, Math.max(SKILL_MIN, nextInt(rng, trueAnchors * 20 - 19, trueAnchors * 20)))
   const ceiling = Math.min(100, trueSkill + nextInt(rng, 0, CEILING_HEADROOM))
   const development = rollWeighted(rng, DEVELOPMENT.map((d) => ({ item: d.id, weight: d.weight })))
 
@@ -75,16 +91,6 @@ export function generateCaptain(rng: RngState, id: string): Captain {
     )
     hiddenTraits.push(pick)
   }
-
-  // Reputation is usually right; sometimes the harbour undersells or oversells a captain.
-  const trueAnchors = skillToAnchors(trueSkill)
-  const r = nextFloat(rng)
-  const reputation =
-    r < REPUTATION_UNDERVALUED
-      ? Math.max(1, trueAnchors - 1)
-      : r < REPUTATION_UNDERVALUED + REPUTATION_OVERRATED
-        ? Math.min(5, trueAnchors + 1)
-        : trueAnchors
   const fee = Math.round((HIRE_FEE[reputation] * (0.9 + nextFloat(rng) * 0.2)) / 10) * 10
 
   const captain: Captain = {
@@ -117,7 +123,7 @@ export function generateCaptain(rng: RngState, id: string): Captain {
 
 /** A captain who comes with a ship (the Derelict Queen): exceptional, lucky, bonded for good. */
 export function generateBondedCaptain(rng: RngState, id: string): Captain {
-  const c = generateCaptain(rng, id)
+  const c = generateCaptain(rng, id, [5, 5])
   c.trueSkill = rollNormal(rng, 85, 5, 75, 98)
   c.ceiling = Math.min(100, c.trueSkill + nextInt(rng, 0, 8))
   if (!c.hiddenTraits.includes('lucky')) c.hiddenTraits[0] = 'lucky'
@@ -143,6 +149,12 @@ export function addRumour(rng: RngState, c: Captain, accuracy: number): Rumour |
   return rumour
 }
 
+/** Whether a captain will take command of a boat of this tier. */
+export function willSail(c: Captain, boatTier: number): boolean {
+  const [lo, hi] = captainTiers(c.reputation)
+  return boatTier >= lo && boatTier <= hi
+}
+
 export function verdictFor(c: Captain): Verdict {
   const truth = skillToAnchors(c.trueSkill)
   return truth > c.reputation ? 'sleeper' : truth < c.reputation ? 'all-talk' : 'true-to-form'
@@ -166,9 +178,10 @@ export function watchesFor(scoutLevel: number): number {
 export function refreshRecruitPool(s: GameState, t: number, level: number) {
   const slot = recruitSlot(t)
   if (s.recruitPool.slot === slot) return
+  const range = QUAY_REPUTATION[s.player.maxTierReached]
   s.recruitPool = {
     slot,
-    recruits: Array.from({ length: RECRUIT_POOL_SIZE }, () => generateCaptain(s.rng, `c${s.nextCaptainSeq++}`)),
+    recruits: Array.from({ length: RECRUIT_POOL_SIZE }, () => generateCaptain(s.rng, `c${s.nextCaptainSeq++}`, range)),
     watchesLeft: watchesFor(level),
   }
 }
@@ -304,6 +317,8 @@ export interface VoyageNews {
   proven: string[]
   disproven: string[]
   developmentRevealed: boolean
+  /** +1 or −1 when word of how they really sail moves their reputation. */
+  reputationChange: number
 }
 
 /**
@@ -312,7 +327,7 @@ export interface VoyageNews {
  * rumours put to rest. `revealEvery` is shorter aboard boats that bring traits out faster.
  */
 export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealEvery = REVEAL_EVERY): VoyageNews {
-  const news: VoyageNews = { proven: [], disproven: [], developmentRevealed: false }
+  const news: VoyageNews = { proven: [], disproven: [], developmentRevealed: false, reputationChange: 0 }
   c.voyageCount++
   const exp: Exposure = c.exposure
   exp[trip.weather]++
@@ -354,6 +369,15 @@ export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealE
     }
   }
 
+  // Word gets around: reputation drifts one anchor toward how they really sail.
+  if (c.voyageCount % REPUTATION_REVIEW_EVERY === 0) {
+    const truth = skillToAnchors(c.trueSkill)
+    if (truth !== c.reputation) {
+      news.reputationChange = truth > c.reputation ? 1 : -1
+      c.reputation += news.reputationChange
+    }
+  }
+
   if (!c.developmentKnown && c.voyageCount >= DEVELOPMENT_KNOWN_AFTER) {
     c.developmentKnown = true
     news.developmentRevealed = true
@@ -390,6 +414,8 @@ export interface CaptainView {
   managesTrack: Track | null
   bonded: boolean
   severance: number
+  /** Boat tiers they'll take command of, given their reputation. */
+  sailsTiers: [number, number]
 }
 
 export function captainView(c: Captain): CaptainView {
@@ -414,5 +440,6 @@ export function captainView(c: Captain): CaptainView {
     managesTrack: c.managesTrack,
     bonded: c.bonded,
     severance: c.bonded ? 0 : severance(c),
+    sailsTiers: captainTiers(c.reputation),
   }
 }
