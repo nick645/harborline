@@ -1,31 +1,38 @@
 import { useState } from 'react'
-import { Alert, StyleSheet, Text, View } from 'react-native'
+import { Pressable, Text, useWindowDimensions, View } from 'react-native'
+import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
-import { boatOfCaptain, managerRole, promotionOptions, quayInfo, recruitViews, rosterViews } from '../../../src/game/crew'
+import { boatOfCaptain, managerRole, quayInfo, recruitViews, rosterViews } from '../../../src/game/crew'
 import { SCOUT_ACTIONS, type ScoutAction } from '../../../src/game/data/captains'
 import { coins, duration } from '../../../src/format'
-import { useTheme } from '../theme'
-import { Body, Button, Card, Muted, Row, Tag } from './ui'
+import { QuayScene } from '../art/QuayScene'
+import { Figure } from '../art/Figure'
+import { useSceneClock } from '../art/clock'
+import { lightAt } from '../art/light'
+import { lookFor } from '../art/looks'
+import { SkillRange } from '../screens/CaptainScreen'
+import { fonts, useTheme } from '../theme'
+import { Anchors, Button, Card, Muted, Row, Tag, Title } from './ui'
 
 type Props = {
   game: GameState
   now: number
-  onScout: (id: string, action: ScoutAction) => void
+  /** Returns true if the scouting went ahead. */
+  onScout: (id: string, action: ScoutAction) => boolean
   onHire: (id: string) => void
-  onFire: (id: string) => void
-  onAshore: (id: string) => void
-  onPromote: (id: string, role: 'dockhand' | 'harbormaster' | 'fleet-manager', track?: 'cargo' | 'passenger') => void
-  onTakeOver: (id: string) => void
+  onOpenCaptain: (id: string) => void
 }
+
+const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'True to form' } as const
 
 export function CaptainsScreen(props: Props) {
   const [tab, setTab] = useState<'quay' | 'roster'>('quay')
   return (
     <View style={{ gap: 10 }}>
       <Row>
-        <Button small kind={tab === 'quay' ? 'primary' : 'secondary'} label={`Quay (${props.game.recruitPool.recruits.length})`} onPress={() => setTab('quay')} />
-        <Button small kind={tab === 'roster' ? 'primary' : 'secondary'} label={`Yours (${props.game.player.roster.length})`} onPress={() => setTab('roster')} />
+        <Button small kind={tab === 'quay' ? 'primary' : 'secondary'} label={`The quay (${props.game.recruitPool.recruits.length})`} onPress={() => setTab('quay')} />
+        <Button small kind={tab === 'roster' ? 'primary' : 'secondary'} label={`Your captains (${props.game.player.roster.length})`} onPress={() => setTab('roster')} />
       </Row>
       {tab === 'quay' ? <Quay {...props} /> : <Roster {...props} />}
     </View>
@@ -33,37 +40,103 @@ export function CaptainsScreen(props: Props) {
 }
 
 function Quay({ game, now, onScout, onHire }: Props) {
+  const t = useTheme()
+  const { width } = useWindowDimensions()
   const info = quayInfo(game, now)
+  const recruits = recruitViews(game)
+  const [selectedId, setSelected] = useState<string | null>(null)
+  const [moment, setMoment] = useState<{ id: string; action: ScoutAction } | null>(null)
+  const sel = recruits.find((r) => r.id === selectedId) ?? recruits[0] ?? null
+
+  const scout = (action: ScoutAction) => {
+    if (sel && onScout(sel.id, action)) setMoment({ id: sel.id, action })
+  }
+
   return (
     <View style={{ gap: 10 }}>
-      <Muted>
-        {info.watchesLeft} watch{info.watchesLeft === 1 ? '' : 'es'} left · new faces in {duration(info.refreshesAt - now)} · scout level {info.scoutLevel}
-      </Muted>
-      {recruitViews(game).map((c) => (
-        <Card key={c.id}>
-          <Head c={c} />
-          <SkillRange band={c.skillBand} />
-          <Traits c={c} />
+      <Row style={{ justifyContent: 'space-between' }}>
+        <Muted>New faces in {duration(info.refreshesAt - now)}</Muted>
+        <Row style={{ gap: 3 }}>
+          {Array.from({ length: Math.max(info.watchesLeft, 0) + 0 }, (_, i) => (
+            <Text key={i} style={{ color: t.accent, fontSize: 14 }}>●</Text>
+          ))}
+          <Muted>
+            {info.watchesLeft} watch{info.watchesLeft === 1 ? '' : 'es'} left
+          </Muted>
+        </Row>
+      </Row>
+
+      {recruits.length > 0 ? (
+        <QuayScene
+          width={Math.min(width - 24, 720)}
+          light={lightAt(now)}
+          recruits={recruits}
+          selectedId={sel?.id ?? null}
+          onSelect={(id) => {
+            setSelected(id)
+            setMoment(null)
+          }}
+        />
+      ) : (
+        <Muted>Nobody else is looking for work today.</Muted>
+      )}
+
+      {sel && (
+        <Card>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Title size={24}>{sel.name}</Title>
+            <Anchors n={sel.reputation} />
+          </Row>
+          <Muted>
+            From {sel.homePort} · takes tier {sel.sailsTiers[0]}–{sel.sailsTiers[1]} boats · asks {coins(sel.fee)}c
+          </Muted>
+          {sel.traits.map((tr) => (
+            <Text key={tr.id} style={{ fontFamily: fonts.titleItalic, fontSize: 18, color: tr.status === 'disproven' ? t.muted : '#e2d2c8', textDecorationLine: tr.status === 'disproven' ? 'line-through' : 'none' }}>
+              “{tr.rumour}”
+            </Text>
+          ))}
+          {!(sel.skillBand[0] <= 1 && sel.skillBand[1] >= 100) && <SkillRange band={sel.skillBand} />}
+          {sel.verdict && <Tag label={VERDICT[sel.verdict]} color={sel.verdict === 'sleeper' ? t.good : sel.verdict === 'all-talk' ? t.bad : t.muted} dark />}
+          {moment?.id === sel.id && <Moment c={sel} action={moment.action} />}
           <Row>
             {(Object.keys(SCOUT_ACTIONS) as ScoutAction[]).map((a) => (
               <Button
                 key={a}
                 small
                 kind="secondary"
-                label={`${SCOUT_ACTIONS[a].name} · ${SCOUT_ACTIONS[a].watches}w`}
-                disabled={(a === 'run' && c.verdict !== null) || info.watchesLeft < SCOUT_ACTIONS[a].watches}
-                onPress={() => onScout(c.id, a)}
+                label={`${SCOUT_ACTIONS[a].name} · ${SCOUT_ACTIONS[a].watches}`}
+                disabled={(a === 'run' && sel.verdict !== null) || info.watchesLeft < SCOUT_ACTIONS[a].watches}
+                onPress={() => scout(a)}
               />
             ))}
-            <Button small label={`Hire ${coins(c.fee)}c`} disabled={game.player.coins < c.fee} onPress={() => onHire(c.id)} />
           </Row>
+          <Button label={`Hire for ${coins(sel.fee)}c`} disabled={game.player.coins < sel.fee} onPress={() => onHire(sel.id)} />
         </Card>
-      ))}
+      )}
     </View>
   )
 }
 
-function Roster({ game, onFire, onAshore, onPromote, onTakeOver }: Props) {
+/** A scouting action told as a little moment on the quay. */
+function Moment({ c, action }: { c: CaptainView; action: ScoutAction }) {
+  const t = useTheme()
+  const first = c.name.split(' ')[0]
+  const latest = c.traits[c.traits.length - 1]
+  const text =
+    action === 'ask'
+      ? `You stand a round at the Gull & Lantern. Someone at the bar leans in: “${latest?.rumour ?? '…'}”`
+      : action === 'logbook'
+        ? `${first} lets you leaf through their logbook under the lamp. Tidy entries, a few smudged ones. Skill somewhere between ${c.skillBand[0]} and ${c.skillBand[1]}.`
+        : `You take ${first} out past the breakwater as the lamps come on. By the time you tie up, you have a feeling: ${c.verdict ? VERDICT[c.verdict] : '…'}.`
+  return (
+    <View style={{ backgroundColor: t.surface2, borderRadius: 10, padding: 10 }}>
+      <Text style={{ color: t.text, fontFamily: fonts.body, fontSize: 14, lineHeight: 20 }}>{text}</Text>
+    </View>
+  )
+}
+
+function Roster({ game, onOpenCaptain }: Props) {
+  const t = useTheme()
   const roster = rosterViews(game)
   if (roster.length === 0) return <Muted>No captains yet. Find one on the quay.</Muted>
   return (
@@ -71,116 +144,42 @@ function Roster({ game, onFire, onAshore, onPromote, onTakeOver }: Props) {
       {roster.map((c) => {
         const boat = boatOfCaptain(game, c.id)
         const role = managerRole(c.role)
+        const where = role ? role.name : boat ? (boat.state === 'sailing' || boat.state === 'returning' ? `At the helm of ${boat.nickname}` : `Aboard ${boat.nickname}`) : 'Ashore'
         return (
-          <Card key={c.id}>
-            <Head c={c} />
-            <Muted>
-              {role ? `${role.name} · ${role.description}` : boat ? `Aboard ${boat.nickname}${boat.state !== 'idle' ? ' (at sea)' : ''}` : 'Ashore'} · {c.voyageCount} voyage
-              {c.voyageCount === 1 ? '' : 's'}
-              {c.hiredBy ? ` · hired by ${roster.find((m) => m.id === c.hiredBy)?.name ?? 'a manager'}` : ''}
-            </Muted>
-            <SkillRange band={c.skillBand} />
-            {c.knownDevelopment && (
-              <Muted>
-                {c.knownDevelopment.name}: {c.knownDevelopment.description}
-              </Muted>
-            )}
-            <Traits c={c} />
-            <Row>
-              {boat && !c.bonded && boat.state === 'idle' && <Button small kind="secondary" label="Step ashore" onPress={() => onAshore(c.id)} />}
-              {c.hiredBy && <Button small kind="secondary" label="Take over" onPress={() => onTakeOver(c.id)} />}
-              {promotionOptions(game, c.id).map((r) =>
-                r.id === 'fleet-manager' ? (
-                  (['cargo', 'passenger'] as const).map((track) => (
-                    <Button key={track} small kind="secondary" label={`Make ${r.name} (${track})`} onPress={() => onPromote(c.id, r.id, track)} />
-                  ))
-                ) : (
-                  <Button key={r.id} small kind="secondary" label={`Make ${r.name}`} onPress={() => onPromote(c.id, r.id)} />
-                ),
-              )}
-              {!c.bonded && (
-                <Button
-                  small
-                  kind="danger"
-                  label={`Let go · ${coins(c.severance)}c`}
-                  disabled={game.player.coins < c.severance || (!!boat && boat.state !== 'idle')}
-                  onPress={() =>
-                    Alert.alert(`Let ${c.name} go?`, `Severance is ${coins(c.severance)} coins.`, [
-                      { text: 'Keep', style: 'cancel' },
-                      { text: 'Let go', style: 'destructive', onPress: () => onFire(c.id) },
-                    ])
-                  }
-                />
-              )}
-            </Row>
-          </Card>
+          <Pressable key={c.id} onPress={() => onOpenCaptain(c.id)} accessibilityRole="button" accessibilityLabel={`Open Captain ${c.name}`}>
+            <Card>
+              <Row style={{ flexWrap: 'nowrap' }}>
+                <Portrait id={c.id} />
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Title size={20}>{c.name}</Title>
+                    <Anchors n={c.reputation} size={12} />
+                  </Row>
+                  <Muted>
+                    {where} · {c.voyageCount} voyage{c.voyageCount === 1 ? '' : 's'}
+                    {c.hiredBy ? ' · hired by a manager' : ''}
+                  </Muted>
+                  <SkillRange band={c.skillBand} />
+                </View>
+                <Text style={{ color: t.muted, fontSize: 20 }}>›</Text>
+              </Row>
+            </Card>
+          </Pressable>
         )
       })}
     </View>
   )
 }
 
-const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'True to form' } as const
-
-function Head({ c }: { c: CaptainView }) {
-  const t = useTheme()
+/** A small head-and-shoulders portrait under lamplight. */
+function Portrait({ id }: { id: string }) {
+  const clock = useSceneClock()
   return (
-    <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Row>
-          <Body style={{ fontWeight: '700' }}>{c.name}</Body>
-          {c.verdict && (
-            <Tag label={VERDICT[c.verdict]} color={c.verdict === 'sleeper' ? t.good : c.verdict === 'all-talk' ? t.bad : t.muted} />
-          )}
-        </Row>
-        <Muted>
-          from {c.homePort} · sails tier {c.sailsTiers[0]}–{c.sailsTiers[1]} boats
-        </Muted>
-      </View>
-      <Text style={{ fontSize: 15, letterSpacing: 1 }}>
-        <Text style={{ color: t.text }}>{'⚓︎'.repeat(c.reputation)}</Text>
-        <Text style={{ color: t.muted, opacity: 0.3 }}>{'⚓︎'.repeat(5 - c.reputation)}</Text>
-      </Text>
-    </Row>
+    <Canvas style={{ width: 56, height: 64 }}>
+      <Group clip={rrect(rect(0, 0, 56, 64), 10, 10)}>
+        <Rect x={0} y={0} width={56} height={64} color="#433145" />
+        <Figure look={lookFor(id)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
+      </Group>
+    </Canvas>
   )
 }
-
-function SkillRange({ band }: { band: [number, number] }) {
-  const t = useTheme()
-  const [lo, hi] = band
-  const unknown = lo <= 1 && hi >= 100
-  return (
-    <Row style={{ flexWrap: 'nowrap' }}>
-      <Muted>Skill</Muted>
-      <View style={[styles.track, { backgroundColor: t.surface2 }]}>
-        {!unknown && <View style={[styles.band, { left: `${lo - 1}%`, width: `${Math.max(2, hi - lo + 1)}%`, backgroundColor: t.accent }]} />}
-      </View>
-      <Muted>{unknown ? '?' : `${lo}–${hi}`}</Muted>
-    </Row>
-  )
-}
-
-function Traits({ c }: { c: CaptainView }) {
-  const t = useTheme()
-  if (!c.traits.length) return <Muted>Nobody knows much about them yet.</Muted>
-  return (
-    <View style={{ gap: 2 }}>
-      {c.traits.map((tr) => (
-        <Text key={tr.id} style={{ fontSize: 13, color: tr.status === 'disproven' ? t.muted : t.text }}>
-          {tr.status === 'proven' && (
-            <>
-              <Text style={{ fontWeight: '700' }}>✓ {tr.name}</Text> <Text style={{ color: t.muted }}>{tr.description}</Text>
-            </>
-          )}
-          {tr.status === 'rumour' && <Text>Rumour: “{tr.rumour}”</Text>}
-          {tr.status === 'disproven' && <Text style={{ textDecorationLine: 'line-through' }}>“{tr.rumour}”</Text>}
-        </Text>
-      ))}
-    </View>
-  )
-}
-
-const styles = StyleSheet.create({
-  track: { flex: 1, height: 10, borderRadius: 5, overflow: 'hidden' },
-  band: { position: 'absolute', top: 0, bottom: 0, borderRadius: 5 },
-})

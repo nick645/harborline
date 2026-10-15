@@ -9,7 +9,8 @@ import { GameError, newGame, settle, settleAway } from '../../src/game/state'
 import { randomSeed } from '../../src/game/rolls'
 import { clearSave, loadGame, saveGame } from './storage'
 
-const TICK_MS = 500
+// Once a second: countdowns show seconds, and scenes animate on their own clock.
+const TICK_MS = 1000
 const AUTOSAVE_MS = 5000
 
 export const worthReporting = (r: AwayReport) => r.tripsCompleted > 0 || r.sunk.length > 0 || r.lost.length > 0
@@ -84,16 +85,20 @@ export function useGame() {
     }
   }, [comeBack, commit])
 
-  /** Run a game action against the settled present. Game refusals become a message, not a crash. */
+  /**
+   * Run a game action against the settled present. Game refusals become a message, not a crash.
+   * Returns whether the action went ahead.
+   */
   const act = useCallback(
-    (fn: (g: GameState, t: number) => GameState) => {
-      if (!ref.current) return
+    (fn: (g: GameState, t: number) => GameState): boolean => {
+      if (!ref.current) return false
       try {
         const t = Date.now()
         const next = fn(settle(ref.current, t), t)
         commit(next)
         setError(null)
         void saveGame(next)
+        return true
       } catch (e) {
         if (!(e instanceof GameError)) throw e
         // Some refusals still change things: a captain's trait comes to light.
@@ -102,6 +107,7 @@ export function useGame() {
           void saveGame(e.state)
         }
         setError(e.message)
+        return false
       }
     },
     [commit],

@@ -1,61 +1,48 @@
-// The web build's palette, as values (React Native has no CSS variables).
+// The Lantern palette: warm plum shadows, honey and amber light. One theme, day or night;
+// the scenes themselves follow the clock. Storms are the cold exception, by design.
 
-import { useColorScheme } from 'react-native'
-
-const light = {
-  bg: '#f4f1ea',
-  surface: '#ffffff',
-  surface2: '#ece7dc',
-  text: '#1d2430',
-  muted: '#6b7280',
-  border: '#d9d2c3',
-  accent: '#1f6fb2',
-  accentText: '#ffffff',
-  good: '#2f8f57',
-  bad: '#c0392b',
-  warn: '#b7791f',
-  sea: '#cfe3f0',
-  route: '#7aa3c2',
-  port: '#f4f1ea',
-  portStroke: '#1d2430',
-  home: '#1f6fb2',
-  calm: '#4f8fbf',
-  choppy: '#3b9c8f',
+export const theme = {
+  bg: '#2b1f2c',
+  surface: '#36283a',
+  surface2: '#433145',
+  text: '#f3e7d8',
+  muted: '#c9b6ae',
+  border: '#56404f',
+  accent: '#f2b45a',
+  accentText: '#2b1f2c',
+  good: '#7fd1a8',
+  bad: '#ff8fa6',
+  warn: '#f5a35a',
+  paper: '#f3e7d8',
+  ink: '#2b1f2c',
+  pencil: '#6b5a52',
+  calm: '#5a8fb0',
+  choppy: '#4aa39a',
   rough: '#d07a1e',
-  storm: '#b3263a',
-  rare: '#2f7fd1',
-  legendary: '#c9861a',
-  mythic: '#8b3fc6',
-}
-
-export type Theme = typeof light
-
-const dark: Theme = {
-  bg: '#11161d',
-  surface: '#19212b',
-  surface2: '#222c38',
-  text: '#e6e9ee',
-  muted: '#94a0b1',
-  border: '#2e3a48',
-  accent: '#4b9be0',
-  accentText: '#0b1520',
-  good: '#4cc27f',
-  bad: '#ef6b5b',
-  warn: '#e0a84a',
-  sea: '#12324a',
-  route: '#3d6a8c',
-  port: '#e6e9ee',
-  portStroke: '#0b1520',
-  home: '#4b9be0',
-  calm: '#3d7aa6',
-  choppy: '#2f8a7e',
-  rough: '#c46f16',
   storm: '#c4344a',
   rare: '#5aa2ea',
   legendary: '#e6a53a',
   mythic: '#b07be6',
 }
 
+export type Theme = typeof theme
+
 export function useTheme(): Theme {
-  return useColorScheme() === 'dark' ? dark : light
+  return theme
+}
+
+/** Font families by role. Custom fonts carry their weight in the family name. */
+export const fonts = {
+  body: 'Barlow_400Regular',
+  medium: 'Barlow_500Medium',
+  semibold: 'Barlow_600SemiBold',
+  bold: 'Barlow_700Bold',
+  title: 'Cormorant_700Bold',
+  titleItalic: 'Cormorant_600SemiBold_Italic',
+}
+
+/** Map a fontWeight to the matching Barlow family. */
+export function bodyFont(weight?: string | number): string {
+  const w = Number(weight ?? 400)
+  return w >= 700 ? fonts.bold : w >= 600 ? fonts.semibold : w >= 500 ? fonts.medium : fonts.body
 }

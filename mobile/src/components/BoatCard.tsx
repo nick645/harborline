@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Boat, GameState } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, sellPrice } from '../../../src/game/economy'
 import { getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
@@ -7,10 +7,13 @@ import { abilityOf } from '../../../src/game/abilities'
 import { availableCaptains, captainViewById, knownCrewEffect } from '../../../src/game/crew'
 import { LOW_CONDITION_THRESHOLD, SALVAGE_CONDITION } from '../../../src/game/data/economy'
 import { WEATHER } from '../../../src/game/data/weather'
-import { TIER_COLORS } from '../../../src/colors'
 import { coins, duration, percent } from '../../../src/format'
-import { useTheme } from '../theme'
-import { Body, Button, Card, Muted, Row, Tag } from './ui'
+import { Canvas } from '@shopify/react-native-skia'
+import { fonts, useTheme } from '../theme'
+import { BoatArt } from '../art/BoatArt'
+import { boatWidth } from '../art/boatGeometry'
+import { LIGHT } from '../art/light'
+import { Body, Button, Card, Muted, Row, Tag, Title } from './ui'
 
 type Props = {
   game: GameState
@@ -23,6 +26,20 @@ type Props = {
   onSell: () => void
   onSalvage: () => void
   onCaptain: (captainId: string) => void
+  /** Open the live view of this boat; absent when already on it. */
+  onOpen?: () => void
+  onOpenCaptain: (captainId: string) => void
+}
+
+/** A small drawing of the boat for her card. */
+function BoatThumb({ cls }: { cls: ReturnType<typeof getBoatClass> }) {
+  const W = boatWidth(cls)
+  const scale = 60 / W
+  return (
+    <Canvas style={{ width: 64, height: 44 }}>
+      <BoatArt cls={cls} light={LIGHT.golden} x={2} y={32} scale={scale} />
+    </Canvas>
+  )
 }
 
 const signed = (x: number) => `${x >= 0 ? '+' : '−'}${Math.round(Math.abs(x) * 100)}%`
@@ -38,28 +55,35 @@ export function BoatCard(props: Props) {
 
   return (
     <Card accent={boat.state === 'idle' ? t.accent : boat.state === 'sunk' ? t.bad : undefined}>
-      <Row style={{ flexWrap: 'nowrap' }}>
-        <View style={[styles.swatch, { backgroundColor: TIER_COLORS[cls.sizeTier] }]} />
+      <Pressable
+        onPress={props.onOpen}
+        disabled={!props.onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`Watch ${boat.nickname}`}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+      >
+        <BoatThumb cls={cls} />
         <View style={{ flex: 1 }}>
           <Row>
-            <Body style={{ fontWeight: '700' }}>{boat.nickname}</Body>
+            <Title size={21}>{boat.nickname}</Title>
             {rarityColor && <Tag label={cls.rarity.toUpperCase()} color={rarityColor} />}
           </Row>
           <Muted>
             {cls.name} · {cls.track === 'cargo' ? 'Cargo' : 'Passenger'} · T{cls.sizeTier} · cap {cls.capacity}
           </Muted>
+          {props.onOpen && <Muted style={{ color: t.accent }}>Watch her ›</Muted>}
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
           <View style={[styles.condTrack, { backgroundColor: t.surface2 }]}>
             <View style={{ width: `${cond}%`, height: '100%', backgroundColor: condColor }} />
           </View>
-          <Text style={{ color: condColor, fontSize: 12, fontWeight: '700' }}>{cond}</Text>
+          <Text style={{ color: condColor, fontSize: 12, fontFamily: fonts.bold }}>{cond}</Text>
         </View>
-      </Row>
+      </Pressable>
 
       {ability && (
         <Muted>
-          <Text style={{ fontWeight: '700', color: t.text }}>{ability.name}:</Text> {ability.description}
+          <Text style={{ fontFamily: fonts.bold, color: t.text }}>{ability.name}:</Text> {ability.description}
           {ability.inactiveReason ? ` (${ability.inactiveReason})` : ''}
         </Muted>
       )}
@@ -79,7 +103,7 @@ export function BoatCard(props: Props) {
   )
 }
 
-function CrewLine({ game, boat, now, onCaptain }: Props) {
+function CrewLine({ game, boat, now, onCaptain, onOpenCaptain }: Props) {
   const t = useTheme()
   const captain = captainViewById(game, boat.captainId)
   const effect = knownCrewEffect(game, boat.id, now)
@@ -96,12 +120,14 @@ function CrewLine({ game, boat, now, onCaptain }: Props) {
   return (
     <View style={{ gap: 6 }}>
       {captain ? (
-        <Muted>
-          Captain <Text style={{ color: t.text, fontWeight: '700' }}>{captain.name}</Text> {'⚓︎'.repeat(captain.reputation)} · best guess:{' '}
-          {parts.length ? parts.join(', ') : 'no effect known yet'}
-        </Muted>
+        <Pressable onPress={() => onOpenCaptain(captain.id)} accessibilityRole="button" accessibilityLabel={`Open Captain ${captain.name}`}>
+          <Muted>
+            Captain <Text style={{ color: t.accent, fontFamily: fonts.semibold }}>{captain.name}</Text> {'⚓︎'.repeat(captain.reputation)} · best guess:{' '}
+            {parts.length ? parts.join(', ') : 'no effect known yet'}
+          </Muted>
+        </Pressable>
       ) : boat.state === 'sunk' ? null : (
-        <Text style={{ color: t.bad, fontWeight: '700', fontSize: 13 }}>
+        <Text style={{ color: t.bad, fontFamily: fonts.bold, fontSize: 13 }}>
           No captain aboard: she can’t sail.{spare.length === 0 ? ' Hire one in Captains.' : ''}
         </Text>
       )}
@@ -185,14 +211,14 @@ function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props)
                   <Body style={{ fontWeight: '700', fontSize: 14 }}>{getPort(r.portB).name}</Body>
                   <Tag label={WEATHER[q.weather].name} color={t[q.weather]} />
                 </Row>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: q.payout > 0 ? t.good : t.bad }}>
-                  {coins(q.payout)}c <Text style={{ fontSize: 11, fontWeight: '400', color: t.muted }}>/trip now</Text>
+                <Text style={{ fontSize: 20, fontFamily: fonts.title, color: q.payout > 0 ? t.accent : t.bad }}>
+                  {coins(q.payout)}c <Text style={{ fontSize: 11, fontFamily: fonts.body, color: t.muted }}>/trip now</Text>
                 </Text>
                 <Muted style={{ fontSize: 11 }}>
                   {trips} × {duration(q.durationMs)} · −{q.worstDamage} worst
                   {q.lossRisk > 0 ? ` · ${percent(q.lossRisk)} lose cargo` : ''}
                 </Muted>
-                {q.canSink && <Text style={{ color: t.bad, fontSize: 11, fontWeight: '800' }}>Could sink</Text>}
+                {q.canSink && <Text style={{ color: t.bad, fontSize: 11, fontFamily: fonts.bold }}>Could sink</Text>}
                 <Button small label={q.blocked ?? 'Send'} disabled={!!q.blocked} onPress={() => onAssign(r.id, trips)} />
               </Card>
             </View>
@@ -233,7 +259,6 @@ function Sunk({ game, boat, onSalvage }: Props) {
 }
 
 const styles = StyleSheet.create({
-  swatch: { width: 12, height: 30, borderRadius: 3 },
   condTrack: { width: 60, height: 8, borderRadius: 4, overflow: 'hidden' },
   routes: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
   routeCell: { width: '50%', padding: 4 },

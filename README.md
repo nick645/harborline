@@ -29,7 +29,15 @@ npx expo start          # scan the QR code with Expo Go on your phone (same Wi-F
 npx expo start --ios    # or open in the iOS Simulator
 ```
 
-Install **Expo Go** from the App Store / Play Store first. Saves live on the phone (AsyncStorage) in the same format as the web build. So far the phone app has the map, fleet (send, recall, repair, sell, salvage, captains aboard), captains (quay, scouting, hiring, roster, promotion), shipyard and log; the workshop, port upgrades, managers' controls and storm notifications are still web-only.
+Install **Expo Go** from the App Store / Play Store first. Saves live on the phone (AsyncStorage) in the same format as the web build.
+
+**Art (direction C, "Lantern"):** warm plum and honey, Cormorant and Barlow type, and light that follows the phone's clock — dawn, day, golden hour, lamplit night — with storms as a cold violet contrast. Scenes are drawn in code with Skia (`mobile/src/art/`) and animate on their own clock (still when Reduce Motion is on):
+
+- **Your boat, live** (tap a boat): side on in the weather of her current trip, bobbing harder in rough water, with wake, funnel smoke, rain and lightning in storms, moored at the pier when docked, a wreck when sunk. Boats are drawn from their class: longer and taller by tier, crates and cranes for cargo, decks of lit windows for passengers, a trim for rarity.
+- **Your captain** (tap a captain): at the helm when at sea, at the Gull & Lantern window with a steaming mug when ashore; traits as a logbook — proven inked, rumours pencilled, disproven struck through.
+- **The quay** (Captains tab): recruits under the harbour lamps, each with a look generated from their id (the same look everywhere); scouting actions play out as small moments.
+
+The phone app doesn't have the workshop, port upgrades, manager controls or storm notifications yet.
 
 ## Layout
 
