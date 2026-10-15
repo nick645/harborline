@@ -28,6 +28,7 @@ import {
 } from '../src/game/state'
 import { getBoatClass, repairCostPerPoint } from '../src/game/economy'
 import { getPart, hasParts } from '../src/game/parts'
+import { fleetCap } from '../src/game/upgrades'
 import { ROUTES } from '../src/game/data/routes'
 import { LOW_CONDITION_THRESHOLD, STARTING_COINS, WEAR_MULTIPLIERS } from '../src/game/data/economy'
 import { WEATHER, WEATHER_SLOT_MS } from '../src/game/data/weather'
@@ -75,12 +76,12 @@ const fleetTierCount = (s: GameState, tier: number) =>
 /** Fill the current top tier up to `width` boats, then save for the next tier. */
 function buyWideThenClimb(s: GameState, width: number): string | null {
   const tier = maxTier(s)
-  if (fleetTierCount(s, tier) < width) {
+  if (fleetTierCount(s, tier) < width && s.player.ownedBoats.length < fleetCap(s)) {
     const sameTier = commons().filter((c) => c.sizeTier === tier).sort((a, b) => a.price - b.price)[0]
     if (sameTier) return s.player.coins >= sameTier.price ? sameTier.id : null
   }
   const target = nextTierClass(s) ?? byPriceDesc()[0]
-  return s.player.coins >= target.price ? target.id : null
+  return s.player.coins >= target.price && s.player.ownedBoats.length < fleetCap(s, target.sizeTier) ? target.id : null
 }
 
 const STRATEGIES: Strategy[] = [
@@ -94,7 +95,7 @@ const STRATEGIES: Strategy[] = [
     describe: 'never buy sideways; save straight for the next tier',
     pickPurchase: (s) => {
       const target = nextTierClass(s) ?? byPriceDesc()[0]
-      return s.player.coins >= target.price ? target.id : null
+      return s.player.coins >= target.price && s.player.ownedBoats.length < fleetCap(s, target.sizeTier) ? target.id : null
     },
   },
   {
@@ -133,7 +134,7 @@ const roughWater = (w: string) => w === 'rough' || w === 'storm'
 function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPolicy): GameState {
   s = scrapStandardParts(s)
   for (const cls of craftableClasses()) {
-    if (hasParts(s.player.partInventory, cls.requiredParts)) s = craftBoat(s, cls.id, t)
+    if (hasParts(s.player.partInventory, cls.requiredParts) && s.player.ownedBoats.length < fleetCap(s, cls.sizeTier)) s = craftBoat(s, cls.id, t)
   }
   // Buy first so a new boat can sail this turn.
   for (let id = strat.pickPurchase(s); id; id = strat.pickPurchase(s)) s = buyBoat(s, id, t)

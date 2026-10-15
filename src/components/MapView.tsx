@@ -4,7 +4,8 @@ import { getVoyage } from '../game/state'
 import { TIER_COLORS } from '../colors'
 import { HOME_PORT_ID, MAP_HEIGHT, MAP_WIDTH, PORTS } from '../game/data/ports'
 import { WEATHER } from '../game/data/weather'
-import { routeWeather, weatherChangesAt } from '../game/weather'
+import { forecast, routeWeather, weatherChangesAt } from '../game/weather'
+import { upgradeValue } from '../game/upgrades'
 import { duration } from '../format'
 
 type Props = {
@@ -32,19 +33,33 @@ function DemandChip({ y, track, demand }: { y: number; track: string; demand: nu
   )
 }
 
-function WeatherChip({ y, weather }: { y: number; weather: Weather }) {
+/** One-character marks for radar chips; colour carries the rest. */
+const FORECAST_MARK: Record<Weather, string> = { calm: '—', choppy: '~', rough: '≈', storm: '!' }
+
+function WeatherChip({ y, weather, ahead }: { y: number; weather: Weather; ahead: Weather[] }) {
   return (
     <>
       <rect x={-58} y={y} width={116} height={40} rx={8} className={`map-weather ${weather}`} />
       <text x={0} y={y + 28} textAnchor="middle" className="map-weather-text">
         {WEATHER[weather].name}
       </text>
+      {/* Weather Radar: the next changes, as a row of small chips above. */}
+      {ahead.map((w, i) => (
+        <g key={i} transform={`translate(${-58 + i * 34} ${y - 34})`}>
+          <title>{`${i === 0 ? 'Next' : `${i + 1} changes ahead`}: ${WEATHER[w].name}`}</title>
+          <rect width={28} height={28} rx={6} className={`map-weather ${w}`} />
+          <text x={14} y={20} textAnchor="middle" className="map-forecast-text">
+            {FORECAST_MARK[w]}
+          </text>
+        </g>
+      ))}
     </>
   )
 }
 
 export function MapView({ game, now, selectedBoatId, onSelectBoat }: Props) {
   const home = getPort(HOME_PORT_ID)
+  const radar = upgradeValue(game, 'weather-radar')
   const boatsAtSea = game.player.ownedBoats.filter((b) => b.state === 'sailing' || b.state === 'returning')
 
   return (
@@ -67,7 +82,7 @@ export function MapView({ game, now, selectedBoatId, onSelectBoat }: Props) {
         const [dx, dy] = DEMAND_CHIP_OFFSET[b.id] ?? DEFAULT_CHIP_OFFSET
         return (
           <g key={r.id} transform={`translate(${b.x + dx} ${b.y + dy})`}>
-            <WeatherChip y={-86} weather={routeWeather(game, r.id, now)} />
+            <WeatherChip y={-86} weather={routeWeather(game, r.id, now)} ahead={forecast(game, r.id, now, radar)} />
             <DemandChip y={-42} track="C" demand={r.demandCargo} />
             <DemandChip y={2} track="P" demand={r.demandPassenger} />
           </g>

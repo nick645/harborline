@@ -62,15 +62,22 @@ export function hasParts(inventory: string[], ids: string[]): boolean {
 }
 
 /** Odds for each rarity on one roll at the end of a trip. */
-export function dropChances(ctx: TripContext, hooks: AbilityHooks): Record<PartRarity, number> {
+export function dropChances(
+  ctx: TripContext,
+  hooks: AbilityHooks,
+  { yardBonus = 0, automated = false }: { yardBonus?: number; automated?: boolean } = {},
+): Record<PartRarity, number> {
   const w: Weather = ctx.weather
   const rough = w === 'rough' || w === 'storm'
   const rareEligible = rough || ctx.cls.sizeTier >= RARE_PART_MIN_BOAT_TIER
+  const standard = STANDARD_PART_CHANCE + yardBonus
+  // Boats run by a manager never find anything better than standard fittings.
+  if (automated) return { mythic: 0, legendary: 0, rare: 0, standard }
   return {
     mythic: w === 'storm' ? MYTHIC_PART_CHANCE_STORM : 0,
     legendary: LEGENDARY_PART_CHANCE[w] + (hooks.legendaryChanceBonus?.(ctx) ?? 0),
-    rare: rareEligible ? RARE_PART_CHANCE + (hooks.rareChanceBonus ?? 0) : 0,
-    standard: STANDARD_PART_CHANCE,
+    rare: rareEligible ? RARE_PART_CHANCE + (hooks.rareChanceBonus ?? 0) + yardBonus : 0,
+    standard,
   }
 }
 

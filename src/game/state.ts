@@ -2,11 +2,11 @@
 // the input is never mutated. All timers are absolute timestamps, so catching up after
 // any gap is a single settle pass, never a tick loop.
 
-import type { AwayReport, Boat, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage } from './types'
+import type { AwayReport, Boat, Captain, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage } from './types'
 import { BOAT_CLASSES } from './data/boats'
 import { ROUTES } from './data/routes'
 import { NICKNAMES } from './data/nicknames'
-import { WEATHER, LOST_TRIP_CONDITION } from './data/weather'
+import { WEATHER, LOST_TRIP_CONDITION, WEATHER_SLOT_MS } from './data/weather'
 import {
   CONDITION_MAX,
   LOG_LIMIT,
@@ -18,6 +18,7 @@ import {
   WEAR_MULTIPLIERS,
   WEATHER_DAMAGE_SPREAD,
 } from './data/economy'
+import { AUTOMATED_PAY_SHARE, AUTOMATED_REPAIR_BELOW, AUTOMATED_WAIT_SLOTS } from './data/managers'
 import {
   canBeSold,
   getBoatClass,
@@ -30,12 +31,30 @@ import {
 } from './economy'
 import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick } from './rolls'
 import { hooksOf, type TripContext } from './abilities'
-import { routeWeather } from './weather'
+import { routeWeather, weatherSlot } from './weather'
 import { countParts, dropChances, getPart, hasParts, partName, pickPart, takeParts } from './parts'
+import {
+  captainMods,
+  combineMods,
+  generateBondedCaptain,
+  getTrait,
+  proveTrait,
+  recordVoyage,
+  refreshRecruitPool,
+  type CaptainMods,
+} from './captains'
+import { fleetCap, scoutLevel, upgradeValue } from './upgrades'
 
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
 
-export class GameError extends Error {}
+export class GameError extends Error {
+  /** Some refusals still change the game (a captain shows who they are); this carries that state. */
+  readonly state?: GameState
+  constructor(message: string, state?: GameState) {
+    super(message)
+    this.state = state
+  }
+}
 
 export function newGame(seed: number, now: number): GameState {
   const rng = createRng(seed)
@@ -53,15 +72,19 @@ export function newGame(seed: number, now: number): GameState {
       partInventory: [],
       roster: [],
       portUpgrades: {},
+      maxTierReached: 1,
       lastSeenAt: now,
     },
     routes,
     voyages: [],
     rng,
     nextBoatSeq: 1,
+    nextCaptainSeq: 1,
+    recruitPool: { slot: -1, recruits: [], watchesLeft: 0 },
     log: [],
   }
   for (const classId of STARTING_BOAT_CLASSES) addBoat(state, classId, now)
+  refreshRecruitPool(state, now, scoutLevel(state))
   return state
 }
 
@@ -83,8 +106,49 @@ export function getVoyage(state: GameState, boatId: string): Voyage | undefined 
   return state.voyages.find((v) => v.boatId === boatId)
 }
 
+export function getCaptain(state: GameState, captainId: string): Captain {
+  const c = state.player.roster.find((x) => x.id === captainId)
+  if (!c) throw new GameError(`No captain ${captainId}`)
+  return c
+}
+
+/** Captains sailing aboard a boat: its captain, plus a mate on boats that carry two. */
+export function captainsAboard(state: GameState, boat: Boat): Captain[] {
+  const ids = [boat.captainId, hooksOf(boat).carriesMate ? boat.mateId : null]
+  return ids.flatMap((id) => state.player.roster.filter((c) => c.id === id))
+}
+
+/** Highest tier among boats owned right now. */
+export function topTier(state: GameState): number {
+  return Math.max(1, ...state.player.ownedBoats.map((b) => getBoatClass(b.classId).sizeTier))
+}
+
+/** The manager running this boat, if any: an assigned one, or a fleet manager covering its track. */
+export function managerOf(state: GameState, boat: Boat): Captain | null {
+  if (boat.managedBy) {
+    const m = state.player.roster.find((c) => c.id === boat.managedBy && c.role !== 'sailing')
+    if (m) return m
+  }
+  const tier = getBoatClass(boat.classId).sizeTier
+  if (tier >= topTier(state)) return null
+  return (
+    state.player.roster.find(
+      (c) => c.role === 'fleet-manager' && c.managesTrack === getBoatClass(boat.classId).track,
+    ) ?? null
+  )
+}
+
+export function isAutomated(state: GameState, boat: Boat): boolean {
+  return boat.currentRoute !== null && managerOf(state, boat) !== null
+}
+
 function tripContext(state: GameState, boat: Boat, routeId: string, t: number): TripContext {
   return { state, boat, cls: getBoatClass(boat.classId), routeId, weather: routeWeather(state, routeId, t), t }
+}
+
+function tripMods(state: GameState, boat: Boat, ctx: TripContext, view: 'known' | 'true'): CaptainMods {
+  const trip = { track: ctx.cls.track, weather: ctx.weather, t: ctx.t }
+  return combineMods(captainsAboard(state, boat).map((c) => captainMods(c, trip, view)))
 }
 
 /** Multiplier other boats' auras give a boat departing on a route. */
@@ -108,29 +172,45 @@ function fleetDemandMult(state: GameState): number {
 /**
  * What one trip on this route would pay, take and risk if the boat left at time t.
  * Later trips in a queued run re-quote at their own departure, in that moment's weather.
+ *
+ * `view` decides what is known about the captains aboard: 'known' (the default, and the only
+ * one the UI uses) counts proven traits and the middle of the skill range; 'true' is what
+ * actually happens at sea.
  */
-export function quoteVoyage(state: GameState, boatId: string, routeId: string, t: number) {
+export function quoteVoyage(state: GameState, boatId: string, routeId: string, t: number, view: 'known' | 'true' = 'known') {
   const boat = getBoat(state, boatId)
   const route = getRoute(state, routeId)
   const ctx = tripContext(state, boat, routeId, t)
   const h = hooksOf(boat)
+  const mods = tripMods(state, boat, ctx, view)
   const weather = WEATHER[ctx.weather]
   const distance = routeDistance(route)
+  const automated = isAutomated(state, boat)
 
   const raw = ctx.cls.track === 'cargo' ? route.demandCargo : route.demandPassenger
   const demand =
-    (h.demandLock ?? Math.max(raw, h.demandFloor ?? 0)) * (h.demandMult?.(ctx) ?? 1) * fleetDemandMult(state)
-  const grossMult = weather.payoutMult * (h.payoutMult?.(ctx) ?? 1) * auraPayoutMult(state, boat, routeId)
+    (h.demandLock ?? Math.max(raw, h.demandFloor ?? 0)) *
+    (h.demandMult?.(ctx) ?? 1) *
+    fleetDemandMult(state) *
+    mods.demandMult
+  const grossMult =
+    weather.payoutMult *
+    (h.payoutMult?.(ctx) ?? 1) *
+    auraPayoutMult(state, boat, routeId) *
+    mods.payoutMult *
+    (automated ? (h.automatedPayShare ?? AUTOMATED_PAY_SHARE) : 1)
   const payout = voyagePayout(ctx.cls, demand, distance, boat.condition, {
     capacityMult: h.capacityMult?.(ctx) ?? 1,
     grossMult,
+    fuelMult: mods.fuelMult * (1 - upgradeValue(state, 'fuel-depot')),
   })
-  const durationMs = Math.round(roundTripMs(ctx.cls, distance) * (h.durationMult?.(ctx) ?? 1))
-  const lossRisk = weather.lossRisk * (h.lossRiskMult?.(ctx) ?? 1)
+  const durationMs = Math.round(roundTripMs(ctx.cls, distance) * (h.durationMult?.(ctx) ?? 1) * mods.durationMult)
+  const lossRisk = weather.lossRisk * (h.lossRiskMult?.(ctx) ?? 1) * mods.lossRiskMult
   // Worst roll this weather can deal on this hull: if it would reach 0, the boat could sink.
   const wear = WEAR_MULTIPLIERS.find((w) => boat.condition < w.below)?.mult ?? 1
-  const rawWorst = Math.round(weather.conditionCost * WEATHER_DAMAGE_SPREAD[1] * wear)
+  const rawWorst = Math.round(weather.conditionCost * WEATHER_DAMAGE_SPREAD[1] * wear * mods.damageMult)
   const worstDamage = Math.max(0, Math.round(h.damage?.(rawWorst, ctx) ?? rawWorst))
+  const refusal = mods.refusesStorm && ctx.weather === 'storm' ? 'The captain refuses to sail into a storm' : null
   return {
     payout,
     worstDamage,
@@ -141,7 +221,7 @@ export function quoteVoyage(state: GameState, boatId: string, routeId: string, t
     weather: ctx.weather,
     lossRisk,
     perMinute: (payout / durationMs) * 60_000,
-    blocked: h.departureBlock?.(t) ?? null,
+    blocked: h.departureBlock?.(t) ?? refusal,
   }
 }
 
@@ -161,9 +241,14 @@ export function salvageQuote(state: GameState, boatId: string): number {
   return anyAfloat ? fee : Math.min(fee, Math.max(0, state.player.coins))
 }
 
+function repairPerPoint(state: GameState, boat: Boat): number {
+  const mult = (hooksOf(boat).repairCostMult ?? 1) * (1 - upgradeValue(state, 'dry-dock'))
+  return repairCostPerPoint(getBoatClass(boat.classId), mult)
+}
+
 export function repairQuote(state: GameState, boatId: string): number {
   const boat = getBoat(state, boatId)
-  return Math.ceil((CONDITION_MAX - boat.condition) * repairCostPerPoint(getBoatClass(boat.classId), hooksOf(boat).repairCostMult))
+  return Math.ceil((CONDITION_MAX - boat.condition) * repairPerPoint(state, boat))
 }
 
 /** Spare copies (beyond the first) of rare-or-better parts, grouped by rarity, slot and track. */
@@ -187,11 +272,17 @@ export function assignRoute(state: GameState, boatId: string, routeId: string, n
   const s = structuredClone(state)
   const boat = getBoat(s, boatId)
   if (boat.state !== 'idle') throw new GameError('Boat is not docked')
+  const manager = managerOf(s, boat)
+  if (manager && boat.currentRoute) throw new GameError(`${manager.name} is running this boat; take it back first`)
   const tank = getBoatClass(boat.classId).fuelTankTrips
   if (!Number.isInteger(trips) || trips < 1 || trips > tank) throw new GameError(`Trips must be 1–${tank}`)
   getRoute(s, routeId)
-  const blocked = hooksOf(boat).departureBlock?.(now)
-  if (blocked) throw new GameError(blocked)
+  const q = quoteVoyage(s, boatId, routeId, now, 'true')
+  if (q.blocked) {
+    // A refusal at the gangway is how a superstitious captain gives themselves away.
+    if (revealRefusal(s, boat, now)) throw new GameError(q.blocked, s)
+    throw new GameError(q.blocked)
+  }
   accrueDocked(s, boat, now)
   startTrip(s, boat, routeId, now, 1, trips)
   return s
@@ -206,6 +297,13 @@ export function recallBoat(state: GameState, boatId: string): GameState {
   return s
 }
 
+/** The harbour grows with the tier you reach, so a step up a tier always fits. */
+function checkFleetRoom(state: GameState, newTier: number) {
+  if (state.player.ownedBoats.length >= fleetCap(state, newTier)) {
+    throw new GameError(`The harbour is full (${fleetCap(state)} boats). Sell one, reach a higher tier, or build Berths.`)
+  }
+}
+
 /** Buy a common boat with coins, or a rare boat with coins plus its rare part. */
 export function buyBoat(state: GameState, classId: string, now: number): GameState {
   const cls = getBoatClass(classId)
@@ -213,6 +311,7 @@ export function buyBoat(state: GameState, classId: string, now: number): GameSta
   if (cls.price <= 0) throw new GameError('Not for sale')
   if (state.player.coins < cls.price) throw new GameError('Not enough coins')
   if (!hasParts(state.player.partInventory, cls.requiredParts)) throw new GameError(`Needs ${cls.requiredParts.map(partName).join(', ')}`)
+  checkFleetRoom(state, cls.sizeTier)
   const s = structuredClone(state)
   s.player.coins -= cls.price
   s.player.partInventory = takeParts(s.player.partInventory, cls.requiredParts)
@@ -225,10 +324,17 @@ export function craftBoat(state: GameState, classId: string, now: number): GameS
   const cls = getBoatClass(classId)
   if (cls.rarity !== 'legendary' && cls.rarity !== 'mythic') throw new GameError(`${cls.name} is bought, not crafted`)
   if (!hasParts(state.player.partInventory, cls.requiredParts)) throw new GameError('Set incomplete')
+  checkFleetRoom(state, cls.sizeTier)
   const s = structuredClone(state)
   s.player.partInventory = takeParts(s.player.partInventory, cls.requiredParts)
   const boat = addBoat(s, classId, now)
   log(s, now, 'craft', `Built ${cls.name}, "${boat.nickname}"`)
+  if (hooksOf(boat).arrivesWithCaptain) {
+    const c = generateBondedCaptain(s.rng, `c${s.nextCaptainSeq++}`)
+    s.player.roster.push(c)
+    boat.captainId = c.id
+    log(s, now, 'captain', `${c.name} came aboard with her, bonded to the ship for good`)
+  }
   return s
 }
 
@@ -249,13 +355,9 @@ export function sellBoat(state: GameState, boatId: string, now: number): GameSta
 export function repairBoat(state: GameState, boatId: string): GameState {
   const boat = getBoat(state, boatId)
   if (boat.state !== 'idle') throw new GameError('Only docked boats can be repaired')
-  const perPoint = repairCostPerPoint(getBoatClass(boat.classId), hooksOf(boat).repairCostMult)
-  const affordable = Math.floor(Math.max(0, state.player.coins) / perPoint)
-  const points = Math.min(CONDITION_MAX - boat.condition, affordable)
-  if (points <= 0) return state
+  if (repairInPlace(state, boat, true) === 0) return state
   const s = structuredClone(state)
-  s.player.coins -= Math.ceil(points * perPoint)
-  getBoat(s, boatId).condition += points
+  repairInPlace(s, getBoat(s, boatId))
   return s
 }
 
@@ -307,7 +409,8 @@ export function settle(state: GameState, now: number): GameState {
 
 /**
  * Same as settle, plus a summary of what happened since the player was last seen.
- * Away time earns exactly like present time: boats only run the trips they were sent on.
+ * Away time earns exactly like present time: hand-run boats only run the trips they were
+ * sent on; boats under a manager keep working.
  */
 export function settleAway(state: GameState, now: number): { state: GameState; report: AwayReport } {
   const s = structuredClone(state)
@@ -315,13 +418,16 @@ export function settleAway(state: GameState, now: number): { state: GameState; r
   const awayMs = Math.max(0, now - s.player.lastSeenAt)
   const outcome = settleInPlace(s, now)
   for (const b of s.player.ownedBoats) accrueDocked(s, b, now)
+  s.player.scoutingLevel = scoutLevel(s)
+  refreshRecruitPool(s, now, s.player.scoutingLevel)
   s.player.lastSeenAt = Math.max(s.player.lastSeenAt, now)
   return { state: s, report: { awayMs, coinsEarned: s.player.coins - coinsBefore, ...outcome } }
 }
 
 // ---------- internals (mutate the given state) ----------
 
-function log(s: GameState, at: number, kind: LogKind, text: string) {
+/** Add a harbour log entry. Exported for the crew actions; not for the UI. */
+export function log(s: GameState, at: number, kind: LogKind, text: string) {
   s.log.unshift({ at, kind, text })
   if (s.log.length > LOG_LIMIT) s.log.length = LOG_LIMIT
 }
@@ -333,12 +439,15 @@ function addBoat(s: GameState, classId: string, now: number): Boat {
     nickname: pickNickname(s),
     condition: CONDITION_MAX,
     captainId: null,
+    mateId: null,
+    managedBy: null,
     currentRoute: null,
     state: 'idle',
     etaMs: null,
     dockedAt: now,
   }
   s.player.ownedBoats.push(boat)
+  s.player.maxTierReached = Math.max(s.player.maxTierReached, getBoatClass(classId).sizeTier)
   return boat
 }
 
@@ -351,6 +460,18 @@ function pickNickname(s: GameState): string {
   let n = 2
   while (used.has(`${base} ${n}`)) n++
   return `${base} ${n}`
+}
+
+/** Repair as much as affordable. With `dryRun`, only reports the points it would repair. */
+function repairInPlace(s: GameState, boat: Boat, dryRun = false): number {
+  const perPoint = repairPerPoint(s, boat)
+  const affordable = Math.floor(Math.max(0, s.player.coins) / perPoint)
+  const points = Math.min(CONDITION_MAX - boat.condition, affordable)
+  if (points > 0 && !dryRun) {
+    s.player.coins -= Math.ceil(points * perPoint)
+    boat.condition += points
+  }
+  return Math.max(0, points)
 }
 
 /** Pay out docked-time earnings (abilities like the Cormorant's) up to time t. */
@@ -375,8 +496,20 @@ function accrueDocked(s: GameState, boat: Boat, t: number) {
   boat.dockedAt += earned / perMs
 }
 
+/** If a captain aboard refused because of a trait the player didn't know, reveal it. */
+function revealRefusal(s: GameState, boat: Boat, at: number): boolean {
+  let news = false
+  for (const c of captainsAboard(s, boat)) {
+    if (c.hiddenTraits.includes('superstitious') && proveTrait(c, 'superstitious')) {
+      log(s, at, 'captain', `${c.name} refused to take ${boat.nickname} into a storm: ${getTrait('superstitious').name}`)
+      news = true
+    }
+  }
+  return news
+}
+
 function startTrip(s: GameState, boat: Boat, routeId: string, at: number, tripIndex: number, tripsTotal: number) {
-  const q = quoteVoyage(s, boat.id, routeId, at)
+  const q = quoteVoyage(s, boat.id, routeId, at, 'true')
   s.voyages.push({
     boatId: boat.id,
     routeId,
@@ -394,6 +527,7 @@ function startTrip(s: GameState, boat: Boat, routeId: string, at: number, tripIn
   boat.currentRoute = routeId
   boat.etaMs = at + q.durationMs / 2
   boat.dockedAt = null
+  boat.autoWaitUntil = undefined
 }
 
 function dockBoat(boat: Boat, at: number) {
@@ -402,16 +536,36 @@ function dockBoat(boat: Boat, at: number) {
   boat.dockedAt = at
 }
 
-type VoyageEvent = { at: number; voyage: Voyage; kind: 'arrive' | 'dock' }
+/** The next moment a managed boat can leave: its route in calm or choppy water. */
+function nextAutoDeparture(s: GameState, boat: Boat): number {
+  const from = Math.max(boat.dockedAt ?? 0, boat.autoWaitUntil ?? 0)
+  for (let k = 0; k <= AUTOMATED_WAIT_SLOTS; k++) {
+    const t = k === 0 ? from : (weatherSlot(from) + k) * WEATHER_SLOT_MS
+    const w = routeWeather(s, boat.currentRoute!, t)
+    if (w === 'calm' || w === 'choppy') return t
+  }
+  return (weatherSlot(from) + AUTOMATED_WAIT_SLOTS) * WEATHER_SLOT_MS
+}
 
-function nextEvent(s: GameState, now: number): VoyageEvent | null {
-  let best: VoyageEvent | null = null
+type SettleEvent =
+  | { at: number; kind: 'arrive' | 'dock'; voyage: Voyage; boatId: string }
+  | { at: number; kind: 'auto'; boatId: string }
+
+function nextEvent(s: GameState, now: number): SettleEvent | null {
+  let best: SettleEvent | null = null
+  const consider = (ev: SettleEvent) => {
+    if (ev.at > now) return
+    if (!best || ev.at < best.at || (ev.at === best.at && ev.boatId < best.boatId)) best = ev
+  }
   for (const v of s.voyages) {
-    const ev: VoyageEvent = v.paid
-      ? { at: v.startedAt + v.durationMs, voyage: v, kind: 'dock' }
-      : { at: v.startedAt + v.durationMs / 2, voyage: v, kind: 'arrive' }
-    if (ev.at > now) continue
-    if (!best || ev.at < best.at || (ev.at === best.at && ev.voyage.boatId < best.voyage.boatId)) best = ev
+    consider(
+      v.paid
+        ? { at: v.startedAt + v.durationMs, kind: 'dock', voyage: v, boatId: v.boatId }
+        : { at: v.startedAt + v.durationMs / 2, kind: 'arrive', voyage: v, boatId: v.boatId },
+    )
+  }
+  for (const b of s.player.ownedBoats) {
+    if (b.state === 'idle' && isAutomated(s, b)) consider({ at: nextAutoDeparture(s, b), kind: 'auto', boatId: b.id })
   }
   return best
 }
@@ -421,10 +575,17 @@ function settleInPlace(s: GameState, now: number) {
   const sunk: string[] = []
   const lost: string[] = []
   const parts: string[] = []
-  // Each trip has at most two events and runs are capped by the fuel tank, so this is bounded.
+  // Each trip has at most two events, runs are capped by the fuel tank, and managed boats
+  // depart at most once per trip, so this is bounded by the voyages that fit before `now`.
   for (let ev = nextEvent(s, now); ev; ev = nextEvent(s, now)) {
+    const boat = getBoat(s, ev.boatId)
+
+    if (ev.kind === 'auto') {
+      autoDepart(s, boat, ev.at)
+      continue
+    }
+
     const v = ev.voyage
-    const boat = getBoat(s, v.boatId)
     const h = hooksOf(boat)
     const ctx: TripContext = {
       state: s,
@@ -434,11 +595,12 @@ function settleInPlace(s: GameState, now: number) {
       weather: v.weatherAtStart ?? 'calm',
       t: v.startedAt,
     }
+    const mods = tripMods(s, boat, ctx, 'true')
 
     if (ev.kind === 'arrive') {
       // Outbound leg done; the voyage now waits for its 'dock' event.
       v.paid = true
-      const lossRisk = WEATHER[ctx.weather].lossRisk * (h.lossRiskMult?.(ctx) ?? 1)
+      const lossRisk = WEATHER[ctx.weather].lossRisk * (h.lossRiskMult?.(ctx) ?? 1) * mods.lossRiskMult
       if (rollChance(s.rng, lossRisk)) {
         // Lost to the weather: no pay, no parts, the run is over and the boat limps home.
         v.lost = true
@@ -448,6 +610,7 @@ function settleInPlace(s: GameState, now: number) {
         log(s, ev.at, 'lost', `${boat.nickname} lost her cargo in ${WEATHER[ctx.weather].name.toLowerCase()} seas`)
         if (h.instantReturnOnLoss) {
           s.voyages = s.voyages.filter((x) => x !== v)
+          recordCaptains(s, boat, ctx, ev.at)
           dockBoat(boat, ev.at)
         } else {
           boat.state = 'returning'
@@ -457,7 +620,7 @@ function settleInPlace(s: GameState, now: number) {
       }
 
       // The trip's wear lands on the outbound leg. A hull that reaches 0 goes down with the cargo.
-      const raw = rollConditionLoss(s.rng, ctx.weather, boat.condition)
+      const raw = Math.round(rollConditionLoss(s.rng, ctx.weather, boat.condition) * mods.damageMult)
       boat.condition = Math.max(0, boat.condition - Math.max(0, Math.round(h.damage?.(raw, ctx) ?? raw)))
       if (boat.condition === 0) {
         boat.state = 'sunk'
@@ -479,33 +642,63 @@ function settleInPlace(s: GameState, now: number) {
       s.voyages = s.voyages.filter((x) => x !== v)
       if (!v.lost) {
         tripsCompleted++
-        v.partRollResult = rollTripParts(s, ctx)
+        v.partRollResult = rollTripParts(s, ctx, mods)
         for (const id of v.partRollResult) {
           parts.push(id)
           if (getPart(id).rarity !== 'standard') log(s, ev.at, 'part', `${boat.nickname} found ${partName(id)}`)
         }
       }
-      const blocked = h.departureBlock?.(ev.at)
-      if (v.tripIndex < v.tripsTotal && !blocked) {
-        startTrip(s, boat, v.routeId, ev.at, v.tripIndex + 1, v.tripsTotal)
-      } else {
-        dockBoat(boat, ev.at)
+      recordCaptains(s, boat, ctx, ev.at)
+
+      let leaving = v.tripIndex < v.tripsTotal && !h.departureBlock?.(ev.at)
+      if (leaving && quoteVoyage(s, boat.id, v.routeId, ev.at, 'true').blocked) {
+        // The next trip would sail into a storm the captain won't face: the run ends here.
+        revealRefusal(s, boat, ev.at)
+        leaving = false
       }
+      if (leaving) startTrip(s, boat, v.routeId, ev.at, v.tripIndex + 1, v.tripsTotal)
+      else dockBoat(boat, ev.at)
     }
   }
   return { tripsCompleted, sunk, lost, parts }
 }
 
+/** A managed boat's turn: patch the hull if it's worn, then head out on its usual route. */
+function autoDepart(s: GameState, boat: Boat, at: number) {
+  accrueDocked(s, boat, at)
+  if (boat.condition < AUTOMATED_REPAIR_BELOW) repairInPlace(s, boat)
+  const q = quoteVoyage(s, boat.id, boat.currentRoute!, at, 'true')
+  if (q.blocked || q.payout <= 0 || q.canSink) {
+    // Not worth it right now; look again when the weather next turns.
+    boat.autoWaitUntil = (weatherSlot(at) + 1) * WEATHER_SLOT_MS
+    return
+  }
+  startTrip(s, boat, boat.currentRoute!, at, 1, 1)
+}
+
+/** Every captain aboard gains the voyage's experience; tell the log what came to light. */
+function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number) {
+  const revealEvery = hooksOf(boat).traitRevealEvery
+  for (const c of captainsAboard(s, boat)) {
+    const news = recordVoyage(s.rng, c, { track: ctx.cls.track, weather: ctx.weather, t: ctx.t }, revealEvery)
+    for (const id of news.proven) log(s, at, 'captain', `${c.name} showed what they're made of: ${getTrait(id).name}`)
+    for (const id of news.disproven) log(s, at, 'captain', `Turns out ${c.name} isn't ${getTrait(id).name.toLowerCase()} after all`)
+    if (news.developmentRevealed) log(s, at, 'captain', `You're getting the measure of ${c.name}`)
+  }
+}
+
 /** Roll for parts at the end of a completed trip. Returns the ids found (already added). */
-function rollTripParts(s: GameState, ctx: TripContext): string[] {
+function rollTripParts(s: GameState, ctx: TripContext, mods: CaptainMods): string[] {
   const h = hooksOf(ctx.boat)
+  const automated = isAutomated(s, ctx.boat)
+  const chances = dropChances(ctx, h, { yardBonus: upgradeValue(s, 'salvage-yard'), automated })
   const found: string[] = []
-  const rolls = 1 + (h.extraPartRolls?.(ctx) ?? 0)
+  const rolls = 1 + (h.extraPartRolls?.(ctx) ?? 0) + mods.extraPartRolls
   for (let i = 0; i < rolls; i++) {
-    const rarity = rollPartRarity(s.rng, dropChances(ctx, h))
+    const rarity = rollPartRarity(s.rng, chances)
     if (!rarity) continue
     // If every set of that rarity is already done, the find falls back to a rare part.
-    const id = pickPart(s.rng, s, rarity, ctx.cls.track) ?? pickPart(s.rng, s, 'rare', ctx.cls.track)
+    const id = pickPart(s.rng, s, rarity, ctx.cls.track) ?? (automated ? null : pickPart(s.rng, s, 'rare', ctx.cls.track))
     if (!id) continue
     const part = getPart(id)
     const extra: string[] = []

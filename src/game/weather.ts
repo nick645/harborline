@@ -46,9 +46,16 @@ export function routeWeather(state: GameState, routeId: string, t: number): Weat
   return stormBringer ? 'storm' : naturalWeather(state.rng.seed, routeId, t)
 }
 
+/** The weather a route will have over the next `slots` weather changes (Weather Radar). */
+export function forecast(state: GameState, routeId: string, t: number, slots: number): Weather[] {
+  return Array.from({ length: slots }, (_, k) => routeWeather(state, routeId, (weatherSlot(t) + k + 1) * WEATHER_SLOT_MS))
+}
+
 export interface StormAlert {
   routeId: string
   weather: Weather
+  /** 0 when the weather has just turned; otherwise how far ahead the radar saw it coming. */
+  inMs: number
   /** Boats with trips still queued on this route, which will sail into it unless called home. */
   boatIds: string[]
 }
@@ -56,18 +63,24 @@ export interface StormAlert {
 const SEVERITY: Record<Weather, number> = { calm: 0, choppy: 1, rough: 2, storm: 3 }
 
 /**
- * Routes whose weather turned rough or stormy at the slot starting at `at` (worse than the
- * slot before), with boats that still have trips queued there. Only weather that has
- * actually arrived is reported; seeing it coming is a later upgrade.
+ * Routes whose weather turns rough or stormy (worse than the slot before), with boats that
+ * still have trips queued there. Without radar, only weather that has just arrived at `at`
+ * is reported; each level of Weather Radar sees one more change ahead.
  */
-export function stormAlerts(state: GameState, at: number): StormAlert[] {
+export function stormAlerts(state: GameState, at: number, radarSlots = 0): StormAlert[] {
   const alerts: StormAlert[] = []
   for (const route of state.routes) {
-    const now = routeWeather(state, route.id, at)
-    const before = routeWeather(state, route.id, at - 1)
-    if (SEVERITY[now] < SEVERITY.rough || SEVERITY[now] <= SEVERITY[before]) continue
     const boatIds = state.voyages.filter((v) => v.routeId === route.id && v.tripIndex < v.tripsTotal).map((v) => v.boatId)
-    if (boatIds.length) alerts.push({ routeId: route.id, weather: now, boatIds })
+    if (!boatIds.length) continue
+    for (let k = 0; k <= radarSlots; k++) {
+      const turnAt = at + k * WEATHER_SLOT_MS
+      const now = routeWeather(state, route.id, turnAt)
+      const before = routeWeather(state, route.id, turnAt - 1)
+      if (SEVERITY[now] >= SEVERITY.rough && SEVERITY[now] > SEVERITY[before]) {
+        alerts.push({ routeId: route.id, weather: now, inMs: k * WEATHER_SLOT_MS, boatIds })
+        break
+      }
+    }
   }
   return alerts
 }

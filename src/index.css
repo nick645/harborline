@@ -257,3 +257,35 @@ h3 { font-size: 13px; margin: 12px 0 6px; color: var(--muted); font-weight: 600;
 .alert-toggle { padding: 4px 8px; font-size: 12px; }
 .stats { flex-wrap: wrap; justify-content: flex-end; }
 .map-clock { font-size: 24px; font-weight: 600; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.map-forecast-text { font-size: 18px; font-weight: 800; fill: #fff; }
+
+/* ---------- phase 4: captains, port ---------- */
+.captains, .port { display: grid; gap: 8px; }
+.tabs { display: flex; gap: 6px; }
+.captain-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px;
+  display: grid; gap: 6px;
+}
+.captain-card.manager { border-left: 4px solid var(--legendary); }
+.captain-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.anchors { letter-spacing: 1px; font-size: 14px; white-space: nowrap; }
+.anchors .on { color: var(--text); }
+.anchors .off { color: var(--muted); opacity: 0.3; }
+.skill-range { display: flex; align-items: center; gap: 8px; }
+.skill-track { position: relative; flex: 1; height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.skill-band { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 5px; opacity: 0.85; }
+.skill-band.unknown { background: repeating-linear-gradient(45deg, var(--border), var(--border) 4px, transparent 4px, transparent 8px); }
+.skill-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--muted); opacity: 0.5; }
+.verdict { font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 4px; color: #fff; vertical-align: 1px; }
+.verdict.sleeper { background: var(--good); }
+.verdict.all-talk { background: var(--bad); }
+.verdict.true-to-form { background: var(--muted); }
+.trait-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 13px; }
+.trait-list li.disproven { opacity: 0.6; }
+.crew-line { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px; }
+.small-btn { padding: 2px 8px; font-size: 12px; margin-left: 6px; }
+select {
+  font: inherit; font-size: 13px; color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; max-width: 100%;
+}
+.captain-card .boat-actions button { padding: 6px 10px; font-size: 13px; }

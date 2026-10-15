@@ -2,7 +2,7 @@
 
 A cozy boat-shipping tycoon about risk at sea: storms pay, storms sink, and the rarest hulls only come out of bad weather.
 
-**Built so far:** Phase 1 (core loop), Phase 2 (full catalog, parts, set crafting) and Phase 3 (weather, seasons, storm alerts, storm balance).
+**Built so far:** Phase 1 (core loop), Phase 2 (full catalog, parts, set crafting), Phase 3 (weather, seasons, storm alerts, storm balance) and Phase 4 (captains, recruiting, port upgrades, delegation).
 
 Single-player, offline, no network calls. Plain web app (Vite + React + TypeScript) so the loop can be iterated without device builds; the game logic is framework-free and moves to Expo unchanged.
 
@@ -29,9 +29,12 @@ src/game/            pure game logic — no React imports
   parts.ts           part lookup, drop odds, set picking
   economy.ts         payout / duration / repair / sell / salvage formulas
   rolls.ts           seeded RNG; every random roll lives here
+  captains.ts        captain generation, scouting, effects, growth and reveals; captainView()
+  crew.ts            captain, manager and port-upgrade actions, plus the views the UI reads
+  upgrades.ts        port upgrade effects, fleet cap, scout level
   state.ts           actions (send, buy, craft, scrap, melt, repair, salvage) and time settlement
   save.ts            save (de)serialization
-src/components/      map, boat card, shipyard, workshop, harbor log
+src/components/      map, boat card, captains, shipyard, workshop, port, harbor log
 src/storage.ts       localStorage + game clock
 src/notify.ts        browser notifications for storm alerts
 scripts/sim.ts       balance harness
@@ -64,14 +67,30 @@ scripts/sim.ts       balance harness
 - **Away time** earns exactly like present time, at full rate, but only for trips already queued. Coming back shows what finished and what sank.
 - The RNG seed and state are stored in the save, so a session can be replayed.
 
+## Captains
+
+Every captain starts mostly unknown. Only the sea tells you who they really are.
+
+- **On the quay** (5 recruits, new faces every 6 hours) you see a name, a home port, a **Reputation** of 1–5 anchors, an asking fee, and one dockside rumour. Reputation is right about 70% of the time; the rest are under- or oversold by an anchor.
+- **Hidden underneath:** skill (1–100), 2–4 traits, a ceiling, and a development style (Steady learner, Quick study, Late bloomer, Peaked). None of these ever reach the UI directly; a test enforces it.
+- **Scouting spends watches** (6 per pool at scout level 1, +2 per level): *Ask around the docks* (1) adds a trait rumour that's right 60–85% of the time by scout level; *Read their logbook* (2) gives a skill range 60→10 points wide, never exact; *Take them out on a run* (3) gives a verdict — **Sleeper**, **All talk**, or **True to form** — and another rumour.
+- **Fees follow reputation, not skill**, so Sleepers are bargains. Letting a captain go costs severance that grows with voyages served.
+- **At sea:** skill 50 is neutral; 100 pays +20% and takes −15% storm damage. Every 5 voyages the skill range narrows and a trait the sea has tested may prove itself (storm traits only show in storms); rumours of traits they don't have fall apart once tested; the development style shows after 30 voyages. A superstitious captain gives themselves away by refusing to sail into a storm.
+- **Traits:** Steady, Reckless, Beloved, Green, Superstitious, Lucky (rare), Navigator, Thrifty, Heavy-handed, Fair-weather, Night owl, Haggler.
+- **Desk jobs:** a captain with 100+ voyages can be promoted — Dockhand (1 tier 1–2 boat, from tier 3), Harbormaster (up to 6 boats below your top tier, from tier 4), Fleet Manager (a whole track below your top tier, from tier 5). Managed boats re-run their last route at 85% pay, wait out rough water, repair themselves, find no rare parts, and keep working while you're away.
+
+## Port upgrades
+
+Six, three levels each (level 2 costs 3× level 1, level 3 costs 9×): Dry Dock (repairs −15/27/40%), Berths (+1/2/3 boats), Weather Radar (see 1/2/3 weather changes ahead, with storm alerts that much earlier), Fuel Depot (fuel −10/17/25%), Salvage Yard (+1/2/3% standard and rare parts), Scout Office (+1/1/2 scout levels). The harbour holds 6 boats at tier 1, growing with the tier you reach (to 40 at tier 6); stepping up a tier always fits.
+
 ## Pacing targets
 
 Prices are tuned against these targets with `npm run sim`:
 
 | Milestone | Target | Simulated (risk-aware bot, full-tank sends) |
 |---|---|---|
-| First purchase (a tier-1 Skiff or Launch, 2,000c) | 30–60 min | ~41 min |
-| First tier-2 boat (Harbor Skiff / Harbor Ferry, 22,000c) | 4–5 h | ~3.9 h with 8 tier-1 boats, ~5.2 h with 4 |
+| First purchase (a tier-1 Skiff or Launch, 2,000c) | 30–60 min | ~39 min |
+| First tier-2 boat (Harbor Skiff / Harbor Ferry, 22,000c) | 4–5 h | ~4.0 h building wide (harbour full at 6), ~4.9 h with 4 |
 
 Tiers 3–6 keep the spec's ~3.5× price step and are not tuned yet. Over 6 h the bot finds ~10–20 rare parts and 1–2 legendary pieces.
 

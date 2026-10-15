@@ -61,6 +61,10 @@ export interface Boat {
   /** 0–100 */
   condition: number
   captainId: string | null
+  /** Second captain, only on boats whose ability carries two (The Meridian). */
+  mateId: string | null
+  /** Manager captain running this boat on its own, or null when hand-managed. */
+  managedBy: string | null
   /** Route currently being run, the last route run while idle, or where it sank. */
   currentRoute: string | null
   state: BoatState
@@ -68,6 +72,8 @@ export interface Boat {
   etaMs: number | null
   /** While docked: when docked-time effects were last settled. Null at sea or sunk. */
   dockedAt: number | null
+  /** Managed boats only: don't try to leave before this time (weather or pay wasn't right). */
+  autoWaitUntil?: number
 }
 
 /** One round trip. A boat sent on several trips runs them back to back, one Voyage each. */
@@ -102,14 +108,65 @@ export interface Part {
   track: Track
 }
 
+export type DevelopmentStyle = 'steady' | 'quick-study' | 'late-bloomer' | 'peaked'
+export type Verdict = 'sleeper' | 'all-talk' | 'true-to-form'
+export type CaptainRole = 'sailing' | 'dockhand' | 'harbormaster' | 'fleet-manager'
+export type RumourStatus = 'rumour' | 'proven' | 'disproven'
+
+/** Something heard about a captain. It may be false; voyages prove or disprove it. */
+export interface Rumour {
+  traitId: string
+  status: RumourStatus
+}
+
+/** What a captain has been through, which decides which traits can show themselves. */
+export type Exposure = Record<Weather | 'cargo' | 'passenger' | 'night', number>
+
+/**
+ * A captain. Fields marked HIDDEN never reach the UI: components only see captainView().
+ */
 export interface Captain {
   id: string
   name: string
+  homePort: string
+  /** Public 1–5 anchors. Usually right, sometimes not. */
+  reputation: number
+  /** Fee to hire, set by reputation, not by true skill. */
+  fee: number
+  /** HIDDEN: 1–100. */
   trueSkill: number
-  revealedTraits: string[]
+  /** HIDDEN: where trueSkill grows toward. */
+  ceiling: number
+  /** HIDDEN until developmentKnown. */
+  development: DevelopmentStyle
+  developmentKnown: boolean
+  /** HIDDEN: every trait the captain actually has. */
   hiddenTraits: string[]
+  /** Traits proven at sea (always true). */
+  revealedTraits: string[]
+  /** What's been heard, true or not. */
+  rumours: Rumour[]
+  /** Displayed skill range; always contains trueSkill, never narrower than the minimum. */
+  skillBand: [number, number]
+  verdict: Verdict | null
   voyageCount: number
+  exposure: Exposure
+  /** Scout level when last scouted (0 if never). */
   scoutLevel: number
+  /** Watches spent scouting this captain while a recruit. */
+  watchesSpent: number
+  role: CaptainRole
+  /** Fleet managers run every boat on this track below the top tier. */
+  managesTrack: Track | null
+  /** Bonded captains (Derelict Queen) can't be fired. */
+  bonded: boolean
+}
+
+export interface RecruitPool {
+  /** 6-hour slot this pool belongs to. */
+  slot: number
+  recruits: Captain[]
+  watchesLeft: number
 }
 
 export interface Player {
@@ -119,6 +176,8 @@ export interface Player {
   partInventory: string[]
   roster: Captain[]
   portUpgrades: Record<string, number>
+  /** Highest boat tier ever owned: unlocks manager roles and grows the fleet cap. */
+  maxTierReached: number
   /** Absolute timestamp of the last settle while the player was present. */
   lastSeenAt: number
 }
@@ -128,7 +187,7 @@ export interface RngState {
   state: number
 }
 
-export type LogKind = 'part' | 'sunk' | 'lost' | 'craft' | 'info'
+export type LogKind = 'part' | 'sunk' | 'lost' | 'craft' | 'captain' | 'info'
 
 export interface LogEntry {
   at: number
@@ -143,6 +202,8 @@ export interface GameState {
   voyages: Voyage[]
   rng: RngState
   nextBoatSeq: number
+  nextCaptainSeq: number
+  recruitPool: RecruitPool
   /** Newest first; capped at LOG_LIMIT entries. */
   log: LogEntry[]
 }

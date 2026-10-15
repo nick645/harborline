@@ -47,6 +47,14 @@ export function rollConditionLoss(rng: RngState, weather: Weather, condition: nu
   return Math.max(1, Math.round(base * mult))
 }
 
+/** Normally distributed value (Box–Muller), clamped to [min, max] and rounded. */
+export function rollNormal(rng: RngState, mean: number, sd: number, min: number, max: number): number {
+  const u = Math.max(nextFloat(rng), 1e-9)
+  const v = nextFloat(rng)
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)
+  return Math.round(Math.min(max, Math.max(min, mean + z * sd)))
+}
+
 export function rollChance(rng: RngState, p: number): boolean {
   return p > 0 && nextFloat(rng) < p
 }

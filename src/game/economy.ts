@@ -54,11 +54,15 @@ export function voyagePayout(
   demand: number,
   distance: number,
   condition: number,
-  { capacityMult = 1, grossMult = 1 }: { capacityMult?: number; grossMult?: number } = {},
+  {
+    capacityMult = 1,
+    grossMult = 1,
+    fuelMult = 1,
+  }: { capacityMult?: number; grossMult?: number; fuelMult?: number } = {},
 ): number {
   let gross = boatClass.capacity * capacityMult * demand * distance * PAYOUT_FACTOR * grossMult
   if (condition < LOW_CONDITION_THRESHOLD) gross *= LOW_CONDITION_PAYOUT_MULT
-  return Math.round(gross - boatClass.fuelPerLeg * 2)
+  return Math.round(gross - boatClass.fuelPerLeg * 2 * fuelMult)
 }
 
 /** Only boats bought with coins can be sold; crafted boats are kept (or traded, later). */

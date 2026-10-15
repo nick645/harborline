@@ -49,11 +49,14 @@ function give(s: GameState, classId: string): string {
     nickname: id,
     condition: 100,
     captainId: null,
+    mateId: null,
+    managedBy: null,
     currentRoute: null,
     state: 'idle',
     etaMs: null,
     dockedAt: T0,
   })
+  s.player.maxTierReached = Math.max(s.player.maxTierReached, getBoatClass(classId).sizeTier)
   return id
 }
 
@@ -160,7 +163,9 @@ describe('storm alerts', () => {
     }
     expect(stormAlerts(s, at)).toEqual([]) // nobody queued there
     s = assignRoute(s, s.player.ownedBoats[0].id, route, at - 60_000, 4)
-    expect(stormAlerts(s, at)).toEqual([{ routeId: route, weather: naturalWeather(s.rng.seed, route, at), boatIds: [s.player.ownedBoats[0].id] }])
+    expect(stormAlerts(s, at)).toEqual([{ routeId: route, weather: naturalWeather(s.rng.seed, route, at), inMs: 0, boatIds: [s.player.ownedBoats[0].id] }])
+    // With radar, the same storm is seen one change early.
+    expect(stormAlerts(s, at - WEATHER_SLOT_MS, 1)[0]?.inMs).toBe(WEATHER_SLOT_MS)
     // A boat on its last trip won't sail again, so there's nothing to warn about.
     expect(stormAlerts(recallBoat(s, s.player.ownedBoats[0].id), at)).toEqual([])
   })
@@ -424,6 +429,7 @@ describe('fleet actions', () => {
   it('gives every new boat a nickname nobody else in the fleet has', () => {
     let s = newGame(3, T0)
     s.player.coins = 1e6
+    s.player.maxTierReached = 6 // a big enough harbour for 30 more boats
     for (let i = 0; i < 30; i++) s = buyBoat(s, 'skiff', T0)
     const names = s.player.ownedBoats.map((b) => b.nickname)
     expect(new Set(names).size).toBe(names.length)

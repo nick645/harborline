@@ -1,0 +1,315 @@
+import { describe, expect, it } from 'vitest'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import type { Captain, GameState, Weather } from './types'
+import { assignRoute, buyBoat, craftBoat, newGame, quoteVoyage, settle, settleAway, getBoat, isAutomated } from './state'
+import {
+  assignCaptain,
+  buyUpgrade,
+  canManage,
+  fireCaptain,
+  hireCaptain,
+  promoteCaptain,
+  scoutRecruit,
+  setManaged,
+} from './crew'
+import { captainView, generateCaptain, recordVoyage, verdictFor } from './captains'
+import { createRng } from './rolls'
+import { fleetCap, scoutLevel } from './upgrades'
+import { naturalWeather } from './weather'
+import { getPart } from './parts'
+import { getBoatClass } from './economy'
+import { HIRE_FEE, SCOUT_ACCURACY, SCOUT_BAND_WIDTH, skillToAnchors, WATCHES_BASE } from './data/captains'
+import { WEATHER_SLOT_MS } from './data/weather'
+import { ROUTES } from './data/routes'
+
+const T0 = 1_000_000_000_000
+
+function captain(seed: number, edit: Partial<Captain> = {}): Captain {
+  return { ...generateCaptain(createRng(seed), 'cx'), ...edit }
+}
+
+/** Put a captain straight onto the roster and aboard a boat. */
+function crew(s: GameState, boatIndex: number, edit: Partial<Captain> = {}): Captain {
+  const c = captain(s.player.roster.length + 100, { id: `crew${s.player.roster.length}`, ...edit })
+  s.player.roster.push(c)
+  s.player.ownedBoats[boatIndex].captainId = c.id
+  return c
+}
+
+function timeWith(s: GameState, routeId: string, weather: Weather): number {
+  for (let t = T0; ; t += WEATHER_SLOT_MS) if (naturalWeather(s.rng.seed, routeId, t) === weather) return t
+}
+
+describe('generation', () => {
+  it('reputation is right about 70% of the time, and fees follow reputation', () => {
+    let right = 0
+    let sleepers = 0
+    for (let i = 0; i < 3000; i++) {
+      const c = captain(i)
+      if (skillToAnchors(c.trueSkill) === c.reputation) right++
+      if (verdictFor(c) === 'sleeper') sleepers++
+      expect(c.fee).toBeGreaterThanOrEqual(HIRE_FEE[c.reputation] * 0.9 - 10)
+      expect(c.fee).toBeLessThanOrEqual(HIRE_FEE[c.reputation] * 1.1 + 10)
+      expect(c.hiddenTraits.length).toBeGreaterThanOrEqual(2)
+      expect(c.hiddenTraits.length).toBeLessThanOrEqual(4)
+      expect(c.skillBand).toEqual([1, 100])
+      expect(c.rumours).toHaveLength(1)
+    }
+    expect(right / 3000).toBeGreaterThan(0.65)
+    expect(right / 3000).toBeLessThan(0.8)
+    expect(sleepers / 3000).toBeGreaterThan(0.08)
+  })
+})
+
+describe('scouting', () => {
+  it('spends watches; the logbook gives a range that holds the truth; the run gives a verdict', () => {
+    let s = newGame(1, T0)
+    const r = s.recruitPool.recruits[0]
+    expect(s.recruitPool.watchesLeft).toBe(WATCHES_BASE)
+    s = scoutRecruit(s, r.id, 'logbook')
+    const after = s.recruitPool.recruits[0]
+    expect(after.skillBand[1] - after.skillBand[0]).toBe(SCOUT_BAND_WIDTH[1])
+    expect(after.trueSkill).toBeGreaterThanOrEqual(after.skillBand[0])
+    expect(after.trueSkill).toBeLessThanOrEqual(after.skillBand[1])
+    s = scoutRecruit(s, r.id, 'run')
+    expect(s.recruitPool.recruits[0].verdict).toBe(verdictFor(r))
+    expect(s.recruitPool.watchesLeft).toBe(WATCHES_BASE - 2 - 3)
+    expect(() => scoutRecruit(s, r.id, 'run')).toThrow()
+    expect(() => scoutRecruit(scoutRecruit(s, r.id, 'ask'), r.id, 'logbook')).toThrow() // out of watches or nothing new
+  })
+
+  it('rumours are about as accurate as the scout level says', () => {
+    let real = 0
+    let n = 0
+    for (let i = 0; i < 2000; i++) {
+      const c = captain(i)
+      const rumour = c.rumours[0]
+      n++
+      if (c.hiddenTraits.includes(rumour.traitId)) real++
+    }
+    expect(real / n).toBeGreaterThan(SCOUT_ACCURACY[1] - 0.05)
+    expect(real / n).toBeLessThan(SCOUT_ACCURACY[1] + 0.05)
+  })
+
+  it('the pool refreshes every 6 hours with a fresh set of watches', () => {
+    const s = newGame(1, T0)
+    const first = s.recruitPool.recruits.map((c) => c.id)
+    const later = settle(s, T0 + 6 * 3600_000)
+    expect(later.recruitPool.recruits.map((c) => c.id)).not.toEqual(first)
+    expect(later.recruitPool.watchesLeft).toBe(WATCHES_BASE)
+  })
+})
+
+describe('hiring and firing', () => {
+  it('hires for the fee and fires for severance that grows with voyages', () => {
+    let s = newGame(1, T0)
+    s.player.coins = 1e6
+    const r = s.recruitPool.recruits[0]
+    s = hireCaptain(s, r.id, T0)
+    expect(s.player.coins).toBe(1e6 - r.fee)
+    expect(s.player.roster.map((c) => c.id)).toEqual([r.id])
+    const fresh = captainView(s.player.roster[0]).severance
+    s.player.roster[0].voyageCount = 50
+    expect(captainView(s.player.roster[0]).severance).toBeGreaterThan(fresh)
+    const before = s.player.coins
+    s = fireCaptain(s, r.id, T0)
+    expect(s.player.coins).toBe(before - Math.round(Math.min(r.fee * 0.2 + 50 * r.fee * 0.01, r.fee * 1.5)))
+    expect(s.player.roster).toHaveLength(0)
+  })
+})
+
+describe('captains at sea', () => {
+  it('skill and traits change what a trip pays, and the UI quote only knows what has been proven', () => {
+    const s = newGame(1, T0)
+    const t = timeWith(s, ROUTES[3].id, 'calm')
+    const base = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t, 'true').payout
+    crew(s, 0, { trueSkill: 100, hiddenTraits: ['haggler', 'thrifty'], skillBand: [1, 100] })
+    const truth = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t, 'true').payout
+    const known = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t).payout
+    expect(truth).toBeGreaterThan(base)
+    // Known: skill read as the middle of 1–100, no proven traits — close to an average captain.
+    expect(Math.abs(known - base)).toBeLessThan(Math.abs(truth - base))
+  })
+
+  it('the skill range narrows with voyages but always holds the truth', () => {
+    const rng = createRng(4)
+    const c = captain(4)
+    for (let i = 0; i < 200; i++) {
+      recordVoyage(rng, c, { track: 'cargo', weather: 'calm', t: T0 })
+      expect(c.trueSkill).toBeGreaterThanOrEqual(c.skillBand[0])
+      expect(c.trueSkill).toBeLessThanOrEqual(c.skillBand[1])
+    }
+    expect(c.skillBand[1] - c.skillBand[0]).toBeLessThan(15)
+    expect(c.skillBand[1] - c.skillBand[0]).toBeGreaterThanOrEqual(6)
+    expect(c.developmentKnown).toBe(true)
+  })
+
+  it('storm traits only show themselves in storms', () => {
+    const rng = createRng(5)
+    const c = captain(5, { hiddenTraits: ['steady', 'fair-weather'], revealedTraits: [], rumours: [] })
+    for (let i = 0; i < 100; i++) recordVoyage(rng, c, { track: 'cargo', weather: 'calm', t: T0 })
+    expect(c.revealedTraits).toEqual([])
+    for (let i = 0; i < 100; i++) recordVoyage(rng, c, { track: 'cargo', weather: 'storm', t: T0 })
+    expect(c.revealedTraits.sort()).toEqual(['fair-weather', 'steady'])
+  })
+
+  it('a false rumour is disproven once the sea has tested it', () => {
+    const rng = createRng(6)
+    const c = captain(6, { hiddenTraits: ['haggler', 'thrifty'], rumours: [{ traitId: 'beloved', status: 'rumour' }] })
+    for (let i = 0; i < 20; i++) recordVoyage(rng, c, { track: 'cargo', weather: 'calm', t: T0 })
+    expect(c.rumours[0].status).toBe('rumour') // never carried passengers, so nothing to go on
+    for (let i = 0; i < 10; i++) recordVoyage(rng, c, { track: 'passenger', weather: 'calm', t: T0 })
+    expect(c.rumours[0].status).toBe('disproven')
+  })
+
+  it('a superstitious captain refuses a storm, and that is how you find out', () => {
+    let s = newGame(1, T0)
+    const c = crew(s, 0, { hiddenTraits: ['superstitious', 'haggler'], revealedTraits: [] })
+    const t = timeWith(s, ROUTES[2].id, 'storm')
+    // The UI quote doesn't know yet, so it doesn't warn.
+    expect(quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[2].id, t).blocked).toBeNull()
+    let err: unknown
+    try {
+      assignRoute(s, s.player.ownedBoats[0].id, ROUTES[2].id, t)
+    } catch (e) {
+      err = e
+    }
+    const revealed = (err as { state?: GameState }).state!
+    expect(revealed.player.roster.find((x) => x.id === c.id)!.revealedTraits).toContain('superstitious')
+    s = revealed
+    expect(quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[2].id, t).blocked).not.toBeNull()
+  })
+
+  it('captains gain voyages when their boat completes trips', () => {
+    let s = newGame(1, T0)
+    const c = crew(s, 0)
+    s = assignRoute(s, s.player.ownedBoats[0].id, ROUTES[0].id, timeWith(s, ROUTES[0].id, 'calm'), 3)
+    s = settle(s, T0 + 30 * 24 * 3600_000)
+    expect(s.player.roster.find((x) => x.id === c.id)!.voyageCount).toBeGreaterThan(0)
+  })
+})
+
+describe('the hidden truth never reaches the UI', () => {
+  it('captainView carries no hidden fields', () => {
+    const v = captainView(captain(1)) as unknown as Record<string, unknown>
+    for (const key of ['trueSkill', 'ceiling', 'hiddenTraits', 'exposure']) expect(v).not.toHaveProperty(key)
+    expect(v.knownDevelopment).toBeNull()
+    expect(v).not.toHaveProperty('development')
+  })
+
+  it('no UI file touches a hidden captain field', () => {
+    const files = [join(__dirname, '..', 'App.tsx'), ...readdirSync(join(__dirname, '..', 'components')).map((f) => join(__dirname, '..', 'components', f))]
+    for (const f of files) {
+      const src = readFileSync(f, 'utf8')
+      for (const hidden of ['trueSkill', 'hiddenTraits', '.ceiling', '.development', "'true')"]) {
+        expect(src.includes(hidden), `${f} mentions ${hidden}`).toBe(false)
+      }
+    }
+  })
+})
+
+describe('port upgrades', () => {
+  it('Berths raise the fleet cap; reaching tiers does too', () => {
+    let s = newGame(1, T0)
+    expect(fleetCap(s)).toBe(6)
+    s.player.coins = 1e6
+    s = buyUpgrade(s, 'berths', T0)
+    expect(fleetCap(s)).toBe(7)
+    s.player.maxTierReached = 3
+    expect(fleetCap(s)).toBe(17)
+  })
+
+  it('a full harbour can always step up a tier', () => {
+    let s = newGame(1, T0)
+    s.player.coins = 1e6
+    for (let i = 0; i < 4; i++) s = buyBoat(s, 'skiff', T0)
+    expect(s.player.ownedBoats).toHaveLength(6)
+    expect(() => buyBoat(s, 'skiff', T0)).toThrow(/harbour is full/)
+    s = buyBoat(s, 'harbor-skiff', T0)
+    expect(fleetCap(s)).toBe(10)
+  })
+
+  it('Scout Office and tier milestones raise the scout level, up to 5', () => {
+    let s = newGame(1, T0)
+    s.player.coins = 1e7
+    expect(scoutLevel(s)).toBe(1)
+    s = buyUpgrade(buyUpgrade(buyUpgrade(s, 'scout-office', T0), 'scout-office', T0), 'scout-office', T0)
+    expect(scoutLevel(s)).toBe(3)
+    s.player.maxTierReached = 6
+    expect(scoutLevel(s)).toBe(5)
+    expect(() => buyUpgrade(s, 'scout-office', T0)).toThrow()
+  })
+
+  it('Fuel Depot and Dry Dock lower costs', () => {
+    let s = newGame(1, T0)
+    s.player.coins = 1e6
+    const t = timeWith(s, ROUTES[3].id, 'calm')
+    const before = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t).payout
+    s = buyUpgrade(s, 'fuel-depot', T0)
+    expect(quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t).payout).toBeGreaterThan(before)
+  })
+})
+
+describe('delegation', () => {
+  function veteranHarbor() {
+    let s = newGame(2, T0)
+    s.player.coins = 1e6
+    s.player.maxTierReached = 4
+    // A tier-4 boat makes the starters "below your top tier".
+    s.player.ownedBoats.push({ ...s.player.ownedBoats[0], id: 'big', classId: 'short-sea-freighter', nickname: 'Big' })
+    const vet = crew(s, 1, { voyageCount: 120 })
+    s = promoteCaptain(s, vet.id, 'harbormaster', T0)
+    return { s, vet }
+  }
+
+  it('promotion needs 100 voyages and the right tier', () => {
+    const s = newGame(1, T0)
+    const c = crew(s, 0, { voyageCount: 99 })
+    s.player.maxTierReached = 4
+    expect(() => promoteCaptain(s, c.id, 'dockhand', T0)).toThrow()
+    s.player.roster[0].voyageCount = 100
+    s.player.maxTierReached = 2
+    expect(() => promoteCaptain(s, c.id, 'dockhand', T0)).toThrow()
+    s.player.maxTierReached = 3
+    expect(promoteCaptain(s, c.id, 'dockhand', T0).player.roster[0].role).toBe('dockhand')
+  })
+
+  it("a managed boat keeps working while you're away, at reduced pay, never in storms or for rare parts", () => {
+    const { s: start, vet } = veteranHarbor()
+    let s = start
+    const dinghy = s.player.ownedBoats[0].id
+    expect(canManage(s, vet.id, dinghy)).toMatch(/route/) // never sailed: nothing to re-run
+    s = settle(assignRoute(s, dinghy, ROUTES[1].id, T0, 1), T0 + 3600_000)
+    s = setManaged(s, dinghy, vet.id)
+    expect(isAutomated(s, getBoat(s, dinghy))).toBe(true)
+    expect(() => assignRoute(s, dinghy, ROUTES[2].id, T0 + 3600_000)).toThrow()
+    const { state, report } = settleAway(s, T0 + 3600_000 + 8 * 3600_000)
+    expect(report.tripsCompleted).toBeGreaterThan(20)
+    expect(report.parts.every((id) => getPart(id).rarity === 'standard')).toBe(true)
+    expect(state.voyages.filter((v) => v.boatId === dinghy).every((v) => v.weatherAtStart !== 'storm' && v.weatherAtStart !== 'rough')).toBe(true)
+    expect(report.sunk).toEqual([])
+  })
+
+  it("managers can't take on top-tier boats or more than their share", () => {
+    const { s, vet } = veteranHarbor()
+    s.player.ownedBoats.forEach((b) => (b.currentRoute = ROUTES[0].id))
+    expect(canManage(s, vet.id, 'big')).toMatch(/top-tier/)
+  })
+})
+
+describe('the Derelict Queen', () => {
+  it('arrives with a bonded captain who cannot be fired', () => {
+    let s = newGame(1, T0)
+    s.player.partInventory = [...getBoatClass('derelict-queen').requiredParts]
+    s = craftBoat(s, 'derelict-queen', T0)
+    const queen = s.player.ownedBoats.at(-1)!
+    const c = s.player.roster.find((x) => x.id === queen.captainId)!
+    expect(c.bonded).toBe(true)
+    expect(c.hiddenTraits).toContain('lucky')
+    expect(() => fireCaptain(s, c.id, T0)).toThrow()
+    const other = captain(77, { id: 'other' })
+    s.player.roster.push(other)
+    expect(() => assignCaptain(s, other.id, queen.id)).toThrow()
+  })
+})

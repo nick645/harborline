@@ -6,6 +6,9 @@ import { abilityOf } from '../game/abilities'
 import { LOW_CONDITION_THRESHOLD, SALVAGE_CONDITION } from '../game/data/economy'
 import { WEATHER } from '../game/data/weather'
 import { coins, duration, percent } from '../format'
+import { availableCaptains, captainViewById, knownCrewEffect, managersFor } from '../game/crew'
+import { isAutomated, managerOf } from '../game/state'
+import { ANCHOR, Anchors } from './CaptainBits'
 import { TIER_COLORS } from '../colors'
 
 type Props = {
@@ -20,6 +23,8 @@ type Props = {
   onRepair: () => void
   onSell: () => void
   onSalvage: () => void
+  onCaptain: (captainId: string) => void
+  onManage: (managerId: string | null) => void
 }
 
 /** Runs a click handler without also selecting the card underneath. */
@@ -62,8 +67,12 @@ export function BoatCard(props: Props) {
         </p>
       )}
 
+      <CrewLine {...props} />
+
       {boat.state === 'sunk' ? (
         <SunkBody {...props} />
+      ) : boat.state === 'idle' && isAutomated(props.game, boat) ? (
+        <p className="boat-status muted">Docked · leaves again when the water is calm enough</p>
       ) : boat.state === 'idle' ? (
         <DockedBody {...props} lowCondition={lowCondition} />
       ) : (
@@ -206,5 +215,79 @@ function SunkBody({ game, boat, onSalvage }: Props) {
         <span className="muted small">Comes back at {SALVAGE_CONDITION} condition</span>
       </div>
     </>
+  )
+}
+
+const signed = (x: number) => `${x >= 0 ? '+' : '−'}${Math.round(Math.abs(x) * 100)}%`
+
+/** Who's aboard, what that's known to do, and who (if anyone) runs the boat. */
+function CrewLine({ game, boat, now, onCaptain, onManage }: Props) {
+  const captain = captainViewById(game, boat.captainId)
+  const mate = captainViewById(game, boat.mateId)
+  const effect = knownCrewEffect(game, boat.id, now)
+  const manager = managerOf(game, boat)
+  const docked = boat.state === 'idle'
+  const spare = availableCaptains(game).filter((c) => c.id !== boat.captainId && c.id !== boat.mateId)
+  const managers = docked && !manager ? managersFor(game, boat.id) : []
+
+  const parts = effect
+    ? [
+        Math.abs(effect.pay) >= 0.005 && `pay ${signed(effect.pay)}`,
+        Math.abs(effect.stormDamage) >= 0.005 && `storm damage ${signed(effect.stormDamage)}`,
+        Math.abs(effect.stormLoss) >= 0.005 && `storm cargo loss ${signed(effect.stormLoss)}`,
+        Math.abs(effect.speed) >= 0.005 && `speed ${signed(effect.speed)}`,
+        Math.abs(effect.fuel) >= 0.005 && `fuel ${signed(effect.fuel)}`,
+        effect.refusesStorm && 'won’t sail into storms',
+      ].filter(Boolean)
+    : []
+
+  return (
+    <div className="crew-line small" onClick={(e) => e.stopPropagation()}>
+      {captain ? (
+        <span>
+          Captain <strong>{captain.name}</strong> <Anchors n={captain.reputation} />
+          {mate && (
+            <>
+              {' '}
+              · mate <strong>{mate.name}</strong>
+            </>
+          )}
+          <span className="muted"> · best guess: {parts.length ? parts.join(', ') : 'no effect known yet'}</span>
+        </span>
+      ) : (
+        <span className="muted">No captain aboard</span>
+      )}
+      {docked && spare.length > 0 && (
+        <select value="" onChange={(e) => e.target.value && onCaptain(e.target.value)} aria-label="Put a captain aboard">
+          <option value="">{captain ? 'Change captain…' : 'Put a captain aboard…'}</option>
+          {spare.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} ({ANCHOR.repeat(c.reputation)})
+            </option>
+          ))}
+        </select>
+      )}
+      {manager && (
+        <span>
+          Run by <strong>{manager.name}</strong>
+          <span className="muted"> · {isAutomated(game, boat) ? 'earns less, avoids rough water, finds no rare parts' : 'send her out once to start'}</span>
+          {boat.managedBy && (
+            <button className="secondary small-btn" onClick={() => onManage(null)}>
+              Take back
+            </button>
+          )}
+        </span>
+      )}
+      {managers.length > 0 && (
+        <select value="" onChange={(e) => e.target.value && onManage(e.target.value)} aria-label="Hand to a manager">
+          <option value="">Hand to a manager…</option>
+          {managers.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
   )
 }

@@ -47,6 +47,16 @@ export interface AbilityHooks {
   dockedIncomeShare?: number
   /** Any route this boat is running turns to storm. */
   bringsStorms?: boolean
+  /** Built with a bonded captain aboard. */
+  arrivesWithCaptain?: boolean
+  /** Takes a second captain (a mate); both captains' effects apply. */
+  carriesMate?: boolean
+  /** Captains aboard reveal traits every this many voyages instead of the usual. */
+  traitRevealEvery?: number
+  /** Share of normal pay when run by a manager (instead of the usual). */
+  automatedPayShare?: number
+  /** While docked: port upgrades cost this much less. */
+  upgradeDiscount?: number
 
   // ---- auras on the rest of the fleet ----
   /** While owned: every boat's demand is multiplied by this. */
@@ -67,9 +77,6 @@ export interface Ability {
 }
 
 const localHour = (t: number) => new Date(t).getHours()
-const PHASE_4_CAPTAINS = 'Arrives with captains (Phase 4)'
-const PHASE_4_PORTS = 'Arrives with port upgrades (Phase 4)'
-const PHASE_4_DELEGATION = 'Arrives with delegation (Phase 4)'
 
 const ABILITIES: Ability[] = [
   // ---- Tier 1 ----
@@ -93,18 +100,18 @@ const ABILITIES: Ability[] = [
   { id: 'netmender', name: 'Keen eye', description: '+1% rare part chance', hooks: { rareChanceBonus: 0.01 } },
   { id: 'longhaul', name: 'Flat fuel', description: 'Fuel cost flat regardless of distance', inactiveReason: 'Fuel is already flat per leg in this build', hooks: {} },
   { id: 'sightline', name: 'Scenic route', description: '+20% payout on routes over 3 ports', inactiveReason: 'Needs multi-stop routes', hooks: {} },
-  { id: 'gala', name: 'Social season', description: 'Captain traits reveal 25% faster aboard', inactiveReason: PHASE_4_CAPTAINS, hooks: {} },
+  { id: 'gala', name: 'Social season', description: 'Captain traits reveal 25% faster aboard', hooks: { traitRevealEvery: 4 } },
   { id: 'salvager', name: 'Salvager', description: '15% chance a rare part found aboard comes with a duplicate', hooks: { rareDuplicateChance: 0.15 } },
   { id: 'the-cormorant', name: 'Fishes at anchor', description: 'Earns at half rate while docked', hooks: { dockedIncomeShare: 0.5 } },
-  { id: 'derelict-queen', name: 'Derelict Queen', description: 'Arrives with a bonded legendary captain who cannot be fired', inactiveReason: PHASE_4_CAPTAINS, hooks: {} },
+  { id: 'derelict-queen', name: 'Derelict Queen', description: 'Arrives with a bonded legendary captain who cannot be fired', hooks: { arrivesWithCaptain: true } },
 
   // ---- Tier 4 ----
-  { id: 'deckhand', name: 'Runs itself', description: 'Automated at 95% instead of 85%', inactiveReason: PHASE_4_DELEGATION, hooks: {} },
+  { id: 'deckhand', name: 'Runs itself', description: 'Earns 95% instead of 85% when a manager runs it', hooks: { automatedPayShare: 0.95 } },
   { id: 'ironside', name: 'Ironside', description: 'Condition loss capped at 5 per trip', hooks: { damage: (loss) => Math.min(loss, 5) } },
-  { id: 'azure', name: 'Port darling', description: '+10% demand at upgraded ports', inactiveReason: PHASE_4_PORTS, hooks: {} },
+  { id: 'azure', name: 'Port darling', description: '+10% demand at upgraded ports', inactiveReason: 'Only the home port can be upgraded so far', hooks: {} },
   { id: 'vista', name: 'Evergreen', description: 'Ignores seasonal demand dips', inactiveReason: 'Seasons change weather, not demand, so far', hooks: {} },
   { id: 'nightrunner', name: 'Nightrunner', description: 'Trips 30% faster when leaving between 10pm and 6am (device time)', hooks: { durationMult: (c) => (localHour(c.t) >= 22 || localHour(c.t) < 6 ? 0.7 : 1) } },
-  { id: 'the-meridian', name: 'Two at the helm', description: "Carries two captains; both captains' traits apply", inactiveReason: PHASE_4_CAPTAINS, hooks: {} },
+  { id: 'the-meridian', name: 'Two at the helm', description: "Carries two captains; both captains' traits apply", hooks: { carriesMate: true } },
   { id: 'the-long-night', name: 'The Long Night', description: 'Leaves no wake; never loses a trip to the weather, ever', hooks: { lossRiskMult: () => 0 } },
 
   // ---- Tier 5 ----
@@ -120,7 +127,7 @@ const ABILITIES: Ability[] = [
   { id: 'leviathan', name: 'Leviathan', description: '+40% capacity in calm weather', hooks: { capacityMult: (c) => (c.weather === 'calm' ? 1.4 : 1) } },
   { id: 'keystone', name: 'Keystone', description: 'Counts as 2 boats for leaderboard efficiency', inactiveReason: 'Needs the online leaderboard', hooks: {} },
   { id: 'pageant', name: 'Pageant', description: '+10% demand across the whole fleet', hooks: { fleetDemandMult: 1.1 } },
-  { id: 'monarch', name: 'Monarch', description: 'Port upgrades cost 20% less while docked', inactiveReason: PHASE_4_PORTS, hooks: {} },
+  { id: 'monarch', name: 'Monarch', description: 'Port upgrades cost 20% less while docked', hooks: { upgradeDiscount: 0.2 } },
   { id: 'the-colossus', name: 'The Colossus', description: 'A legendary find aboard delivers the whole set', hooks: { fullSetOnLegendary: true } },
   { id: 'grand-dame', name: 'Grand Dame', description: '+10% payout to every boat leaving her port while she is docked', hooks: { dockedPortPayoutMult: 1.1 } },
   { id: 'saint-elmo', name: 'Saint Elmo', description: 'Storms follow her: every route she runs turns to storm', hooks: { bringsStorms: true } },

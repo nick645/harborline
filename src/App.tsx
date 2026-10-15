@@ -24,7 +24,20 @@ import { alertsWanted, notificationsSupported, requestPermission, setAlertsWante
 import { randomSeed } from './game/rolls'
 import { advanceClock, clearSave, clock, DEBUG, loadGame, saveGame } from './storage'
 import { coins, duration } from './format'
+import {
+  assignCaptain,
+  buyUpgrade,
+  fireCaptain,
+  hireCaptain,
+  promoteCaptain,
+  scoutRecruit,
+  setManaged,
+  unassignCaptain,
+} from './game/crew'
+import { fleetCap, upgradeValue } from './game/upgrades'
 import { MapView } from './components/MapView'
+import { CaptainsPanel } from './components/CaptainsPanel'
+import { PortPanel } from './components/PortPanel'
 import { BoatCard } from './components/BoatCard'
 import { Shop } from './components/Shop'
 import { Workshop } from './components/Workshop'
@@ -113,8 +126,14 @@ export default function App() {
       setError(null)
       saveGame(next)
     } catch (e) {
-      if (e instanceof GameError) setError(e.message)
-      else throw e
+      if (!(e instanceof GameError)) throw e
+      // Some refusals still change things: a captain's trait comes to light.
+      if (e.state) {
+        gameRef.current = e.state
+        setGame(e.state)
+        saveGame(e.state)
+      }
+      setError(e.message)
     }
   }, [])
 
@@ -123,14 +142,18 @@ export default function App() {
   const checkAlerts = useCallback(
     (at: number) => {
       // Check against a settled copy without committing it, so away reports stay intact.
-      const found = stormAlerts(settle(gameRef.current, at), at)
+      const settled = settle(gameRef.current, at)
+      const found = stormAlerts(settled, at, upgradeValue(settled, 'weather-radar'))
       if (!found.length) return
       setAlerts(found)
       if (document.hidden && alertsOn) {
         const first = found[0]
         const names = first.boatIds.map((id) => gameRef.current.player.ownedBoats.find((b) => b.id === id)?.nickname)
+        const port = getPort(gameRef.current.routes.find((r) => r.id === first.routeId)!.portB).name
         systemNotify(
-          `${WEATHER[first.weather].name} over ${getPort(gameRef.current.routes.find((r) => r.id === first.routeId)!.portB).name}`,
+          first.inMs > 0
+            ? `${WEATHER[first.weather].name} reaching ${port} in ${duration(first.inMs)}`
+            : `${WEATHER[first.weather].name} over ${port}`,
           `${names.join(', ')} ${names.length === 1 ? 'has' : 'have'} trips queued there. Open Harborline to bring them home.`,
         )
       }
@@ -177,7 +200,7 @@ export default function App() {
         <div className="stats">
           <span className="coins">{coins(game.player.coins)}c</span>
           <span className="muted">
-            {boats.length} boat{boats.length === 1 ? '' : 's'}
+            {boats.length}/{fleetCap(game)} boats
             {idleCount > 0 && ` · ${idleCount} docked`}
             {sunkCount > 0 && ` · ${sunkCount} sunk`}
           </span>
@@ -211,7 +234,9 @@ export default function App() {
         return (
           <div key={a.routeId} className="banner storm">
             <strong>
-              {WEATHER[a.weather].name} over {port}.
+              {a.inMs > 0
+                ? `Radar: ${WEATHER[a.weather].name.toLowerCase()} reaching ${port} in about ${duration(a.inMs)}.`
+                : `${WEATHER[a.weather].name} over ${port}.`}
             </strong>{' '}
             {names} {stillQueued.length === 1 ? 'has' : 'have'} more trips queued there.{' '}
             <button
@@ -256,9 +281,22 @@ export default function App() {
                 onSalvage={() => act((g, t) => salvageBoat(g, b.id, t))}
                 onRepair={() => act((g) => repairBoat(g, b.id))}
                 onSell={() => act((g, t) => sellBoat(g, b.id, t))}
+                onCaptain={(captainId) => act((g) => assignCaptain(g, captainId, b.id))}
+                onManage={(managerId) => act((g) => setManaged(g, b.id, managerId))}
               />
             ))}
           </section>
+
+          <CaptainsPanel
+            game={game}
+            now={now}
+            onScout={(id, action) => act((g) => scoutRecruit(g, id, action))}
+            onHire={(id) => act((g, t) => hireCaptain(g, id, t))}
+            onFire={(id) => act((g, t) => fireCaptain(g, id, t))}
+            onAssign={(id, boatId) => act((g) => assignCaptain(g, id, boatId))}
+            onAshore={(id) => act((g) => unassignCaptain(g, id))}
+            onPromote={(id, role, track) => act((g, t) => promoteCaptain(g, id, role, t, track))}
+          />
 
           <Workshop
             game={game}
@@ -268,6 +306,8 @@ export default function App() {
           />
 
           <Shop game={game} onBuy={(id) => act((g, t) => buyBoat(g, id, t))} />
+
+          <PortPanel game={game} onBuild={(id) => act((g, t) => buyUpgrade(g, id, t))} />
 
           <HarborLog log={game.log} now={now} />
 
@@ -290,6 +330,12 @@ export default function App() {
                     Away {min >= 60 ? `${min / 60}h` : `${min}m`}
                   </button>
                 ))}
+                <button
+                  className="secondary"
+                  onClick={() => act((g) => ({ ...g, player: { ...g.player, coins: g.player.coins + 10_000 } }))}
+                >
+                  +10,000c
+                </button>
                 <button
                   className="secondary"
                   onClick={() => {
