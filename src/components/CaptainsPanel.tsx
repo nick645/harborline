@@ -23,6 +23,8 @@ type Props = {
   onAssign: (captainId: string, boatId: string) => void
   onAshore: (captainId: string) => void
   onPromote: (captainId: string, role: 'dockhand' | 'harbormaster' | 'fleet-manager', track?: Track) => void
+  onTakeOver: (captainId: string) => void
+  onManagerCrewing: (managerId: string, on: boolean) => void
 }
 
 export function CaptainsPanel(props: Props) {
@@ -85,7 +87,7 @@ function Quay({ game, now, onScout, onHire }: Props) {
   )
 }
 
-function Roster({ game, onFire, onAssign, onAshore, onPromote }: Props) {
+function Roster({ game, onFire, onAssign, onAshore, onPromote, onTakeOver, onManagerCrewing }: Props) {
   const roster = rosterViews(game)
   if (roster.length === 0) return <p className="muted small">No captains yet. Find one on the quay.</p>
   const docked = game.player.ownedBoats.filter((b) => b.state === 'idle')
@@ -115,6 +117,12 @@ function Roster({ game, onFire, onAssign, onAshore, onPromote }: Props) {
               )}{' '}
               · {c.voyageCount} voyage{c.voyageCount === 1 ? '' : 's'}
               {c.bonded && ' · bonded to her ship'}
+              {c.hiredBy && (
+                <>
+                  {' '}
+                  · hired by <strong>{roster.find((m) => m.id === c.hiredBy)?.name ?? 'a manager'}</strong>
+                </>
+              )}
             </p>
             <SkillRange band={c.skillBand} />
             {c.knownDevelopment && (
@@ -124,6 +132,17 @@ function Roster({ game, onFire, onAssign, onAshore, onPromote }: Props) {
             )}
             <TraitList c={c} />
             <div className="boat-actions">
+              {role && (
+                <label className="toggle small">
+                  <input type="checkbox" checked={c.handlesCrew} onChange={(e) => onManagerCrewing(c.id, e.target.checked)} />{' '}
+                  Hires and fires crew for their boats
+                </label>
+              )}
+              {c.hiredBy && (
+                <button className="secondary" onClick={() => onTakeOver(c.id)} title="Their manager won't let them go">
+                  Take over
+                </button>
+              )}
               {c.role === 'sailing' && !c.bonded && (
                 <select
                   value=""

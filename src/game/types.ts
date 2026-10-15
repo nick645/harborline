@@ -160,6 +160,10 @@ export interface Captain {
   managesTrack: Track | null
   /** Bonded captains (Derelict Queen) can't be fired. */
   bonded: boolean
+  /** The manager who hired this captain and may let them go; null once the player takes over. */
+  hiredBy?: string | null
+  /** Managers only: whether they hire and fire crew for the boats they run (default on). */
+  handlesCrew?: boolean
 }
 
 export interface RecruitPool {

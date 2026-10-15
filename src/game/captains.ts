@@ -416,6 +416,10 @@ export interface CaptainView {
   severance: number
   /** Boat tiers they'll take command of, given their reputation. */
   sailsTiers: [number, number]
+  /** Id of the manager who hired them (and may let them go), if any. */
+  hiredBy: string | null
+  /** Managers: whether they hire and fire crew. */
+  handlesCrew: boolean
 }
 
 export function captainView(c: Captain): CaptainView {
@@ -441,5 +445,7 @@ export function captainView(c: Captain): CaptainView {
     bonded: c.bonded,
     severance: c.bonded ? 0 : severance(c),
     sailsTiers: captainTiers(c.reputation),
+    hiredBy: c.hiredBy ?? null,
+    handlesCrew: c.handlesCrew !== false,
   }
 }

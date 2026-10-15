@@ -11,7 +11,9 @@ import {
   hireCaptain,
   promoteCaptain,
   scoutRecruit,
+  setManagerCrewing,
   setManaged,
+  takeOverCaptain,
 } from './crew'
 import { captainView, generateCaptain, recordVoyage, verdictFor } from './captains'
 import { createRng } from './rolls'
@@ -329,6 +331,72 @@ describe('delegation', () => {
     const { s, vet } = veteranHarbor()
     s.player.ownedBoats.forEach((b) => (b.currentRoute = ROUTES[0].id))
     expect(canManage(s, vet.id, 'big')).toMatch(/top-tier/)
+  })
+})
+
+describe('managers and crew', () => {
+  /** A harbormaster running the dinghy, which has sailed once and is now docked. */
+  function managedDinghy() {
+    let s = newGame(2, T0)
+    s.player.coins = 1e6
+    s.player.maxTierReached = 4
+    s.player.ownedBoats.push({ ...s.player.ownedBoats[0], id: 'big', classId: 'short-sea-freighter', nickname: 'Big', captainId: null })
+    const vet = crew(s, 1, { voyageCount: 120 })
+    s = promoteCaptain(s, vet.id, 'harbormaster', T0)
+    const dinghy = s.player.ownedBoats[0].id
+    s = settle(assignRoute(s, dinghy, ROUTES[1].id, T0, 1), T0 + 3600_000)
+    s = setManaged(s, dinghy, vet.id)
+    return { s, vet, dinghy }
+  }
+
+  it("a manager hires a captain for a boat that has none, and it shows on your roster", () => {
+    const { s: start, vet, dinghy } = managedDinghy()
+    let s = start
+    const starter = getBoat(s, dinghy).captainId!
+    s.player.roster = s.player.roster.filter((c) => c.id !== starter) // nobody ashore to reuse
+    getBoat(s, dinghy).captainId = null
+    s = settle(s, T0 + 2 * 3600_000)
+    const hired = s.player.roster.find((c) => c.id === getBoat(s, dinghy).captainId)!
+    expect(hired.hiredBy).toBe(vet.id)
+    expect(s.log.some((e) => e.text.includes('hired'))).toBe(true)
+  })
+
+  it('a manager puts a captain who is ashore aboard before hiring anyone', () => {
+    const { s: start, dinghy } = managedDinghy()
+    let s = start
+    const starter = getBoat(s, dinghy).captainId!
+    getBoat(s, dinghy).captainId = null
+    const rosterSize = s.player.roster.length
+    s = settle(s, T0 + 2 * 3600_000)
+    expect(getBoat(s, dinghy).captainId).toBe(starter)
+    expect(s.player.roster).toHaveLength(rosterSize)
+  })
+
+  it('a manager lets go a poor captain they hired, but never one you took over', () => {
+    const { s: start, vet, dinghy } = managedDinghy()
+    const poor = (s: GameState) => {
+      const c = s.player.roster.find((x) => x.id === getBoat(s, dinghy).captainId)!
+      Object.assign(c, { hiredBy: vet.id, voyageCount: 25, revealedTraits: ['green', 'fair-weather'], hiddenTraits: ['green', 'fair-weather'], skillBand: [5, 15], trueSkill: 10, reputation: 1 })
+      return c.id
+    }
+    let s = structuredClone(start)
+    const id = poor(s)
+    s = settle(s, T0 + 2 * 3600_000)
+    expect(s.player.roster.some((c) => c.id === id)).toBe(false)
+
+    let mine = structuredClone(start)
+    const kept = poor(mine)
+    mine = takeOverCaptain(mine, kept)
+    mine = settle(mine, T0 + 2 * 3600_000)
+    expect(mine.player.roster.some((c) => c.id === kept)).toBe(true)
+  })
+
+  it('with crew handling off, the manager leaves captains to you', () => {
+    const { s: start, vet, dinghy } = managedDinghy()
+    let s = setManagerCrewing(start, vet.id, false)
+    getBoat(s, dinghy).captainId = null
+    s = settle(s, T0 + 2 * 3600_000)
+    expect(getBoat(s, dinghy).captainId).toBeNull()
   })
 })
 

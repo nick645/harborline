@@ -31,7 +31,9 @@ import {
   hireCaptain,
   promoteCaptain,
   scoutRecruit,
+  setManagerCrewing,
   setManaged,
+  takeOverCaptain,
   unassignCaptain,
 } from './game/crew'
 import { fleetCap, upgradeValue } from './game/upgrades'
@@ -296,6 +298,8 @@ export default function App() {
             onAssign={(id, boatId) => act((g) => assignCaptain(g, id, boatId))}
             onAshore={(id) => act((g) => unassignCaptain(g, id))}
             onPromote={(id, role, track) => act((g, t) => promoteCaptain(g, id, role, t, track))}
+            onTakeOver={(id) => act((g) => takeOverCaptain(g, id))}
+            onManagerCrewing={(id, on) => act((g) => setManagerCrewing(g, id, on))}
           />
 
           <Workshop

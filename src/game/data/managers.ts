@@ -28,3 +28,11 @@ export const AUTOMATED_PAY_SHARE = 0.85
 export const AUTOMATED_REPAIR_BELOW = 50
 /** How far ahead (in weather slots) an automated boat will wait for safe weather before giving up. */
 export const AUTOMATED_WAIT_SLOTS = 48
+
+/** A manager spends at most this share of a boat's value hiring its captain (never less than the minimum). */
+export const MANAGER_HIRE_BUDGET_SHARE = 0.25
+export const MANAGER_HIRE_BUDGET_MIN = 350
+/** Managers judge a captain they hired only after this many voyages. */
+export const MANAGER_JUDGE_AFTER = 20
+/** ...and let them go if what's been proven costs at least this much pay. */
+export const MANAGER_FIRE_BELOW_PAY = 0.95

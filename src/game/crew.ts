@@ -172,6 +172,8 @@ export function fireCaptain(state: GameState, captainId: string, now: number): G
     if (b.mateId === captainId) b.mateId = null
     if (b.managedBy === captainId) b.managedBy = null
   }
+  // Captains a departing manager hired are yours to look after now.
+  for (const x of s.player.roster) if (x.hiredBy === captainId) x.hiredBy = null
   log(s, now, 'captain', `Let ${c.name} go`)
   return s
 }
@@ -271,4 +273,20 @@ export function buyUpgrade(state: GameState, id: UpgradeId, now: number): GameSt
 /** For tests and tools: a captain by id from the roster or the quay. Not for the UI. */
 export function findCaptain(state: GameState, captainId: string): Captain | undefined {
   return state.player.roster.find((c) => c.id === captainId) ?? state.recruitPool.recruits.find((c) => c.id === captainId)
+}
+
+/** Take a manager-hired captain under your own wing: their manager won't let them go. */
+export function takeOverCaptain(state: GameState, captainId: string): GameState {
+  getCaptain(state, captainId)
+  const s = structuredClone(state)
+  getCaptain(s, captainId).hiredBy = null
+  return s
+}
+
+/** Switch whether a manager hires and fires crew for the boats they run. */
+export function setManagerCrewing(state: GameState, managerId: string, on: boolean): GameState {
+  if (getCaptain(state, managerId).role === 'sailing') throw new GameError('Only managers hire crew')
+  const s = structuredClone(state)
+  getCaptain(s, managerId).handlesCrew = on
+  return s
 }

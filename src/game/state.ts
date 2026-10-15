@@ -18,8 +18,17 @@ import {
   WEAR_MULTIPLIERS,
   WEATHER_DAMAGE_SPREAD,
 } from './data/economy'
-import { AUTOMATED_PAY_SHARE, AUTOMATED_REPAIR_BELOW, AUTOMATED_WAIT_SLOTS } from './data/managers'
 import {
+  AUTOMATED_PAY_SHARE,
+  AUTOMATED_REPAIR_BELOW,
+  AUTOMATED_WAIT_SLOTS,
+  MANAGER_FIRE_BELOW_PAY,
+  MANAGER_HIRE_BUDGET_MIN,
+  MANAGER_HIRE_BUDGET_SHARE,
+  MANAGER_JUDGE_AFTER,
+} from './data/managers'
+import {
+  boatValue,
   canBeSold,
   getBoatClass,
   repairCostPerPoint,
@@ -42,6 +51,8 @@ import {
   proveTrait,
   recordVoyage,
   refreshRecruitPool,
+  severance,
+  willSail,
   type CaptainMods,
 } from './captains'
 import { fleetCap, scoutLevel, upgradeValue } from './upgrades'
@@ -672,9 +683,11 @@ function settleInPlace(s: GameState, now: number) {
   return { tripsCompleted, sunk, lost, parts }
 }
 
-/** A managed boat's turn: patch the hull if it's worn, then head out on its usual route. */
+/** A managed boat's turn: sort out its captain, patch the hull if it's worn, then head out. */
 function autoDepart(s: GameState, boat: Boat, at: number) {
   accrueDocked(s, boat, at)
+  const manager = managerOf(s, boat)
+  if (manager && manager.handlesCrew !== false) manageCrew(s, boat, manager, at)
   if (boat.condition < AUTOMATED_REPAIR_BELOW) repairInPlace(s, boat)
   const q = quoteVoyage(s, boat.id, boat.currentRoute!, at, 'true')
   if (q.blocked || q.payout <= 0 || q.canSink) {
@@ -683,6 +696,49 @@ function autoDepart(s: GameState, boat: Boat, at: number) {
     return
   }
   startTrip(s, boat, boat.currentRoute!, at, 1, 1)
+}
+
+/**
+ * A manager looks after the captain of a boat they run. They judge only on what has been
+ * proven at sea, let go only captains they hired themselves, and stay within a hiring budget.
+ */
+function manageCrew(s: GameState, boat: Boat, manager: Captain, at: number) {
+  const cls = getBoatClass(boat.classId)
+  const current = boat.captainId ? getCaptain(s, boat.captainId) : null
+  if (current && current.hiredBy === manager.id && !current.bonded) {
+    const known = captainMods(current, { track: cls.track, weather: 'calm', t: at }, 'known')
+    const provenPoor = current.voyageCount >= MANAGER_JUDGE_AFTER && known.payoutMult * known.demandMult < MANAGER_FIRE_BELOW_PAY
+    const pay = severance(current)
+    if ((provenPoor || !willSail(current, cls.sizeTier)) && s.player.coins >= pay) {
+      s.player.coins -= pay
+      s.player.roster = s.player.roster.filter((c) => c.id !== current.id)
+      boat.captainId = null
+      log(s, at, 'captain', `${manager.name} let ${current.name} go from ${boat.nickname}`)
+    }
+  }
+  if (boat.captainId) return
+
+  // Someone ashore who'll take her, before spending anything.
+  const aboard = new Set(s.player.ownedBoats.flatMap((b) => [b.captainId, b.mateId]))
+  const ashore = s.player.roster.find((c) => c.role === 'sailing' && !c.bonded && !aboard.has(c.id) && willSail(c, cls.sizeTier))
+  if (ashore) {
+    boat.captainId = ashore.id
+    log(s, at, 'captain', `${manager.name} put ${ashore.name} aboard ${boat.nickname}`)
+    return
+  }
+
+  refreshRecruitPool(s, at, scoutLevel(s))
+  const budget = Math.min(s.player.coins, Math.max(MANAGER_HIRE_BUDGET_MIN, boatValue(cls) * MANAGER_HIRE_BUDGET_SHARE))
+  const pick = s.recruitPool.recruits
+    .filter((c) => willSail(c, cls.sizeTier) && c.fee <= budget)
+    .sort((a, b) => b.reputation - a.reputation || a.fee - b.fee)[0]
+  if (!pick) return
+  s.recruitPool.recruits = s.recruitPool.recruits.filter((c) => c.id !== pick.id)
+  s.player.coins -= pick.fee
+  pick.hiredBy = manager.id
+  s.player.roster.push(pick)
+  boat.captainId = pick.id
+  log(s, at, 'captain', `${manager.name} hired ${pick.name} for ${boat.nickname}`)
 }
 
 /** Every captain aboard gains the voyage's experience; tell the log what came to light. */

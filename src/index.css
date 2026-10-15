@@ -289,3 +289,4 @@ select {
   border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; max-width: 100%;
 }
 .captain-card .boat-actions button { padding: 6px 10px; font-size: 13px; }
+.toggle { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
