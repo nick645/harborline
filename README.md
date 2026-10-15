@@ -18,6 +18,19 @@ npm run sim -- --mode storms --minutes 1200   # how play styles fare against the
 
 `npm run sim -- --minutes 600 --seeds 300 --reaction 15` changes session length, seed count, and the bot's reaction time in seconds.
 
+## Phone app (Expo)
+
+`mobile/` is an Expo app that imports the same game logic from `src/game/` (Metro watches `../src`), so the rules can't drift between web and phone.
+
+```bash
+cd mobile
+npm install
+npx expo start          # scan the QR code with Expo Go on your phone (same Wi-Fi)
+npx expo start --ios    # or open in the iOS Simulator
+```
+
+Install **Expo Go** from the App Store / Play Store first. Saves live on the phone (AsyncStorage) in the same format as the web build. So far the phone app has the map, fleet (send, recall, repair, sell, salvage, captains aboard), captains (quay, scouting, hiring, roster, promotion), shipyard and log; the workshop, port upgrades, managers' controls and storm notifications are still web-only.
+
 ## Layout
 
 ```
@@ -37,6 +50,7 @@ src/game/            pure game logic — no React imports
 src/components/      map, boat card, captains, shipyard, workshop, port, harbor log
 src/storage.ts       localStorage + game clock
 src/notify.ts        browser notifications for storm alerts
+mobile/              Expo phone app sharing src/game
 scripts/sim.ts       balance harness
 ```
 

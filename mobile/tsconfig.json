@@ -1,0 +1,8 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "include": ["**/*.ts", "**/*.tsx", "../src/game/**/*.ts", "../src/format.ts", "../src/colors.ts"],
+  "exclude": ["node_modules", "../src/game/**/*.test.ts"]
+}
