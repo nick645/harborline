@@ -98,6 +98,8 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
 - Deckhands (user-approved 2026-10-16): tier t needs t − 1; one-off fee of 5% of tier price per
   hand, no wages; short-handed = +20% trip time per missing hand, never blocked; managers sign
   them on; not characters. Sim: first tier 2 unchanged at ~4.85 h, tier 3 13.5 → 13.8 h.
+  Full crew: −15% hull damage in rough/storm, tier 2+ only (all-in storm chasers: sinkings
+  14 → 12, coins +8%; pacing unchanged).
 
 ## Originality
 

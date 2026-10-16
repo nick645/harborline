@@ -30,6 +30,7 @@ import {
 import {
   boatValue,
   canBeSold,
+  crewDamageMult,
   getBoatClass,
   handFee,
   handsNeeded,
@@ -165,9 +166,11 @@ function tripContext(state: GameState, boat: Boat, routeId: string, t: number): 
   return { state, boat, cls: getBoatClass(boat.classId), routeId, weather: routeWeather(state, routeId, t), t }
 }
 
+/** Everything the people aboard change about a trip: captains' traits, and a full crew of hands. */
 function tripMods(state: GameState, boat: Boat, ctx: TripContext, view: 'known' | 'true'): CaptainMods {
   const trip = { track: ctx.cls.track, weather: ctx.weather, t: ctx.t }
-  return combineMods(captainsAboard(state, boat).map((c) => captainMods(c, trip, view)))
+  const mods = combineMods(captainsAboard(state, boat).map((c) => captainMods(c, trip, view)))
+  return { ...mods, damageMult: mods.damageMult * crewDamageMult(ctx.cls, boat.hands ?? 0, ctx.weather) }
 }
 
 /** Multiplier other boats' auras give a boat departing on a route. */

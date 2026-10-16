@@ -513,6 +513,12 @@ describe('deckhands', () => {
     // Two missing hands at +20% each.
     expect(short.durationMs / full.durationMs).toBeCloseTo(1.4, 2)
     expect(() => signOnHands(s, id, T0)).toThrow(GameError)
+    // A full crew takes less damage in storms; short-handed boats don't get it.
+    const stormAt = timeWith(s, route, 'storm')
+    const crewed = quoteVoyage(s, id, route, stormAt, 'true').worstDamage
+    const bare = structuredClone(s)
+    bare.player.ownedBoats.find((b) => b.id === id)!.hands = 1
+    expect(crewed).toBeLessThan(quoteVoyage(bare, id, route, stormAt, 'true').worstDamage)
     // Old saves have no hands field: read as none.
     delete s.player.ownedBoats.find((b) => b.id === id)!.hands
     expect(quoteVoyage(s, id, route, T0, 'true').handsMissing).toBe(2)

@@ -14,6 +14,7 @@ import {
   SALVAGE_RATE,
   HAND_FEE_SHARE,
   SHORT_HANDED_DURATION,
+  FULL_CREW_STORM_DAMAGE,
 } from './data/economy'
 
 const portsById = new Map(PORTS.map((p) => [p.id, p]))
@@ -95,6 +96,12 @@ export function handFee(boatClass: BoatClass): number {
 /** Trip-time multiplier for a boat sailing with this many hands. */
 export function shortHandedMult(boatClass: BoatClass, hands: number): number {
   return 1 + Math.max(0, handsNeeded(boatClass) - hands) * SHORT_HANDED_DURATION
+}
+
+/** Hull-damage multiplier from the hands aboard in this weather. */
+export function crewDamageMult(boatClass: BoatClass, hands: number, weather: string): number {
+  const need = handsNeeded(boatClass)
+  return need > 0 && hands >= need && (weather === 'rough' || weather === 'storm') ? FULL_CREW_STORM_DAMAGE : 1
 }
 
 export function boatValue(boatClass: BoatClass): number {

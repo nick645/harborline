@@ -55,5 +55,8 @@ export const MELT_COST = 3
 export const HAND_FEE_SHARE = 0.05
 /** Each missing hand makes trips this much longer. Short-handed boats still sail. */
 export const SHORT_HANDED_DURATION = 0.2
+/** A full complement of hands takes this much less hull damage in rough water and storms.
+ * Only boats that need hands (tier 2+) get it, so tier-1 storm runners are unchanged. */
+export const FULL_CREW_STORM_DAMAGE = 0.85
 
 export const LOG_LIMIT = 30

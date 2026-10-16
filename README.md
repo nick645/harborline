@@ -92,6 +92,7 @@ scripts/sim.ts       balance harness
 ## Deckhands
 
 - A boat of tier *t* needs *t − 1* deckhands (none on tier 1, five on a tier-6). Sign them on from the boat card for a one-off fee of 5% of the boat's tier price each; there are no wages, so time away never costs anything.
+- A full crew takes 15% less hull damage in rough water and storms (tier 2+ only; tier-1 boats need no hands and get no bonus).
 - Short-handed boats still sail, but each missing hand makes trips 20% longer. Managers sign on missing hands for the boats they run when the coins are there. Hands stay with their boat and go when she's sold.
 - Deckhands aren't characters: they have no hidden traits. Captains are the people you scout.
 
