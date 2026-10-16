@@ -217,11 +217,19 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
   const bowX = flip ? boatX + 6 : boatX + W * scale - 6
   const sprayP = useDerivedValue(() => ((clock.value * m.speed) % 1700) / 1700)
   const sprayOpacity = useDerivedValue(() => (sprayP.value < 0.5 ? 0.85 * (1 - sprayP.value * 2) : 0))
-  const sprayDrops = [0, 1, 2, 3, 4, 5].map((i) => ({
-    cx: useDerivedValue(() => bowX + wind * -1 * (4 + i * 5) * sprayP.value * 4 * (flip ? -1 : 1) * -1),
-    cy: useDerivedValue(() => DECK_Y - 4 - (14 + i * 4) * Math.sin(sprayP.value * Math.PI) * (m.k / 2)),
-    r: 1.6 + (i % 3) * 0.8,
-  }))
+  // All six drops in one path, thrown forward of the bow and falling back.
+  const ahead = flip ? -1 : 1
+  const spray = useDerivedValue(() => {
+    const p = sprayP.value
+    let d = ''
+    for (let i = 0; i < 6; i++) {
+      const x = bowX + ahead * (4 + i * 5) * p * 4
+      const y = DECK_Y - 4 - (14 + i * 4) * Math.sin(p * Math.PI) * (m.k / 2)
+      const r = 1.6 + (i % 3) * 0.8
+      d += `M${x - r} ${y} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z `
+    }
+    return d
+  })
 
   // Funnel smoke streams back, flattened by the wind.
   const stack = layout.stack
@@ -319,9 +327,7 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
 
         {atSea && m.spray && (
           <Group opacity={sprayOpacity}>
-            {sprayDrops.map((d, i) => (
-              <Circle key={i} cx={d.cx} cy={d.cy} r={d.r} color="#f3fbff" />
-            ))}
+            <Path path={spray} color="#f3fbff" />
           </Group>
         )}
 
