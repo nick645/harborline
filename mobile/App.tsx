@@ -5,8 +5,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
-import { assignRoute, buyBoat, recallBoat, repairBoat, salvageBoat, sellBoat } from '../src/game/state'
-import { assignCaptain, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, takeOverCaptain, unassignCaptain } from '../src/game/crew'
+import { assignRoute, buyBoat, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat } from '../src/game/state'
+import { assignCaptain, buyUpgrade, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName } from '../src/game/parts'
 import { seasonAt, seasonEndsAt } from '../src/game/weather'
 import { fleetCap } from '../src/game/upgrades'
@@ -18,15 +18,17 @@ import { HarborMap } from './src/components/HarborMap'
 import { BoatCard } from './src/components/BoatCard'
 import { CaptainsScreen } from './src/components/CaptainsScreen'
 import { ShipyardScreen } from './src/components/ShipyardScreen'
+import { PortScreen } from './src/components/PortScreen'
 import { BoatScreen } from './src/screens/BoatScreen'
 import { CaptainScreen } from './src/screens/CaptainScreen'
 import { Body, Button, Card, Muted, Row, Title } from './src/components/ui'
 
-type Tab = 'fleet' | 'captains' | 'shipyard' | 'log'
+type Tab = 'fleet' | 'captains' | 'shipyard' | 'port' | 'log'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'fleet', label: 'Fleet' },
   { id: 'captains', label: 'Captains' },
   { id: 'shipyard', label: 'Shipyard' },
+  { id: 'port', label: 'Port' },
   { id: 'log', label: 'Log' },
 ]
 
@@ -176,6 +178,16 @@ function Harbor() {
             )}
 
             {tab === 'shipyard' && <ShipyardScreen game={game} onBuy={(id) => act((g, at) => buyBoat(g, id, at))} />}
+
+            {tab === 'port' && (
+              <PortScreen
+                game={game}
+                onBuild={(id) => act((g, at) => buyUpgrade(g, id, at))}
+                onCraft={(id) => act((g, at) => craftBoat(g, id, at))}
+                onScrap={() => act((g) => scrapStandardParts(g))}
+                onMelt={(rarity, slot, track) => act((g, at) => meltSpares(g, rarity, slot, track, at))}
+              />
+            )}
 
             {tab === 'log' && (
               <View style={{ gap: 6 }}>

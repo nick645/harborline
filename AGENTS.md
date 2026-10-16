@@ -9,8 +9,8 @@ come out of bad weather. Single-player and offline (no accounts, no server, no n
 - Spec phases 1–4 are built (core loop, catalog + parts + crafting, weather/storms, captains + port
   upgrades + delegation), in the web app and its tests.
 - `mobile/` is an Expo (SDK 57) phone app using the same game logic, in the "Lantern" art style.
-  Not on the phone yet: workshop, port upgrades, manager controls, storm notifications (these
-  need a dev build for real background notifications).
+  The Port tab holds port upgrades and the workshop. Not on the phone yet: manager controls,
+  storm notifications (these need a dev build for real background notifications).
 - Everything left in the spec (friend trading, seasons/leaderboards, monetization) needs a backend.
   Don't start it without asking.
 - The original spec and boat catalog PDFs are the user's (not in the repo). Where a number is
