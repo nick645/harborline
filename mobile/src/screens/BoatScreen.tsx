@@ -1,5 +1,6 @@
 // One boat, live: the scene of where she is right now, then the trip and the controls.
 
+import { useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import type { Boat, GameState, Weather } from '../../../src/game/types'
 import { getBoatClass, getPort } from '../../../src/game/economy'
@@ -35,6 +36,8 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
   const dest = route ? getPort(route.portB).name : null
   const progress = v ? Math.min(1, Math.max(0, (now - v.startedAt) / v.durationMs)) : 0
   const sceneWidth = Math.min(width - 24, 720)
+  // Dev only: preview the scene in any weather.
+  const [preview, setPreview] = useState<Weather | null>(null)
 
   return (
     <View style={{ gap: 12 }}>
@@ -42,8 +45,8 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
         <BoatScene
           width={sceneWidth}
           light={lightAt(now)}
-          weather={mode === 'docked' ? 'calm' : weather}
-          mode={mode}
+          weather={preview ?? (mode === 'docked' ? 'calm' : weather)}
+          mode={preview && mode === 'docked' ? 'sailing' : mode}
           cls={cls}
           captain={captain ? lookFor(captain.id) : null}
           condition={boat.condition}
@@ -55,6 +58,17 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
           </Text>
         </View>
       </View>
+
+      {__DEV__ && (
+        <Row>
+          {(['calm', 'choppy', 'rough', 'storm'] as const).map((w) => (
+            <Pressable key={w} onPress={() => setPreview(preview === w ? null : w)} style={[styles.chip, { borderColor: t[w], backgroundColor: preview === w ? t[w] : 'transparent' }]}>
+              <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 12 }}>{w}</Text>
+            </Pressable>
+          ))}
+          <Muted>preview (dev)</Muted>
+        </Row>
+      )}
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
@@ -110,6 +124,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 }
 
 const styles = StyleSheet.create({
+  chip: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
   pill: { position: 'absolute', left: 12, top: 12, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   track: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
