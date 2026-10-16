@@ -72,6 +72,8 @@ export interface Boat {
   etaMs: number | null
   /** While docked: when docked-time effects were last settled. Null at sea or sunk. */
   dockedAt: number | null
+  /** When she went down, while sunk. Older saves start the clock when first loaded. */
+  sunkAt?: number
   /** Deckhands signed on. Absent in older saves, which reads as none. */
   hands?: number
   /** Managed boats only: don't try to leave before this time (weather or pay wasn't right). */
@@ -225,4 +227,6 @@ export interface AwayReport {
   lost: string[]
   /** Part ids found. */
   parts: string[]
+  /** Names of captains lost at sea waiting for their boat to be raised. */
+  captainsLost: string[]
 }

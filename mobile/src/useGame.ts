@@ -15,7 +15,7 @@ import { cancelAlerts, scheduleAlerts } from './notify'
 const TICK_MS = 1000
 const AUTOSAVE_MS = 5000
 
-export const worthReporting = (r: AwayReport) => r.tripsCompleted > 0 || r.sunk.length > 0 || r.lost.length > 0
+export const worthReporting = (r: AwayReport) => r.tripsCompleted > 0 || r.sunk.length > 0 || r.lost.length > 0 || r.captainsLost.length > 0
 
 export function useGame() {
   const [game, setGame] = useState<GameState | null>(null)

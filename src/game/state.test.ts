@@ -18,6 +18,7 @@ import {
   settle,
   settleAway,
   signOnHands,
+  adriftDeadline,
   GameError,
 } from './state'
 import { createRng, rollConditionLoss } from './rolls'
@@ -30,7 +31,7 @@ import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
 import { PARTS } from './data/parts'
 import { ROUTES } from './data/routes'
-import { SALVAGE_CONDITION, STANDARD_SCRAP_VALUE, STARTING_COINS } from './data/economy'
+import { CAPTAIN_ADRIFT_MS, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE, STARTING_COINS } from './data/economy'
 import { SEASON_LENGTH_MS, WEATHER_SLOT_MS } from './data/weather'
 import { deserialize, serialize } from './save'
 
@@ -522,5 +523,46 @@ describe('deckhands', () => {
     // Old saves have no hands field: read as none.
     delete s.player.ownedBoats.find((b) => b.id === id)!.hands
     expect(quoteVoyage(s, id, route, T0, 'true').handsMissing).toBe(2)
+  })
+})
+
+describe('lost at sea', () => {
+  const sinkFirst = (s: GameState) => {
+    const b = s.player.ownedBoats[0]
+    b.state = 'sunk'
+    b.condition = 0
+    b.sunkAt = T0
+    return b
+  }
+
+  it("loses the captain if she isn't raised within the limit; the wreck stays", () => {
+    const s = newGame(3, T0)
+    const b = sinkFirst(s)
+    const captainId = b.captainId!
+    expect(adriftDeadline(s, b)).toBe(T0 + CAPTAIN_ADRIFT_MS)
+    const before = settleAway(s, T0 + CAPTAIN_ADRIFT_MS - 1)
+    expect(before.state.player.roster.some((c) => c.id === captainId)).toBe(true)
+    const after = settleAway(s, T0 + CAPTAIN_ADRIFT_MS)
+    expect(after.state.player.roster.some((c) => c.id === captainId)).toBe(false)
+    expect(after.report.captainsLost).toHaveLength(1)
+    const wreck = after.state.player.ownedBoats[0]
+    expect(wreck.state).toBe('sunk')
+    expect(wreck.captainId).toBeNull()
+  })
+
+  it('raising her in time keeps the captain; bonded captains wait with their ship', () => {
+    let s = newGame(3, T0)
+    const b = sinkFirst(s)
+    const captainId = b.captainId!
+    s.player.coins = 10_000
+    s = salvageBoat(s, b.id, T0 + 1000)
+    s = settle(s, T0 + 2 * CAPTAIN_ADRIFT_MS)
+    expect(s.player.roster.some((c) => c.id === captainId)).toBe(true)
+
+    const t = newGame(3, T0)
+    const w = sinkFirst(t)
+    t.player.roster.find((c) => c.id === w.captainId)!.bonded = true
+    expect(adriftDeadline(t, w)).toBeNull()
+    expect(settle(t, T0 + 2 * CAPTAIN_ADRIFT_MS).player.roster.some((c) => c.id === w.captainId)).toBe(true)
   })
 })

@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications'
 import type { GameState } from '../../src/game/types'
 import type { StormAlert } from '../../src/game/weather'
 import { upcomingAlerts } from '../../src/game/alerts'
+import { adriftDeadline } from '../../src/game/state'
 import { getPort } from '../../src/game/economy'
 import { WEATHER } from '../../src/game/data/weather'
 import { duration } from '../../src/format'
@@ -57,12 +58,29 @@ export function alertText(state: GameState, alert: StormAlert): { title: string;
 export async function scheduleAlerts(state: GameState, now: number): Promise<void> {
   await cancelAlerts()
   if (!(await alertsWanted())) return
+  await scheduleAdrift(state, now)
   for (const alert of upcomingAlerts(state, now, now + HORIZON_MS)) {
     const { title, body } = alertText(state, alert)
     await Notifications.scheduleNotificationAsync({
       identifier: `${ALERT_ID}${alert.routeId}-${alert.at}`,
       content: { title, body },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: alert.at },
+    })
+  }
+}
+
+/** One warning an hour before a sunk boat's captain is lost, if she still isn't raised. */
+async function scheduleAdrift(state: GameState, now: number) {
+  for (const boat of state.player.ownedBoats) {
+    const deadline = adriftDeadline(state, boat)
+    const name = state.player.roster.find((c) => c.id === boat.captainId)?.name
+    if (!deadline || !name) continue
+    const at = Math.max(now + 60_000, deadline - 60 * 60 * 1000)
+    if (at >= deadline) continue
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${ALERT_ID}adrift-${boat.id}`,
+      content: { title: `${name} is still clinging to ${boat.nickname}`, body: `Raise her within ${duration(deadline - at)} or they'll be lost at sea.` },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: at },
     })
   }
 }

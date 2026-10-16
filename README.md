@@ -89,6 +89,10 @@ scripts/sim.ts       balance harness
 - **Away time** earns exactly like present time, at full rate, but only for trips already queued. Coming back shows what finished and what sank.
 - The RNG seed and state are stored in the save, so a session can be replayed.
 
+## Lost at sea
+
+- When a boat sinks, her captain clings to the wreckage. Raise her within **6 hours** (the clock runs while you're away) or the captain is lost at sea and leaves your roster. The wreck itself stays on the seabed and can still be raised. Bonded captains wait with their ship. With alerts on, the phone warns you an hour before.
+
 ## Deckhands
 
 - A boat of tier *t* needs *t − 1* deckhands (none on tier 1, five on a tier-6). Sign them on from the boat card for a one-off fee of 5% of the boat's tier price each; there are no wages, so time away never costs anything.

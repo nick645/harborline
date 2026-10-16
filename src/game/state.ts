@@ -11,6 +11,7 @@ import {
   CONDITION_MAX,
   LOG_LIMIT,
   MELT_COST,
+  CAPTAIN_ADRIFT_MS,
   SALVAGE_CONDITION,
   STANDARD_SCRAP_VALUE,
   STARTING_BOAT_CLASSES,
@@ -417,6 +418,7 @@ export function salvageBoat(state: GameState, boatId: string, now: number): Game
   const b = getBoat(s, boatId)
   b.state = 'idle'
   b.condition = SALVAGE_CONDITION
+  delete b.sunkAt
   b.dockedAt = now
   return s
 }
@@ -670,6 +672,7 @@ function settleInPlace(s: GameState, now: number) {
       if (boat.condition === 0) {
         boat.state = 'sunk'
         boat.etaMs = null
+        boat.sunkAt = ev.at
         s.voyages = s.voyages.filter((x) => x !== v)
         sunk.push(boat.nickname)
         log(s, ev.at, 'sunk', `${boat.nickname} sank in ${WEATHER[ctx.weather].name.toLowerCase()} seas`)
@@ -705,7 +708,37 @@ function settleInPlace(s: GameState, now: number) {
       else dockBoat(boat, ev.at)
     }
   }
-  return { tripsCompleted, sunk, lost, parts }
+  const captainsLost = loseAdrift(s, now)
+  return { tripsCompleted, sunk, lost, parts, captainsLost }
+}
+
+/** When a sunk boat's captain will be lost unless she's raised first, or null if no one's at risk. */
+export function adriftDeadline(state: GameState, boat: Boat): number | null {
+  if (boat.state !== 'sunk' || boat.sunkAt === undefined) return null
+  const atRisk = [boat.captainId, boat.mateId].some((id) => id && !getCaptain(state, id).bonded)
+  return atRisk ? boat.sunkAt + CAPTAIN_ADRIFT_MS : null
+}
+
+/** Captains of boats left on the seabed too long are lost at sea. Bonded captains wait. */
+function loseAdrift(s: GameState, now: number): string[] {
+  const lostNames: string[] = []
+  for (const boat of s.player.ownedBoats) {
+    if (boat.state !== 'sunk') continue
+    boat.sunkAt ??= now
+    const at = boat.sunkAt + CAPTAIN_ADRIFT_MS
+    if (now < at) continue
+    for (const id of [boat.captainId, boat.mateId]) {
+      if (!id) continue
+      const c = getCaptain(s, id)
+      if (c.bonded) continue
+      s.player.roster = s.player.roster.filter((x) => x.id !== id)
+      if (boat.captainId === id) boat.captainId = null
+      if (boat.mateId === id) boat.mateId = null
+      lostNames.push(c.name)
+      log(s, at, 'sunk', `${c.name} was lost at sea, still waiting for ${boat.nickname} to be raised`)
+    }
+  }
+  return lostNames
 }
 
 /** A managed boat's turn: sort out its captain, patch the hull if it's worn, then head out. */

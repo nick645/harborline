@@ -10,6 +10,7 @@ import { routeWeather } from '../../../src/game/weather'
 import { WEATHER } from '../../../src/game/data/weather'
 import { coins, duration, percent } from '../../../src/format'
 import { BoatScene, type BoatMode } from '../art/BoatScene'
+import { SunkScene } from '../art/SunkScene'
 import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
 import { fonts, useTheme } from '../theme'
@@ -42,6 +43,9 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
   return (
     <View style={{ gap: 12 }}>
       <View>
+        {mode === 'sunk' && !preview ? (
+          <SunkScene width={sceneWidth} light={lightAt(now)} cls={cls} captain={captain ? lookFor(captain.id) : null} />
+        ) : (
         <BoatScene
           width={sceneWidth}
           light={lightAt(now)}
@@ -52,6 +56,7 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
           condition={boat.condition}
           hands={boat.hands ?? 0}
         />
+        )}
         <View style={[styles.pill, { backgroundColor: 'rgba(29,20,32,0.75)' }]}>
           <View style={[styles.dot, { backgroundColor: mode === 'sunk' ? t.bad : t[weather] }]} />
           <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 13 }}>

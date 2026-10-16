@@ -31,6 +31,9 @@ export const REPAIR_COST_VALUE_SHARE = 0.001
 export const SALVAGE_RATE = 0.25
 export const SALVAGE_MIN = 100
 export const SALVAGE_CONDITION = 10
+/** A sunk boat's captain clings on this long. If she isn't raised by then, they're lost at sea
+ * (bonded captains wait with their ship). The boat itself stays on the seabed to be raised. */
+export const CAPTAIN_ADRIFT_MS = 6 * 60 * 60 * 1000
 
 // ---------- part drops (one roll per completed trip; checked rarest first) ----------
 

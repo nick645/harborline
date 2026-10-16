@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Boat, GameState } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../../../src/game/economy'
-import { getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
+import { adriftDeadline, getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
 import { abilityOf } from '../../../src/game/abilities'
 import { availableCaptains, captainViewById, knownCrewEffect, managersFor } from '../../../src/game/crew'
 import { LOW_CONDITION_THRESHOLD, SALVAGE_CONDITION } from '../../../src/game/data/economy'
@@ -286,15 +286,27 @@ function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props)
   )
 }
 
-function Sunk({ game, boat, onSalvage }: Props) {
+function Sunk({ game, boat, now, onSalvage }: Props) {
+  const t = useTheme()
   const route = game.routes.find((r) => r.id === boat.currentRoute)
   const cost = salvageQuote(game, boat.id)
+  const deadline = adriftDeadline(game, boat)
+  const captain = captainViewById(game, boat.captainId)
+  const left = deadline ? deadline - now : 0
   return (
-    <Row>
-      <Body style={{ fontWeight: '700' }}>Sunk{route ? ` on the way to ${getPort(route.portB).name}` : ''}.</Body>
-      <Button small label={`Salvage ${coins(cost)}c`} disabled={game.player.coins < cost} onPress={onSalvage} />
-      <Muted>Back at {SALVAGE_CONDITION} condition</Muted>
-    </Row>
+    <View style={{ gap: 6 }}>
+      <Row>
+        <Body style={{ fontWeight: '700' }}>Sunk{route ? ` on the way to ${getPort(route.portB).name}` : ''}.</Body>
+        <Button small label={`Salvage ${coins(cost)}c`} disabled={game.player.coins < cost} onPress={onSalvage} />
+        <Muted>Back at {SALVAGE_CONDITION} condition</Muted>
+      </Row>
+      {deadline && captain && (
+        <Text style={{ color: left < 60 * 60 * 1000 ? t.bad : t.accent, fontFamily: fonts.semibold, fontSize: 13 }}>
+          {captain.name} is clinging to the wreckage. Raise her within {duration(Math.max(0, left))} or they'll be lost at sea.
+        </Text>
+      )}
+      {!captain && <Muted>No one's waiting on her now. She can still be raised.</Muted>}
+    </View>
   )
 }
 

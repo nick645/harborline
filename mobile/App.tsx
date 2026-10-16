@@ -142,13 +142,14 @@ function Harbor() {
       <ScrollView contentContainerStyle={styles.content}>
         {report && (
           <Pressable onPress={clearReport}>
-            <Card accent={report.sunk.length + report.lost.length ? t.bad : t.accent}>
+            <Card accent={report.sunk.length + report.lost.length + report.captainsLost.length ? t.bad : t.accent}>
               <Body>
                 <Text style={{ fontFamily: fonts.bold }}>Welcome back.</Text> While you were away ({duration(report.awayMs)}), your fleet finished{' '}
                 {report.tripsCompleted} trip{report.tripsCompleted === 1 ? '' : 's'} for {coins(report.coinsEarned)}c.
                 {finds.length ? ` Found: ${finds.map(partName).join(', ')}.` : ''}
                 {report.lost.length ? ` Cargo lost: ${report.lost.join(', ')}.` : ''}
                 {report.sunk.length ? ` Sunk: ${report.sunk.join(', ')}.` : ''}
+                {report.captainsLost.length ? ` Lost at sea: ${report.captainsLost.join(', ')}.` : ''}
               </Body>
               <Muted>Tap to dismiss</Muted>
             </Card>
