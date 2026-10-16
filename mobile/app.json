@@ -24,7 +24,10 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-dev-client",
+      "./plugins/withoutPushEntitlement",
+      "expo-notifications"
     ]
   }
 }
