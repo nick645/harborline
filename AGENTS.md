@@ -11,8 +11,9 @@ come out of bad weather. Single-player and offline (no accounts, no server, no n
 - **The game is mobile only.** `mobile/` (Expo SDK 57, "Lantern" art style) is the product; the
   web UI in `src/App.tsx` and `src/components/` is the old prototype and gets no new work.
   `src/game/` stays: it is the shared logic the phone runs, with its tests and the sim.
-- The phone has everything but storm notifications (these need a dev build for real background
-  notifications). Its Log tab has dev-only play-test tools (coins, a set, a manager setup).
+- The phone runs as an Expo **dev build** (not Expo Go). Storm alerts are local notifications
+  scheduled when the app goes to the background (`upcomingAlerts` in `src/game/alerts.ts`) and
+  withdrawn when it returns. The Log tab has dev-only play-test tools.
 - Everything left in the spec (friend trading, seasons/leaderboards, monetization) needs a backend.
   Don't start it without asking.
 - The original spec and boat catalog PDFs are the user's (not in the repo). Where a number is
@@ -23,13 +24,22 @@ come out of bad weather. Single-player and offline (no accounts, no server, no n
 Node is installed per-user, not on PATH: prefix commands with `PATH="$HOME/.local/node/bin:$PATH"`.
 
 ```bash
-npm run dev                 # web game at http://localhost:5173  (?debug adds time-skip, grants, reset)
 npm test                    # vitest: game logic
 npm run lint                # oxlint (covers mobile/ too)
 npx tsc -b                  # typecheck web + scripts
 npm run sim                 # balance harness (pacing); --mode storms compares weather play styles
-cd mobile && npx expo start # phone app via Expo Go; `npx tsc --noEmit` to typecheck it
+cd mobile && npx expo start --dev-client   # dev server the installed app loads from (port 8081)
+cd mobile && npx tsc --noEmit              # typecheck the phone app
 ```
+
+Native builds (`cd mobile && npx expo run:ios --device <UDID>`; `xcrun devicectl list devices`
+lists the user's iPhone and the simulators):
+
+- Export `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8` and put `/opt/homebrew/bin` on PATH, or CocoaPods
+  crashes. Rebuild only when native config changes (plugins, packages); JS reloads live.
+- `ios/` is generated and git-ignored; native fixes live as config plugins in `mobile/plugins/`
+  (scene life cycle for iOS 27; no push entitlement, which the free Apple team can't sign).
+- Free-team builds expire after 7 days: rebuild to the phone when the user says it stopped opening.
 
 Before calling work done: tests, both typechecks and lint pass. After changing pacing, economy or
 captains, re-run `npm run sim` and report the numbers against the targets below.

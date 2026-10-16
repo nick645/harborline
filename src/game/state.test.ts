@@ -23,6 +23,7 @@ import { generateCaptain } from './captains'
 import { getBoatClass, repairCostPerPoint, routeDistance, voyagePayout } from './economy'
 import { missingAbilityIds } from './abilities'
 import { naturalWeather, seasonAt, stormAlerts } from './weather'
+import { upcomingAlerts } from './alerts'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
 import { PARTS } from './data/parts'
@@ -172,6 +173,17 @@ describe('storm alerts', () => {
     expect(stormAlerts(s, at - WEATHER_SLOT_MS, 1)[0]?.inMs).toBe(WEATHER_SLOT_MS)
     // A boat on its last trip won't sail again, so there's nothing to warn about.
     expect(stormAlerts(recallBoat(s, s.player.ownedBoats[0].id), at)).toEqual([])
+
+    // Ahead of time, for the phone's notifications: the same alert, due at the turn.
+    const ahead = upcomingAlerts(s, at - 60_000, at + 6 * WEATHER_SLOT_MS)
+    expect(ahead[0]).toEqual({ ...stormAlerts(s, at)[0], at })
+    expect(upcomingAlerts(newGame(5, T0), at - 60_000, at + 6 * WEATHER_SLOT_MS)).toEqual([])
+    // With radar, each storm is told once, a change early.
+    const radar = structuredClone(s)
+    radar.player.portUpgrades['weather-radar'] = 1
+    const early = upcomingAlerts(radar, at - WEATHER_SLOT_MS - 60_000, at + 6 * WEATHER_SLOT_MS).filter((a) => a.routeId === route)
+    expect(early[0]).toMatchObject({ at: at - WEATHER_SLOT_MS, inMs: WEATHER_SLOT_MS })
+    expect(early.filter((a) => a.at + a.inMs === at)).toHaveLength(1)
   })
 })
 

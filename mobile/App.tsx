@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, BackHandler, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
@@ -13,6 +13,7 @@ import { fleetCap } from '../src/game/upgrades'
 import { coins, duration } from '../src/format'
 import { PROMOTION_VOYAGES } from '../src/game/data/captains'
 import { useGame } from './src/useGame'
+import { alertsWanted, alertText, previewAlert, setAlertsWanted } from './src/notify'
 import { fonts, useTheme } from './src/theme'
 import { lightAt } from './src/art/light'
 import { HarborMap } from './src/components/HarborMap'
@@ -60,7 +61,7 @@ export default function App() {
 
 function Harbor() {
   const t = useTheme()
-  const { game, now, act, error, clearError, report, clearReport, reset } = useGame()
+  const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset } = useGame()
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
   const detail = stack[stack.length - 1] ?? null
@@ -150,6 +151,22 @@ function Harbor() {
             </Card>
           </Pressable>
         )}
+        {alerts.length > 0 && (
+          <Pressable onPress={clearAlerts} accessibilityRole="button" accessibilityHint="Dismisses the storm alert">
+            <Card accent={t.storm}>
+              {alerts.map((a) => {
+                const { title, body } = alertText(game, a)
+                return (
+                  <View key={`${a.routeId}-${a.at}`} style={{ gap: 2 }}>
+                    <Body style={{ fontWeight: '700' }}>{title}</Body>
+                    <Muted>{body}</Muted>
+                  </View>
+                )
+              })}
+              <Muted>Tap to dismiss</Muted>
+            </Card>
+          </Pressable>
+        )}
         {error && (
           <Pressable onPress={clearError}>
             <Card accent={t.bad}>
@@ -193,6 +210,7 @@ function Harbor() {
 
             {tab === 'log' && (
               <View style={{ gap: 6 }}>
+                <StormAlertsToggle />
                 {game.log.length === 0 && <Muted>Nothing to report yet.</Muted>}
                 {game.log.map((e, i) => (
                   <Body key={`${e.at}-${i}`} style={{ fontSize: 14, color: e.kind === 'sunk' || e.kind === 'lost' ? t.bad : t.text }}>
@@ -232,6 +250,7 @@ function Harbor() {
                           })
                         }
                       />
+                      <Button small kind="secondary" label="Preview storm alert" onPress={() => void previewAlert(game, Date.now())} />
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />
                     </Row>
                   </Card>
@@ -252,6 +271,33 @@ function Harbor() {
         </SafeAreaView>
       )}
     </SafeAreaView>
+  )
+}
+
+/** Storm alerts: notifications for routes you have trips queued on, sent while you're away. */
+function StormAlertsToggle() {
+  const t = useTheme()
+  const [on, setOn] = useState<boolean | null>(null)
+  useEffect(() => {
+    void alertsWanted().then(setOn)
+  }, [])
+  const toggle = async () => {
+    const want = !on
+    const now = await setAlertsWanted(want)
+    setOn(now)
+    if (want && !now) Alert.alert('Notifications are off', 'Allow notifications for Harborline in Settings to get storm alerts.')
+  }
+  if (on === null) return null
+  return (
+    <Card>
+      <Pressable onPress={toggle} accessibilityRole="switch" accessibilityState={{ checked: on }} style={styles.toggleRow}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Body style={{ fontWeight: '700' }}>Storm alerts</Body>
+          <Muted>A notification when a route you have trips queued on turns rough or stormy while you're away.</Muted>
+        </View>
+        <Switch value={on} onValueChange={() => void toggle()} trackColor={{ true: t.accent, false: t.muted }} ios_backgroundColor={t.muted} importantForAccessibility="no" />
+      </Pressable>
+    </Card>
   )
 }
 
@@ -296,6 +342,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, minHeight: 56 },
   back: { paddingVertical: 10, paddingRight: 16 },
   content: { padding: 12, gap: 12, paddingBottom: 32 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   tabBar: { flexDirection: 'row', borderTopWidth: 1 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 12 },
 })

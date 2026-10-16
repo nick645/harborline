@@ -8,6 +8,8 @@ import type { AwayReport, GameState } from '../../src/game/types'
 import { GameError, newGame, settle, settleAway } from '../../src/game/state'
 import { randomSeed } from '../../src/game/rolls'
 import { clearSave, loadGame, saveGame } from './storage'
+import { upcomingAlerts, type UpcomingAlert } from '../../src/game/alerts'
+import { cancelAlerts, scheduleAlerts } from './notify'
 
 // Once a second: countdowns show seconds, and scenes animate on their own clock.
 const TICK_MS = 1000
@@ -20,7 +22,10 @@ export function useGame() {
   const [now, setNow] = useState(Date.now)
   const [report, setReport] = useState<AwayReport | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [alerts, setAlerts] = useState<UpcomingAlert[]>([])
   const ref = useRef<GameState | null>(null)
+  /** When the tick last looked for storm alerts; 0 until the first tick. */
+  const lastTick = useRef(0)
 
   const commit = useCallback((g: GameState) => {
     ref.current = g
@@ -61,6 +66,10 @@ export function useGame() {
     const id = setInterval(() => {
       if (!ref.current || AppState.currentState !== 'active') return
       const t = Date.now()
+      // Storm alerts for any weather turn since the last tick, judged as the game stood then.
+      const found = lastTick.current ? upcomingAlerts(ref.current, lastTick.current, t) : []
+      if (found.length) setAlerts(found)
+      lastTick.current = t
       setNow(t)
       commit(settle(ref.current, t))
     }, TICK_MS)
@@ -72,11 +81,18 @@ export function useGame() {
     const id = setInterval(() => ref.current && void saveGame(ref.current), AUTOSAVE_MS)
     const sub = AppState.addEventListener('change', (next) => {
       if (!ref.current) return
-      if (next === 'active') comeBack()
-      else {
-        const g = settle(ref.current, Date.now())
+      if (next === 'active') {
+        // Anything that was due while away has been told by notification.
+        void cancelAlerts()
+        lastTick.current = Date.now()
+        comeBack()
+      } else {
+        const t = Date.now()
+        const g = settle(ref.current, t)
         commit(g)
         void saveGame(g)
+        // iOS passes through 'inactive' on the way out; schedule once, on the way to the background.
+        if (next === 'background') void scheduleAlerts(g, t)
       }
     })
     return () => {
@@ -119,5 +135,16 @@ export function useGame() {
     setReport(null)
   }, [commit])
 
-  return { game, now, act, error, clearError: () => setError(null), report, clearReport: () => setReport(null), reset }
+  return {
+    game,
+    now,
+    act,
+    error,
+    clearError: () => setError(null),
+    report,
+    clearReport: () => setReport(null),
+    alerts,
+    clearAlerts: () => setAlerts([]),
+    reset,
+  }
 }
