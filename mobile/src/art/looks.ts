@@ -32,6 +32,8 @@ export interface Look {
   glasses: boolean
   /** What they hold in front of them in portraits. */
   prop: Prop
+  trousers: string
+  boots: string
 }
 
 /** Hat and hair shapes in figure space: a 56 × 100 standing figure, head centred at (28, 40). */
@@ -77,5 +79,7 @@ export function lookFor(id: string): Look {
     build: pick(['slim', 'slim', 'stocky'] as const, 2, h2),
     glasses: (h2 >>> 28) % 6 === 0,
     prop: pick(['none', 'spyglass', 'mug', 'logbook', 'rope', 'lantern'] as const, 6, hash(`${id}~prop`)),
+    trousers: pick(['#34405a', '#3a3026', '#2e2a33', '#4a4038', '#3d4a3a'] as const, 10, hash(`${id}~legs`)),
+    boots: pick(['#2e1c19', '#2e1c19', '#4a2e22', '#e9b23c', '#1d2a3a'] as const, 16, hash(`${id}~legs`)),
   }
 }

@@ -1,11 +1,12 @@
-// A captain, drawn in Skia. Origin is the figure's top-left in a 56 × 100 box; place it with
-// a transform. The same look is used everywhere the captain appears. Light comes from the
-// figure's right (the lamp's rim); the left side falls into shadow.
+// A captain, drawn in Skia. Origin is the figure's top-left in a 56 × 100 box (56 × 145 with
+// legs); place it with a transform. The same look is used everywhere the captain appears.
+// Light comes from the figure's right (the lamp's rim); the left side falls into shadow.
+// Given motion values (see Walker) they step, swing their arms and act out their prop.
 
 import { useMemo } from 'react'
 import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, Skia, vec } from '@shopify/react-native-skia'
 import type { SharedValue } from 'react-native-reanimated'
-import { useDerivedValue } from 'react-native-reanimated'
+import { useDerivedValue, useSharedValue } from 'react-native-reanimated'
 import { HAT_PATHS, type HairStyle, type Look, type Prop } from './looks'
 import { shade, tint } from './paint'
 
@@ -21,7 +22,21 @@ type Props = {
   rimLight?: string
   /** Out on deck: the scarf streams and the head braces a little more. */
   wind?: boolean
+  /** Draw legs and boots (full length, 145 tall) instead of stopping at the waist. */
+  legs?: boolean
+  /** Walking and acting, driven by a Walker; without it they stand still. */
+  motion?: Motion
 }
+
+export interface Motion {
+  /** Step phase: sin of the walk cycle while walking, 0 while standing. */
+  stride: SharedValue<number>
+  /** 0..1: how far into their action (raising the spyglass, sipping...) they are. */
+  act: SharedValue<number>
+}
+
+/** Height of a full-length figure, feet included. */
+export const FIGURE_FULL_H = 145
 
 
 // Figure-space shapes. Head centred at (28, 39), chin at 53.5.
@@ -75,7 +90,7 @@ const HAT_TRIM: Record<string, { band?: string; shine?: string; badge?: boolean 
   brim: { band: 'M18 28 h20 v2.4 h-20 Z', shine: 'M9 32 C 18 29.6, 30 29.4, 38 30' },
 }
 
-export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, wind = false }: Props) {
+export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, wind = false, legs = false, motion }: Props) {
   // Fine detail (lines, lids, highlights) only where the figure is big enough to show it.
   const fine = scale >= 1.1
   const skinShadow = shade(look.skin, 0.28)
@@ -88,8 +103,66 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const [hl, hr] = HANDS[look.prop]
   const shoulderL: [number, number] = [11 - wide, 70]
   const shoulderR: [number, number] = [45 + wide, 70]
-  const sleeve = (sh: [number, number], hand: [number, number], out: number) =>
-    `M${sh[0]} ${sh[1]} Q ${sh[0] + out} ${(sh[1] + hand[1]) / 2 + 4}, ${hand[0]} ${hand[1]}`
+  const still = useSharedValue(0)
+  const stride = motion?.stride ?? still
+  const act = motion?.act ?? still
+  const prop = look.prop
+
+  // Where the hands and the prop go right now: rest pose, plus a swing while walking, plus
+  // the prop's action as `act` rises.
+  const pose = useDerivedValue(() => {
+    const a = act.value
+    const st = stride.value
+    const t = (clock.value + offset) / 1000
+    let lx = hl[0]
+    let ly = hl[1] + st * 2
+    let rx = hr[0]
+    let ry = hr[1] - st * 2
+    let px = 0
+    let py = st * -1
+    let rot = 0
+    switch (prop) {
+      case 'spyglass':
+        lx += 6 * a; ly -= 40 * a; rx += 4 * a; ry -= 40 * a; px = 5 * a; py += -40 * a; rot = 0.35 * a
+        break
+      case 'mug':
+        lx += 2 * a; ly -= 34 * a; rx -= 1 * a; ry -= 34 * a; py += -34 * a; rot = -0.2 * a
+        break
+      case 'logbook':
+        ly -= 12 * a; ry -= 12 * a; py += -12 * a; rot = -0.15 * a
+        break
+      case 'rope': {
+        const cx = Math.cos(t * 5) * 3 * a
+        const cy = Math.sin(t * 5) * 3 * a
+        lx += cx; ly += cy; rx += cx; ry += cy; px = cx; py += cy; rot = t * 2 * a
+        break
+      }
+      case 'lantern':
+        rx += 6 * a; ry -= 42 * a; px = 6 * a; py += -42 * a
+        break
+      case 'none':
+        rx += (5 + Math.sin(t * 9) * 4) * a; ry -= 46 * a
+        break
+    }
+    return { lx, ly, rx, ry, px, py, rot }
+  })
+  const sleeveL = useDerivedValue(() => {
+    const p = pose.value
+    return `M${shoulderL[0]} ${shoulderL[1]} Q ${shoulderL[0] - 4} ${(shoulderL[1] + p.ly) / 2 + 4}, ${p.lx} ${p.ly}`
+  })
+  const sleeveR = useDerivedValue(() => {
+    const p = pose.value
+    return `M${shoulderR[0]} ${shoulderR[1]} Q ${shoulderR[0] + 4} ${(shoulderR[1] + p.ry) / 2 + 4}, ${p.rx} ${p.ry}`
+  })
+  const handLx = useDerivedValue(() => pose.value.lx)
+  const handLy = useDerivedValue(() => pose.value.ly)
+  const handRx = useDerivedValue(() => pose.value.rx)
+  const handRy = useDerivedValue(() => pose.value.ry)
+  const propT = useDerivedValue(() => [{ translateX: pose.value.px }, { translateY: pose.value.py }, { rotate: pose.value.rot }])
+  const propOrigin = vec((hl[0] + hr[0]) / 2, (hl[1] + hr[1]) / 2)
+  const legL = useDerivedValue(() => [{ translateY: -Math.max(0, stride.value) * 5 }])
+  const legR = useDerivedValue(() => [{ translateY: -Math.max(0, -stride.value) * 5 }])
+  const hipX = look.build === 'stocky' ? 9 : 8
   const blinkEvery = 3600 + (offset % 1300)
 
   const idle = useDerivedValue(() => [
@@ -98,7 +171,12 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
     { scale },
   ])
   const breath = useDerivedValue(() => [{ scaleY: 1 + Math.sin((clock.value + offset) / 600) * 0.014 }])
-  const tilt = useDerivedValue(() => [{ rotate: Math.sin((clock.value + offset) / (wind ? 1300 : 2100)) * (wind ? 0.045 : 0.03) }, { scale: 1.08 }])
+  const tilt = useDerivedValue(() => [
+    // Reading the logbook, they look down at it.
+    { translateY: prop === 'logbook' ? act.value * 2 : 0 },
+    { rotate: Math.sin((clock.value + offset) / (wind ? 1300 : 2100)) * (wind ? 0.045 : 0.03) + stride.value * 0.03 },
+    { scale: 1.08 },
+  ])
   const blink = useDerivedValue(() => {
     const t = (clock.value + offset * 3) % blinkEvery
     return [{ scaleY: t < 110 ? 0.12 : 1 }]
@@ -133,6 +211,20 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
 
   return (
     <Group transform={idle}>
+      {legs && (
+        <Group>
+          {([
+            [28 - hipX, legL, -1],
+            [28 + hipX, legR, 1],
+          ] as const).map(([lx, lt, side]) => (
+            <Group key={side} transform={lt}>
+              <RoundedRect x={lx - 5.2} y={92} width={10.4} height={42} r={3} color={shade(look.trousers, side < 0 ? 0.15 : 0)} />
+              <Path path={`M${lx - 6} 132 h 12 q ${side * 7} 0 ${side * 7} 6 v 4 h -19 Z`} color={look.boots} />
+              <Rect x={lx - 6} y={131} width={12} height={3} color={shade(look.boots, 0.2)} />
+            </Group>
+          ))}
+        </Group>
+      )}
       {/* Body */}
       <Group transform={breath} origin={vec(28, 100)}>
         <Path path={torso}>
@@ -204,11 +296,13 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
       )}
 
       {/* Arms and whatever they're holding */}
-      <Path path={sleeve(shoulderL, hl, -4)} color={shade(base, 0.12)} style="stroke" strokeWidth={7.5} strokeCap="round" />
-      <Path path={sleeve(shoulderR, hr, 4)} color={shade(base, 0.04)} style="stroke" strokeWidth={7.5} strokeCap="round" />
-      <PropArt prop={look.prop} hands={[hl, hr]} clock={clock} offset={offset} />
-      <Circle cx={hl[0]} cy={hl[1]} r={3} color={skinShadow} />
-      <Circle cx={hr[0]} cy={hr[1]} r={3} color={look.skin} />
+      <Path path={sleeveL} color={shade(base, 0.12)} style="stroke" strokeWidth={7.5} strokeCap="round" />
+      <Path path={sleeveR} color={shade(base, 0.04)} style="stroke" strokeWidth={7.5} strokeCap="round" />
+      <Group transform={propT} origin={propOrigin}>
+        <PropArt prop={look.prop} hands={[hl, hr]} clock={clock} offset={offset} />
+      </Group>
+      <Circle cx={handLx} cy={handLy} r={3} color={skinShadow} />
+      <Circle cx={handRx} cy={handRy} r={3} color={look.skin} />
 
       {/* Head */}
       <Group transform={tilt} origin={vec(28, 56)}>
