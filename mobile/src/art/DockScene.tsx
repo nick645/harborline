@@ -14,7 +14,7 @@ import { BoatArt } from './BoatArt'
 import { Figure } from './Figure'
 import { boatWidth } from './boatGeometry'
 import { useSceneClock } from './clock'
-import { mix, shade } from './paint'
+import { mix } from './paint'
 import { SCENE_H, SCENE_W } from './BoatScene'
 
 const WATER = 170
