@@ -7,7 +7,9 @@ import { hash } from './paint'
 export type HatKind = 'cap' | 'souwester' | 'beanie' | 'brim' | 'bun' | 'bare'
 export type HairStyle = 'cropped' | 'swept' | 'long' | 'curls' | 'braid'
 export type FacialHair = 'none' | 'stubble' | 'moustache' | 'beard' | 'mutton'
-export type Coat = 'peacoat' | 'oilskin' | 'knit'
+export type Coat = 'peacoat' | 'oilskin' | 'knit' | 'stripes' | 'raincoat'
+export type Prop = 'none' | 'spyglass' | 'mug' | 'logbook' | 'rope' | 'lantern'
+export type Build = 'slim' | 'stocky'
 export type Extra = 'none' | 'pipe' | 'earring' | 'scar'
 
 export interface Look {
@@ -26,6 +28,10 @@ export interface Look {
   brow: number
   nose: 0 | 1 | 2
   extra: Extra
+  build: Build
+  glasses: boolean
+  /** What they hold in front of them in portraits. */
+  prop: Prop
 }
 
 /** Hat and hair shapes in figure space: a 56 × 100 standing figure, head centred at (28, 40). */
@@ -58,7 +64,7 @@ export function lookFor(id: string): Look {
     hat,
     hatColor: hat === 'bun' || hat === 'bare' ? hair : pick(HAT_COLORS, 4),
     coat: pick(COATS, 8),
-    coatStyle: pick(['peacoat', 'peacoat', 'oilskin', 'knit'] as const, 4, h2),
+    coatStyle: pick(['peacoat', 'peacoat', 'oilskin', 'knit', 'stripes', 'raincoat'] as const, 4, h2),
     scarf: pick(SCARVES, 12),
     skin: pick(SKIN, 15),
     hair,
@@ -68,5 +74,8 @@ export function lookFor(id: string): Look {
     brow: 1 + ((h2 >>> 16) % 8) * 0.2,
     nose: pick([0, 1, 2] as const, 20, h2),
     extra: pick(['none', 'none', 'none', 'pipe', 'earring', 'scar'] as const, 24, h2),
+    build: pick(['slim', 'slim', 'stocky'] as const, 2, h2),
+    glasses: (h2 >>> 28) % 6 === 0,
+    prop: pick(['none', 'spyglass', 'mug', 'logbook', 'rope', 'lantern'] as const, 6, hash(`${id}~prop`)),
   }
 }

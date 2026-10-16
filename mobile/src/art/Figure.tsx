@@ -2,10 +2,11 @@
 // a transform. The same look is used everywhere the captain appears. Light comes from the
 // figure's right (the lamp's rim); the left side falls into shadow.
 
-import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, vec } from '@shopify/react-native-skia'
+import { useMemo } from 'react'
+import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, Skia, vec } from '@shopify/react-native-skia'
 import type { SharedValue } from 'react-native-reanimated'
 import { useDerivedValue } from 'react-native-reanimated'
-import { HAT_PATHS, type HairStyle, type Look } from './looks'
+import { HAT_PATHS, type HairStyle, type Look, type Prop } from './looks'
 import { shade, tint } from './paint'
 
 type Props = {
@@ -26,8 +27,22 @@ type Props = {
 // Figure-space shapes. Head centred at (28, 39), chin at 53.5.
 const HEAD = 'M16.5 37 C 16.5 28, 21 24.5, 28 24.5 C 35 24.5, 39.5 28, 39.5 37 C 39.5 46, 35 53.5, 28 53.5 C 21 53.5, 16.5 46, 16.5 37 Z'
 const HEAD_SHADOW = 'M16.5 37 C 16.5 28, 21 24.5, 28 24.5 C 22.5 27, 20 32, 20 38 C 20 45, 23 51, 28 53.5 C 21 53.5, 16.5 46, 16.5 37 Z'
-const TORSO = 'M3 100 C 4 76, 11 64, 21 61 L 35 61 C 45 64, 52 76, 53 100 Z'
+const TORSO = {
+  slim: 'M3 100 C 4 76, 11 64, 21 61 L 35 61 C 45 64, 52 76, 53 100 Z',
+  stocky: 'M-1 100 C 0 73, 8 62, 20 60 L 36 60 C 48 62, 56 73, 57 100 Z',
+}
 const TORSO_SHADOW = 'M3 100 C 4 76, 11 64, 21 61 L 24 61 C 17 66, 14 80, 15 100 Z'
+const CREAM = '#efe6d6'
+
+/** Where the hands go for each prop: [left hand, right hand], and the shoulders they hang from. */
+const HANDS: Record<Prop, [[number, number], [number, number]]> = {
+  none: [[11, 99], [45, 99]],
+  spyglass: [[18, 88], [33, 81]],
+  mug: [[23, 87], [33, 85]],
+  logbook: [[20, 88], [36, 88]],
+  rope: [[21, 87], [35, 87]],
+  lantern: [[22, 90], [37, 84]],
+}
 
 const BACK_HAIR: Partial<Record<HairStyle, string>> = {
   long: 'M14.5 31 C 12 44, 12.5 56, 17 63 L 39 63 C 43.5 56, 44 44, 41.5 31 Z',
@@ -65,7 +80,16 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const fine = scale >= 1.1
   const skinShadow = shade(look.skin, 0.28)
   const line = shade(look.skin, 0.5)
-  const knit = look.coatStyle === 'knit'
+  const knit = look.coatStyle === 'knit' || look.coatStyle === 'stripes'
+  const torso = TORSO[look.build]
+  const torsoClip = useMemo(() => Skia.Path.MakeFromSVGString(torso)!, [torso])
+  const base = look.coatStyle === 'stripes' ? CREAM : look.coat
+  const wide = look.build === 'stocky' ? 2.5 : 0
+  const [hl, hr] = HANDS[look.prop]
+  const shoulderL: [number, number] = [11 - wide, 70]
+  const shoulderR: [number, number] = [45 + wide, 70]
+  const sleeve = (sh: [number, number], hand: [number, number], out: number) =>
+    `M${sh[0]} ${sh[1]} Q ${sh[0] + out} ${(sh[1] + hand[1]) / 2 + 4}, ${hand[0]} ${hand[1]}`
   const blinkEvery = 3600 + (offset % 1300)
 
   const idle = useDerivedValue(() => [
@@ -74,7 +98,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
     { scale },
   ])
   const breath = useDerivedValue(() => [{ scaleY: 1 + Math.sin((clock.value + offset) / 600) * 0.014 }])
-  const tilt = useDerivedValue(() => [{ rotate: Math.sin((clock.value + offset) / (wind ? 1300 : 2100)) * (wind ? 0.045 : 0.03) }])
+  const tilt = useDerivedValue(() => [{ rotate: Math.sin((clock.value + offset) / (wind ? 1300 : 2100)) * (wind ? 0.045 : 0.03) }, { scale: 1.08 }])
   const blink = useDerivedValue(() => {
     const t = (clock.value + offset * 3) % blinkEvery
     return [{ scaleY: t < 110 ? 0.12 : 1 }]
@@ -111,9 +135,27 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
     <Group transform={idle}>
       {/* Body */}
       <Group transform={breath} origin={vec(28, 100)}>
-        <Path path={TORSO}>
-          <LinearGradient start={vec(28, 61)} end={vec(28, 100)} colors={[tint(look.coat, 0.1), shade(look.coat, 0.2)]} />
+        <Path path={torso}>
+          <LinearGradient start={vec(28, 61)} end={vec(28, 100)} colors={[tint(base, 0.1), shade(base, 0.2)]} />
         </Path>
+        {look.coatStyle === 'stripes' && (
+          <Group clip={torsoClip}>
+            {[66, 72, 78, 84, 90, 96].map((sy) => (
+              <Rect key={sy} x={-4} y={sy} width={64} height={2.6} color={look.coat} />
+            ))}
+          </Group>
+        )}
+        {look.coatStyle === 'raincoat' && (
+          <>
+            <Path path="M17 60 C 15 52, 19 47, 28 47 C 37 47, 41 52, 39 60 C 34 57, 22 57, 17 60 Z" color={shade(look.coat, 0.18)} />
+            <Path path="M28 62 V 100" color={shade(look.coat, 0.35)} style="stroke" strokeWidth={1} />
+            {[70, 80, 90].map((by) => (
+              <RoundedRect key={by} x={29.5} y={by - 1.2} width={5} height={2.4} r={1.2} color={tint(look.coat, 0.6)} />
+            ))}
+            <RoundedRect x={10} y={88} width={11} height={8} r={1.5} color={shade(look.coat, 0.12)} />
+            <Path path="M38 64 C 44 68, 48 78, 49 90" color="#ffffff" opacity={0.2} style="stroke" strokeWidth={2.6} strokeCap="round" />
+          </>
+        )}
         <Path path={TORSO_SHADOW} color={shade(look.coat, 0.45)} opacity={0.45} />
         {look.coatStyle === 'peacoat' && (
           <>
@@ -131,7 +173,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             <Path path="M40 66 C 46 70, 49 80, 50 92" color="#ffffff" opacity={0.16} style="stroke" strokeWidth={2.4} strokeCap="round" />
           </>
         )}
-        {knit && (
+        {look.coatStyle === 'knit' && (
           <>
             {fine && [70, 77, 84, 91].map((ry) => <Path key={ry} path={`M${8 + (ry - 70) * 0.18} ${ry} H ${48 - (ry - 70) * 0.18}`} color={shade(look.coat, 0.3)} opacity={0.5} style="stroke" strokeWidth={0.7} />)}
           </>
@@ -146,7 +188,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
       <Rect x={23} y={48} width={10} height={14} color={skinShadow} />
       {knit && (
         <>
-            <Path path="M19.6 63.4 C 19.4 59, 21 55.6, 23.4 54.4 L 32.6 54.4 C 35 55.6, 36.6 59, 36.4 63.4 C 32 65.4, 24 65.4, 19.6 63.4 Z" color={tint(look.coat, 0.14)} />
+            <Path path="M19.6 63.4 C 19.4 59, 21 55.6, 23.4 54.4 L 32.6 54.4 C 35 55.6, 36.6 59, 36.4 63.4 C 32 65.4, 24 65.4, 19.6 63.4 Z" color={tint(look.coatStyle === 'stripes' ? look.coat : look.coat, 0.14)} />
             <Path path="M20 58.8 C 24 60.6, 32 60.6, 36 58.8" color={shade(look.coat, 0.25)} style="stroke" strokeWidth={0.8} />
         </>
       )}
@@ -160,6 +202,13 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
           <Circle cx={24} cy={64} r={2.8} color={shade(look.scarf, 0.08)} />
         </>
       )}
+
+      {/* Arms and whatever they're holding */}
+      <Path path={sleeve(shoulderL, hl, -4)} color={shade(base, 0.12)} style="stroke" strokeWidth={7.5} strokeCap="round" />
+      <Path path={sleeve(shoulderR, hr, 4)} color={shade(base, 0.04)} style="stroke" strokeWidth={7.5} strokeCap="round" />
+      <PropArt prop={look.prop} hands={[hl, hr]} clock={clock} offset={offset} />
+      <Circle cx={hl[0]} cy={hl[1]} r={3} color={skinShadow} />
+      <Circle cx={hr[0]} cy={hr[1]} r={3} color={look.skin} />
 
       {/* Head */}
       <Group transform={tilt} origin={vec(28, 56)}>
@@ -194,6 +243,9 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
           <Path path="M21.4 38.4 Q 23.5 37.1 25.6 38.4 M30.4 38.4 Q 32.5 37.1 34.6 38.4" color={line} style="stroke" strokeWidth={0.7} strokeCap="round" />
         )}
         <Path path="M20.6 35.6 Q 23.4 33.9 26.1 35.2 M29.9 35.2 Q 32.6 33.9 35.4 35.6" color={shade(look.hair, 0.1)} style="stroke" strokeWidth={look.brow} strokeCap="round" />
+        {look.glasses && (
+          <Path path="M20.2 39.6 a3.3 3.3 0 1 0 6.6 0 a3.3 3.3 0 1 0 -6.6 0 Z M29.2 39.6 a3.3 3.3 0 1 0 6.6 0 a3.3 3.3 0 1 0 -6.6 0 Z M26.8 39.2 Q 28 38.4 29.2 39.2 M20.2 39 L 17.2 38" color="#2a1a1c" style="stroke" strokeWidth={0.8} />
+        )}
         <Path path={NOSES[look.nose]} color={line} style="stroke" strokeWidth={0.9} strokeCap="round" />
         {look.extra === 'scar' && fine && <Path path="M33.6 35.6 L 35.6 42.4" color={tint(look.skin, 0.45)} style="stroke" strokeWidth={0.8} strokeCap="round" />}
 
@@ -236,4 +288,62 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
       </Group>
     </Group>
   )
+}
+
+/** The thing a captain carries, between their hands. */
+function PropArt({ prop, hands, clock, offset }: { prop: Prop; hands: [[number, number], [number, number]]; clock: SharedValue<number>; offset: number }) {
+  const steam = useDerivedValue(() => 0.25 + 0.25 * Math.sin((clock.value + offset) / 500))
+  const glow = useDerivedValue(() => 0.75 + 0.25 * Math.sin((clock.value + offset) / 240))
+  const [, hr] = hands
+  switch (prop) {
+    case 'none':
+      return null
+    case 'spyglass':
+      return (
+        <Group>
+          <Path path="M13 91 L 26 84" color="#8a5a2a" style="stroke" strokeWidth={4.6} strokeCap="round" />
+          <Path path="M25 84.5 L 40 77" color="#c9a24a" style="stroke" strokeWidth={3.6} strokeCap="round" />
+          <Path path="M30 82 L 31.4 84.6 M35 79.4 L 36.4 82" color="#8a6a2a" style="stroke" strokeWidth={0.8} />
+          <Circle cx={40.4} cy={76.8} r={2.2} color="#e8d9a0" />
+        </Group>
+      )
+    case 'mug':
+      return (
+        <Group>
+          <RoundedRect x={23} y={78} width={10} height={11} r={1.6} color="#c98a5b" />
+          <Rect x={23} y={78} width={10} height={2.2} color="#fff3dc" />
+          <Path path="M33 81 c 4 0, 4 5, 0 5" color="#8a5a3a" style="stroke" strokeWidth={1.4} />
+          <Path path="M26 75 q -2 -3 0 -6 M30 75 q 2 -3 0 -6" color="#fff3dc" style="stroke" strokeWidth={1.1} strokeCap="round" opacity={steam} />
+        </Group>
+      )
+    case 'logbook':
+      return (
+        <Group>
+          <RoundedRect x={17} y={79} width={22} height={14} r={1.4} color="#6e3a2a" />
+          <Rect x={18.5} y={91.2} width={19} height={1.4} color="#efe3d2" />
+          <Rect x={26.6} y={79} width={2.8} height={14} color="#4a2418" />
+          <Circle cx={32.8} cy={85.6} r={1.6} color="#d9a441" />
+        </Group>
+      )
+    case 'rope':
+      return (
+        <Group>
+          {[8, 5.6, 3.2].map((r) => (
+            <Circle key={r} cx={28} cy={86} r={r} color="#c9a26a" style="stroke" strokeWidth={2.2} />
+          ))}
+          <Path path="M33 92 q 4 4 2 8" color="#c9a26a" style="stroke" strokeWidth={2.2} strokeCap="round" />
+        </Group>
+      )
+    case 'lantern':
+      return (
+        <Group>
+          <Path path={`M${hr[0]} ${hr[1]} V ${hr[1] + 3}`} color="#2e1c19" style="stroke" strokeWidth={0.9} />
+          <Circle cx={hr[0]} cy={hr[1] + 9} r={9} opacity={glow}>
+            <RadialGradient c={vec(hr[0], hr[1] + 9)} r={9} colors={['#ffd27aaa', '#ffd27a00']} />
+          </Circle>
+          <RoundedRect x={hr[0] - 3.4} y={hr[1] + 3} width={6.8} height={10} r={1.4} color="#2e1c19" />
+          <RoundedRect x={hr[0] - 2.2} y={hr[1] + 4.6} width={4.4} height={6.6} r={1} color="#ffd27a" opacity={glow} />
+        </Group>
+      )
+  }
 }

@@ -1,7 +1,7 @@
 // Your captain where they are right now: at the helm of their boat, or ashore at the tavern
 // window with something warm. Design space is 358 × 280.
 
-import { Canvas, Circle, Group, Path, Rect, rect, rrect } from '@shopify/react-native-skia'
+import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, rect, rrect, vec } from '@shopify/react-native-skia'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { Light } from './light'
 import type { Look } from './looks'
@@ -24,12 +24,12 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
     return ((clock.value + k * 1400) % 2800) / 2800
   }
   const steamA = {
-    cy: useDerivedValue(() => 168 - 26 * steam(0)),
+    cy: useDerivedValue(() => 174 - 26 * steam(0)),
     r: useDerivedValue(() => 5 * (0.7 + 0.7 * steam(0))),
     opacity: useDerivedValue(() => 0.6 * (1 - steam(0))),
   }
   const steamB = {
-    cy: useDerivedValue(() => 168 - 26 * steam(1)),
+    cy: useDerivedValue(() => 174 - 26 * steam(1)),
     r: useDerivedValue(() => 5 * (0.7 + 0.7 * steam(1))),
     opacity: useDerivedValue(() => 0.6 * (1 - steam(1))),
   }
@@ -85,15 +85,41 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
               <Circle cx={0} cy={-2} r={40} color={light.lamp} opacity={0.14} />
             </Group>
             <Figure look={look} x={14} y={30} scale={2.25} clock={clock} rimLight={light.lamp} />
-            <Rect x={0} y={214} width={W} height={H - 214} color="#3a2420" />
-            <Rect x={0} y={208} width={W} height={10} color="#6e4733" />
-            <Group transform={[{ translateX: 164 }, { translateY: 200 }]}>
+            {/* A chart on the wall */}
+            <Rect x={98} y={30} width={40} height={30} color="#d9c9a8" />
+            <Path path="M102 52 q 8 -14 16 -4 q 6 6 14 -8 M104 36 h 6 M120 44 a 3 3 0 1 0 0.1 0" color="#6e4733" style="stroke" strokeWidth={1} />
+            <Rect x={98} y={30} width={40} height={30} color="#4a2e22" style="stroke" strokeWidth={2.4} />
+            {/* The bar: a polished top and a panelled front down to the bottom of the frame */}
+            <Rect x={0} y={214} width={W} height={H - 214}>
+              <LinearGradient start={vec(0, 214)} end={vec(0, H)} colors={['#5a3424', '#2e1c19']} />
+            </Rect>
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <Rect key={i} x={10 + i * 60} y={228} width={48} height={40} color="#4a2a1e" style="stroke" strokeWidth={2} />
+            ))}
+            <Rect x={0} y={206} width={W} height={10} color="#8a5a3a" />
+            <Rect x={0} y={206} width={W} height={2} color="#c98a5b" opacity={0.7} />
+            {/* On the bar: a candle and a ship in a bottle */}
+            <Group transform={[{ translateX: 236 }, { translateY: 206 }]}>
+              <Rect x={-4} y={-18} width={8} height={18} color="#f3e7d8" />
+              <Path path="M0 -18 C -3 -22, -1 -26, 0 -28 C 1 -26, 3 -22, 0 -18 Z" color="#ffd27a" opacity={flicker} />
+              <Circle cx={0} cy={-22} r={14} opacity={flicker}>
+                <RadialGradient c={vec(0, -22)} r={14} colors={['#ffd27a55', '#ffd27a00']} />
+              </Circle>
+            </Group>
+            <Group transform={[{ translateX: 296 }, { translateY: 206 }]}>
+              <Path path="M-24 0 C -26 -14, -18 -20, -6 -20 L 14 -20 L 14 -14 L 22 -14 L 22 -6 L 14 -6 L 14 0 Z" color="#9fd8cf" opacity={0.35} />
+              <Path path="M-18 -6 L 6 -6 L 3 -2 L -15 -2 Z" color="#6e3a2a" />
+              <Path path="M-6 -6 V -17 L -14 -8 Z M-5 -16 L 2 -8 L -5 -8 Z" color="#f3e7d8" />
+              <Path path="M-24 0 C -26 -14, -18 -20, -6 -20 L 14 -20 L 14 -14 L 22 -14 L 22 -6 L 14 -6 L 14 0 Z" color="#e8fff9" style="stroke" strokeWidth={0.8} />
+              <Rect x={22} y={-13} width={4} height={6} color="#8a5a3a" />
+            </Group>
+            <Group transform={[{ translateX: 176 }, { translateY: 206 }]}>
               <Path path="M-12 0 v -26 h 24 v 26 Z" color="#c98a5b" />
               <Path path="M12 -20 c 10 0, 10 14, 0 14" color="#6e4733" style="stroke" strokeWidth={3} />
               <Rect x={-12} y={-26} width={24} height={5} color="#fff3dc" />
             </Group>
-            <Circle cx={162} cy={steamA.cy} r={steamA.r} opacity={steamA.opacity} color="#fff3dc" />
-            <Circle cx={168} cy={steamB.cy} r={steamB.r} opacity={steamB.opacity} color="#fff3dc" />
+            <Circle cx={174} cy={steamA.cy} r={steamA.r} opacity={steamA.opacity} color="#fff3dc" />
+            <Circle cx={180} cy={steamB.cy} r={steamB.r} opacity={steamB.opacity} color="#fff3dc" />
           </Group>
         )}
       </Group>
