@@ -1,15 +1,15 @@
 // One captain: where they are right now, what's known of them, and their logbook.
 
-import { Alert, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native'
 import type { GameState } from '../../../src/game/types'
-import { boatOfCaptain, captainViewById, managerRole, promotionOptions } from '../../../src/game/crew'
+import { boatOfCaptain, boatsManagedBy, captainViewById, managerRole, promotionOptions } from '../../../src/game/crew'
 import { coins } from '../../../src/format'
 import { DEVELOPMENT_KNOWN_AFTER } from '../../../src/game/data/captains'
 import { CaptainScene } from '../art/CaptainScene'
 import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
 import { fonts, useTheme } from '../theme'
-import { Anchors, Button, Card, Muted, Row, Tag, Title } from '../components/ui'
+import { Anchors, Body, Button, Card, Muted, Row, Tag, Title } from '../components/ui'
 
 type Props = {
   game: GameState
@@ -19,12 +19,13 @@ type Props = {
   onAshore: (id: string) => void
   onFire: (id: string) => void
   onTakeOver: (id: string) => void
+  onManagerCrewing: (id: string, on: boolean) => void
   onPromote: (id: string, role: 'dockhand' | 'harbormaster' | 'fleet-manager', track?: 'cargo' | 'passenger') => void
 }
 
 const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'True to form' } as const
 
-export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFire, onTakeOver, onPromote }: Props) {
+export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFire, onTakeOver, onManagerCrewing, onPromote }: Props) {
   const t = useTheme()
   const { width } = useWindowDimensions()
   const c = captainViewById(game, captainId)
@@ -32,6 +33,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
   const boat = boatOfCaptain(game, c.id)
   const atSea = !!boat && (boat.state === 'sailing' || boat.state === 'returning')
   const role = managerRole(c.role)
+  const managed = role ? boatsManagedBy(game, c.id) : []
   const where = role
     ? `${role.name} · at the harbour office`
     : boat
@@ -61,6 +63,34 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
         <SkillRange band={c.skillBand} />
         {boat && <Button small kind="secondary" label={`Go to ${boat.nickname}`} onPress={() => onOpenBoat(boat.id)} />}
       </Card>
+
+      {role && (
+        <Card>
+          <Body>
+            <Text style={{ fontFamily: fonts.bold }}>{role.name}</Text> · {role.description}
+            {c.managesTrack && ` (${c.managesTrack})`}
+          </Body>
+          <Muted>
+            Runs {managed.length} boat{managed.length === 1 ? '' : 's'}
+            {managed.length ? `: ${managed.map((b) => b.nickname).join(', ')}` : '. Hand boats over from their cards in Fleet.'}
+          </Muted>
+          <Pressable
+            onPress={() => onManagerCrewing(c.id, !c.handlesCrew)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: c.handlesCrew }}
+            style={[styles.toggleRow]}
+          >
+            <Body style={{ flex: 1 }}>Hires and fires crew for their boats</Body>
+            <Switch
+              value={c.handlesCrew}
+              onValueChange={(on) => onManagerCrewing(c.id, on)}
+              trackColor={{ true: t.accent, false: t.muted }}
+              ios_backgroundColor={t.muted}
+              importantForAccessibility="no"
+            />
+          </Pressable>
+        </Card>
+      )}
 
       <View style={[styles.logbook, { backgroundColor: t.paper }]}>
         <Text style={{ fontFamily: fonts.title, fontSize: 22, color: t.ink }}>Logbook</Text>
@@ -134,6 +164,7 @@ export function SkillRange({ band }: { band: [number, number] }) {
 }
 
 const styles = StyleSheet.create({
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   logbook: { borderRadius: 8, padding: 14, paddingLeft: 20, gap: 8, borderLeftWidth: 6, borderLeftColor: '#c2a98c' },
   pencil: { fontFamily: fonts.titleItalic, fontSize: 18, lineHeight: 22 },
   skillTrack: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },

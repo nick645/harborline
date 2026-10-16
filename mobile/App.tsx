@@ -5,12 +5,13 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
-import { assignRoute, buyBoat, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat } from '../src/game/state'
-import { assignCaptain, buyUpgrade, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, takeOverCaptain, unassignCaptain } from '../src/game/crew'
+import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat } from '../src/game/state'
+import { assignCaptain, buyUpgrade, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName } from '../src/game/parts'
 import { seasonAt, seasonEndsAt } from '../src/game/weather'
 import { fleetCap } from '../src/game/upgrades'
 import { coins, duration } from '../src/format'
+import { PROMOTION_VOYAGES } from '../src/game/data/captains'
 import { useGame } from './src/useGame'
 import { fonts, useTheme } from './src/theme'
 import { lightAt } from './src/art/light'
@@ -103,6 +104,7 @@ function Harbor() {
       onSell={() => act((g, at) => sellBoat(g, b.id, at))}
       onSalvage={() => act((g, at) => salvageBoat(g, b.id, at))}
       onCaptain={(captainId) => act((g) => assignCaptain(g, captainId, b.id))}
+      onManage={(managerId) => act((g) => setManaged(g, b.id, managerId))}
     />
   )
 
@@ -203,6 +205,33 @@ function Harbor() {
                     <Muted>Play-test tools (development builds only)</Muted>
                     <Row>
                       <Button small kind="secondary" label="+10,000c" onPress={() => act((g) => ({ ...g, player: { ...g.player, coins: g.player.coins + 10_000 } }))} />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Grant a set"
+                        onPress={() =>
+                          act((g) => {
+                            // Every piece of a random set the player hasn't built.
+                            const sets = craftableClasses().filter((c) => !g.player.ownedBoats.some((b) => b.classId === c.id))
+                            const pick = sets[Math.floor(Math.random() * sets.length)]
+                            return { ...g, player: { ...g.player, partInventory: [...g.player.partInventory, ...pick.requiredParts] } }
+                          })
+                        }
+                      />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Manager setup"
+                        onPress={() =>
+                          act((g, at) => {
+                            // Reach tier 3 (unlocks the dockhand) and make every sailing captain a veteran.
+                            const t3 = shopClasses().find((c) => c.sizeTier === 3 && c.rarity === 'common')!
+                            const s = buyBoat({ ...g, player: { ...g.player, coins: g.player.coins + t3.price } }, t3.id, at)
+                            const roster = s.player.roster.map((c) => (c.role === 'sailing' ? { ...c, voyageCount: Math.max(c.voyageCount, PROMOTION_VOYAGES) } : c))
+                            return { ...s, player: { ...s.player, roster } }
+                          })
+                        }
+                      />
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />
                     </Row>
                   </Card>
@@ -255,6 +284,7 @@ function DetailScreen({
       onAshore={(id) => act((g) => unassignCaptain(g, id))}
       onFire={(id) => act((g, at) => fireCaptain(g, id, at))}
       onTakeOver={(id) => act((g) => takeOverCaptain(g, id))}
+      onManagerCrewing={(id, on) => act((g) => setManagerCrewing(g, id, on))}
       onPromote={(id, role, track) => act((g, at) => promoteCaptain(g, id, role, at, track))}
     />
   )

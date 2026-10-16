@@ -8,9 +8,11 @@ come out of bad weather. Single-player and offline (no accounts, no server, no n
 
 - Spec phases 1–4 are built (core loop, catalog + parts + crafting, weather/storms, captains + port
   upgrades + delegation), in the web app and its tests.
-- `mobile/` is an Expo (SDK 57) phone app using the same game logic, in the "Lantern" art style.
-  The Port tab holds port upgrades and the workshop. Not on the phone yet: manager controls,
-  storm notifications (these need a dev build for real background notifications).
+- **The game is mobile only.** `mobile/` (Expo SDK 57, "Lantern" art style) is the product; the
+  web UI in `src/App.tsx` and `src/components/` is the old prototype and gets no new work.
+  `src/game/` stays: it is the shared logic the phone runs, with its tests and the sim.
+- The phone has everything but storm notifications (these need a dev build for real background
+  notifications). Its Log tab has dev-only play-test tools (coins, a set, a manager setup).
 - Everything left in the spec (friend trading, seasons/leaderboards, monetization) needs a backend.
   Don't start it without asking.
 - The original spec and boat catalog PDFs are the user's (not in the repo). Where a number is

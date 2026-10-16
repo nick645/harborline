@@ -4,7 +4,7 @@ import type { Boat, GameState } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, sellPrice } from '../../../src/game/economy'
 import { getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
 import { abilityOf } from '../../../src/game/abilities'
-import { availableCaptains, captainViewById, knownCrewEffect } from '../../../src/game/crew'
+import { availableCaptains, captainViewById, knownCrewEffect, managersFor } from '../../../src/game/crew'
 import { LOW_CONDITION_THRESHOLD, SALVAGE_CONDITION } from '../../../src/game/data/economy'
 import { WEATHER } from '../../../src/game/data/weather'
 import { coins, duration, percent } from '../../../src/format'
@@ -26,6 +26,8 @@ type Props = {
   onSell: () => void
   onSalvage: () => void
   onCaptain: (captainId: string) => void
+  /** Hand her to a manager, or (null) take her back. */
+  onManage: (managerId: string | null) => void
   /** Open the live view of this boat; absent when already on it. */
   onOpen?: () => void
   onOpenCaptain: (captainId: string) => void
@@ -103,11 +105,12 @@ export function BoatCard(props: Props) {
   )
 }
 
-function CrewLine({ game, boat, now, onCaptain, onOpenCaptain }: Props) {
+function CrewLine({ game, boat, now, onCaptain, onManage, onOpenCaptain }: Props) {
   const t = useTheme()
   const captain = captainViewById(game, boat.captainId)
   const effect = knownCrewEffect(game, boat.id, now)
   const manager = managerOf(game, boat)
+  const managers = boat.state === 'idle' && !manager ? managersFor(game, boat.id) : []
   const spare = boat.state === 'idle' ? availableCaptains(game, boat.id).filter((c) => c.id !== boat.captainId) : []
   const parts = effect
     ? [
@@ -131,7 +134,22 @@ function CrewLine({ game, boat, now, onCaptain, onOpenCaptain }: Props) {
           No captain aboard: she can’t sail.{spare.length === 0 ? ' Hire one in Captains.' : ''}
         </Text>
       )}
-      {manager && <Muted>Run by {manager.name}</Muted>}
+      {manager && (
+        <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+          <Muted style={{ flex: 1 }}>
+            Run by <Text style={{ color: t.text, fontFamily: fonts.semibold }}>{manager.name}</Text> ·{' '}
+            {isAutomated(game, boat) ? 'earns less, avoids rough water, finds no rare parts' : 'send her out once to start'}
+          </Muted>
+          {boat.managedBy && <Button small kind="secondary" label="Take back" onPress={() => onManage(null)} />}
+        </Row>
+      )}
+      {managers.length > 0 && (
+        <Row>
+          {managers.map((m) => (
+            <Button key={m.id} small kind="secondary" label={`Hand to ${m.name.split(' ')[0]}`} onPress={() => onManage(m.id)} />
+          ))}
+        </Row>
+      )}
       {spare.length > 0 && (
         <Row>
           {spare.slice(0, 3).map((c) => (
