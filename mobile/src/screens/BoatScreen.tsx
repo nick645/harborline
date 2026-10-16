@@ -11,6 +11,7 @@ import { WEATHER } from '../../../src/game/data/weather'
 import { coins, duration, percent } from '../../../src/format'
 import { BoatScene, type BoatMode } from '../art/BoatScene'
 import { SunkScene } from '../art/SunkScene'
+import { DockScene } from '../art/DockScene'
 import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
 import { fonts, useTheme } from '../theme'
@@ -45,6 +46,17 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
       <View>
         {mode === 'sunk' && !preview ? (
           <SunkScene width={sceneWidth} light={lightAt(now)} cls={cls} captain={captain ? lookFor(captain.id) : null} />
+        ) : mode === 'docked' && !preview ? (
+          <DockScene
+            width={sceneWidth}
+            light={lightAt(now)}
+            cls={cls}
+            captain={captain ? lookFor(captain.id) : null}
+            captainName={captain?.name}
+            condition={boat.condition}
+            hands={boat.hands ?? 0}
+            onOpenCaptain={captain ? () => onOpenCaptain(captain.id) : undefined}
+          />
         ) : (
         <BoatScene
           width={sceneWidth}
