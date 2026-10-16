@@ -3,7 +3,6 @@
 // Ghost is half there, the Unmoored floats above the sea. Same local space as BoatArt: deck
 // amidships at y = 0, stern x = 0, bow x = W, hull down to y = H.
 
-import type { ReactNode } from 'react'
 import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, Skia, vec } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { BoatLayout, Pose } from './boatGeometry'
@@ -16,7 +15,7 @@ import { shade, tint } from './paint'
 /** Everything a part of a boat drawing needs. */
 export type Ctx = { L: BoatLayout; tier: number; lit: (c: string) => string; light: Light; seed: number; condition: number }
 
-type SP = { ctx: Ctx; clock: SharedValue<number>; captain: Look | null; people: boolean }
+export type SP = { ctx: Ctx; clock: SharedValue<number>; captain: Look | null; people: boolean }
 
 // ---------- shared bits ----------
 
@@ -95,7 +94,7 @@ const windows = (x0: number, x1: number, y: number, w: number, h: number, gap: n
 // ---------- legendary ----------
 
 /** Takes no damage in storms: a sealed whaleback with a lightning rod and a red storm sail. */
-function Stormchaser(p: SP) {
+export function Stormchaser(p: SP) {
   const { L, lit } = p.ctx
   const { W } = L
   const spark = useDerivedValue(() => {
@@ -124,7 +123,7 @@ function Stormchaser(p: SP) {
 }
 
 /** Trips take half the time: a varnished mahogany runabout throwing spray. */
-function TheErrand(p: SP) {
+export function TheErrand(p: SP) {
   const { L, lit } = p.ctx
   const { W } = L
   const hull = `M-2 -4 L ${W * 0.7} -5 C ${W * 0.9} -6, ${W - 2} -9, ${W + 6} -12 C ${W - 12} 4, ${W * 0.7} ${L.H}, ${W * 0.5} ${L.H} L ${W * 0.06} ${L.H} C 0 ${L.H}, -3 ${L.H * 0.5}, -2 -4 Z`
@@ -162,7 +161,7 @@ function TheErrand(p: SP) {
 }
 
 /** Never loses a trip: kingfisher blue over orange, a beak for a bowsprit. */
-function Kingfisher(p: SP) {
+export function Kingfisher(p: SP) {
   const { L, lit } = p.ctx
   const { W } = L
   const bow = L.deckY(W)
@@ -191,7 +190,7 @@ function Kingfisher(p: SP) {
 }
 
 /** Comes home if a trip is lost: she sails on a gull's wings. */
-function TheGull(p: SP) {
+export function TheGull(p: SP) {
   const { L, lit } = p.ctx
   const { W } = L
   const mx = W * 0.5
@@ -220,7 +219,7 @@ function TheGull(p: SP) {
 }
 
 /** Duplicates rare finds: a salvage tug with a crane, a catch on the hook and her scars on show. */
-function Salvager(p: SP) {
+export function Salvager(p: SP) {
   const { L, lit } = p.ctx
   const { W } = L
   const swing = useDerivedValue(() => [{ rotate: 0.12 * Math.sin(p.clock.value / 700) }])
@@ -252,7 +251,7 @@ function Salvager(p: SP) {
 }
 
 /** Earns at anchor: black as the bird, a long neck at the bow and lines over the side. */
-function TheCormorant(p: SP) {
+export function TheCormorant(p: SP) {
   const { L, lit } = p.ctx
   const { W } = L
   const bob = useDerivedValue(() => Math.sin(p.clock.value / 500) * 2)
@@ -280,7 +279,7 @@ function TheCormorant(p: SP) {
 }
 
 /** Faster by night: a low blockade runner in dazzle paint, hooded lamps only. */
-function Nightrunner(p: SP) {
+export function Nightrunner(p: SP) {
   const { L, lit } = p.ctx
   const { W, H } = L
   const hull = L.hullPath
@@ -310,7 +309,7 @@ function Nightrunner(p: SP) {
 }
 
 /** Carries two captains: a catamaran with a wheelhouse on each hull and a brass sun on the mast. */
-function TheMeridian(p: SP) {
+export function TheMeridian(p: SP) {
   const { L, lit } = p.ctx
   const { W, H } = L
   const spin = useDerivedValue(() => [{ rotate: p.clock.value / 4000 }])
@@ -350,7 +349,7 @@ function TheMeridian(p: SP) {
 }
 
 /** Rolls for parts twice: an icebreaker with a riveted ram and teeth at the bow. */
-function Ironjaw(p: SP) {
+export function Ironjaw(p: SP) {
   const { L, lit } = p.ctx
   const { W, H } = L
   const hull = `M-2 -3 Q ${W * 0.6} 0, ${W * 0.9} -14 L ${W + 4} -16 L ${W + 14} ${H * 0.55} L ${W * 0.84} ${H} L ${W * 0.08} ${H} C ${W * 0.02} ${H}, -2 ${H * 0.6}, -2 -3 Z`
@@ -381,9 +380,9 @@ function Ironjaw(p: SP) {
 }
 
 /** Always sells high: a paddle steamer in gingerbread and gold. */
-function TheMirabel(p: SP) {
+export function TheMirabel(p: SP) {
   const { L, lit } = p.ctx
-  const { W, H } = L
+  const { W } = L
   const turn = useDerivedValue(() => [{ rotate: -p.clock.value / 700 }])
   const wheel = { x: W * 0.5, y: 2, r: 22 }
   return (
@@ -425,7 +424,7 @@ function TheMirabel(p: SP) {
 }
 
 /** A legendary find brings the whole set: a giant, stacked to the sky. */
-function TheColossus(p: SP) {
+export function TheColossus(p: SP) {
   const { L, lit, seed } = p.ctx
   const { W, H } = L
   const colors = ['#b8423a', '#2f5d62', '#e9b23c', '#3d5a73', '#7a4e5e', '#6b5a2e', '#c97a3a']
@@ -464,7 +463,7 @@ function TheColossus(p: SP) {
 }
 
 /** Lifts every boat leaving her port: a four-funnelled grande dame of the sea. */
-function GrandDame(p: SP) {
+export function GrandDame(p: SP) {
   const { L, lit } = p.ctx
   const { W, H } = L
   const hull = `M-4 -10 Q ${W * 0.6} -6, ${W + 6} -22 C ${W - 4} ${H * 0.5}, ${W * 0.86} ${H}, ${W * 0.8} ${H} L ${W * 0.1} ${H} C ${W * 0.02} ${H}, -6 ${H * 0.3}, -4 -10 Z`
@@ -511,7 +510,7 @@ function GrandDame(p: SP) {
 // ---------- mythic ----------
 
 /** Sails only between midnight and four: a galleon that isn't quite there. */
-function TheGhost(p: SP) {
+export function TheGhost(p: SP) {
   const { L } = p.ctx
   const { W, H } = L
   const fade = useDerivedValue(() => 0.62 + 0.2 * Math.sin(p.clock.value / 900) + 0.06 * Math.sin(p.clock.value / 137))
@@ -560,7 +559,7 @@ function TheGhost(p: SP) {
 }
 
 /** Comes with a bonded captain: a queen raised from the seabed, weed and barnacles and all. */
-function DerelictQueen(p: SP) {
+export function DerelictQueen(p: SP) {
   const { L, lit, seed } = p.ctx
   const { W, H } = L
   const sway = useDerivedValue(() => [{ skewX: 0.12 * Math.sin(p.clock.value / 800) }])
@@ -600,7 +599,7 @@ function DerelictQueen(p: SP) {
 }
 
 /** Never lost to the weather, ever: black hull, sails of night sky, a crescent at the masthead. */
-function TheLongNight(p: SP) {
+export function TheLongNight(p: SP) {
   const { L, seed } = p.ctx
   const { W, H } = L
   const twinkle = useDerivedValue(() => 0.5 + 0.5 * Math.sin(p.clock.value / 300))
@@ -638,7 +637,7 @@ function TheLongNight(p: SP) {
 }
 
 /** Never needs fuel: she has slipped her moorings and floats clear of the sea. */
-function TheUnmoored(p: SP) {
+export function TheUnmoored(p: SP) {
   const { L, lit } = p.ctx
   const { W, H } = L
   const hover = useDerivedValue(() => [{ translateY: -26 + Math.sin(p.clock.value / 1100) * 5 }])
@@ -676,7 +675,7 @@ function TheUnmoored(p: SP) {
 }
 
 /** Storms follow her: a clipper crowned in St Elmo's fire, under her own cloud. */
-function SaintElmo(p: SP) {
+export function SaintElmo(p: SP) {
   const { L, lit } = p.ctx
   const { W } = L
   const masts = [0.2, 0.38, 0.56, 0.74]
@@ -715,24 +714,4 @@ function SaintElmo(p: SP) {
       <Aboard p={p} captainAt={{ x: W * 0.08, pose: 'wheel' }} hands={[{ x: W * 0.92, pose: 'lookout' }, { x: W * 0.3, pose: 'haul' }, { x: W * 0.48, pose: 'haul' }, { x: W * 0.66, pose: 'haul' }, { x: W * 0.84, pose: 'coil' }]} />
     </Group>
   )
-}
-
-export const SPECIALS: Record<string, (p: SP) => ReactNode> = {
-  stormchaser: Stormchaser,
-  'the-errand': TheErrand,
-  kingfisher: Kingfisher,
-  'the-gull': TheGull,
-  salvager: Salvager,
-  'the-cormorant': TheCormorant,
-  nightrunner: Nightrunner,
-  'the-meridian': TheMeridian,
-  ironjaw: Ironjaw,
-  'the-mirabel': TheMirabel,
-  'the-colossus': TheColossus,
-  'grand-dame': GrandDame,
-  'the-ghost': TheGhost,
-  'derelict-queen': DerelictQueen,
-  'the-long-night': TheLongNight,
-  'the-unmoored': TheUnmoored,
-  'saint-elmo': SaintElmo,
 }
