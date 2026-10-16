@@ -6,6 +6,7 @@ import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, vec } 
 import type { SharedValue } from 'react-native-reanimated'
 import { useDerivedValue } from 'react-native-reanimated'
 import { HAT_PATHS, type HairStyle, type Look } from './looks'
+import { shade, tint } from './paint'
 
 type Props = {
   look: Look
@@ -21,16 +22,6 @@ type Props = {
   wind?: boolean
 }
 
-/** Blend two #rrggbb colours; t = 0 gives a, 1 gives b. */
-function mix(a: string, b: string, t: number): string {
-  const p = (c: string, i: number) => parseInt(c.slice(i, i + 2), 16)
-  const ch = (i: number) => Math.round(p(a, i) + (p(b, i) - p(a, i)) * t)
-    .toString(16)
-    .padStart(2, '0')
-  return `#${ch(1)}${ch(3)}${ch(5)}`
-}
-const shade = (c: string, t: number) => mix(c, '#1d1218', t)
-const tint = (c: string, t: number) => mix(c, '#fff3dc', t)
 
 // Figure-space shapes. Head centred at (28, 39), chin at 53.5.
 const HEAD = 'M16.5 37 C 16.5 28, 21 24.5, 28 24.5 C 35 24.5, 39.5 28, 39.5 37 C 39.5 46, 35 53.5, 28 53.5 C 21 53.5, 16.5 46, 16.5 37 Z'

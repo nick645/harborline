@@ -2,6 +2,8 @@
 // the quay, on your roster, at the helm and at the tavern. Only the id goes in: a look never
 // hints at hidden skill or traits.
 
+import { hash } from './paint'
+
 export type HatKind = 'cap' | 'souwester' | 'beanie' | 'brim' | 'bun' | 'bare'
 export type HairStyle = 'cropped' | 'swept' | 'long' | 'curls' | 'braid'
 export type FacialHair = 'none' | 'stubble' | 'moustache' | 'beard' | 'mutton'
@@ -43,12 +45,6 @@ const SCARVES = ['#c2452a', '#f2b45a', '#f3e7d8', '#7fd1a8', '#e8a0b4', '#9ec0cf
 const SKIN = ['#f0c9a0', '#e0b48a', '#c98a5b', '#b5764c', '#8a5a3a', '#6b4430']
 const HAIR = ['#3a2630', '#5a3a2a', '#8a5a3a', '#c9a27a', '#2e1c19', '#a8452e']
 const GREY = '#b9aea6'
-
-function hash(s: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193)
-  return h >>> 0
-}
 
 export function lookFor(id: string): Look {
   const h = hash(id)

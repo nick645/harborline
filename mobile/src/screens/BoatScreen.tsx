@@ -46,6 +46,7 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
           mode={mode}
           cls={cls}
           captainHat={captain ? lookFor(captain.id).hat : null}
+          condition={boat.condition}
         />
         <View style={[styles.pill, { backgroundColor: 'rgba(29,20,32,0.75)' }]}>
           <View style={[styles.dot, { backgroundColor: mode === 'sunk' ? t.bad : t[weather] }]} />

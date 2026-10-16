@@ -20,6 +20,7 @@ import { HarborMap } from './src/components/HarborMap'
 import { BoatCard } from './src/components/BoatCard'
 import { CaptainsScreen } from './src/components/CaptainsScreen'
 import { ShipyardScreen } from './src/components/ShipyardScreen'
+import { BoatGallery } from './src/components/BoatGallery'
 import { PortScreen } from './src/components/PortScreen'
 import { BoatScreen } from './src/screens/BoatScreen'
 import { CaptainScreen } from './src/screens/CaptainScreen'
@@ -64,6 +65,7 @@ function Harbor() {
   const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset } = useGame()
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
+  const [gallery, setGallery] = useState(false)
   const detail = stack[stack.length - 1] ?? null
   const open = (d: Detail) => setStack((s) => [...s, d])
   const back = () => setStack((s) => s.slice(0, -1))
@@ -251,10 +253,12 @@ function Harbor() {
                         }
                       />
                       <Button small kind="secondary" label="Preview storm alert" onPress={() => void previewAlert(game, Date.now())} />
+                      <Button small kind="secondary" label={gallery ? 'Hide boats' : 'Boat gallery'} onPress={() => setGallery(!gallery)} />
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />
                     </Row>
                   </Card>
                 )}
+                {__DEV__ && gallery && <BoatGallery />}
               </View>
             )}
           </>

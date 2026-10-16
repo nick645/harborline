@@ -7,7 +7,7 @@ import type { BoatClass, Weather } from '../../../src/game/types'
 import type { HatKind } from './looks'
 import { STORM, type Light } from './light'
 import { BoatArt } from './BoatArt'
-import { boatWidth } from './boatGeometry'
+import { boatLayout } from './boatGeometry'
 import { useSceneClock } from './clock'
 
 export const SCENE_W = 358
@@ -24,6 +24,8 @@ type Props = {
   mode: BoatMode
   cls: BoatClass
   captainHat: HatKind | null
+  /** Hull condition 0–100, shown as wear. */
+  condition?: number
 }
 
 const WAVES = 'M0 0 q 20 -6 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0 t 40 0'
@@ -44,7 +46,7 @@ function usePuff(clock: SharedValue<number>, k: number, x: number, y: number, dr
   }
 }
 
-export function BoatScene({ width, light, weather, mode, cls, captainHat }: Props) {
+export function BoatScene({ width, light, weather, mode, cls, captainHat, condition = 100 }: Props) {
   const clock = useSceneClock()
   const s = width / SCENE_W
   const storm = weather === 'storm'
@@ -52,10 +54,12 @@ export function BoatScene({ width, light, weather, mode, cls, captainHat }: Prop
   const atSea = mode === 'sailing' || mode === 'returning'
   const swell = rough ? 2.2 : weather === 'choppy' ? 1.5 : 1
 
-  const W = boatWidth(cls)
+  const layout = boatLayout(cls)
+  const W = layout.W
   const scale = (170 + cls.sizeTier * 12) / W
   const boatX = (SCENE_W - W * scale) / 2 + (mode === 'docked' ? 30 : 0)
   const flip = mode === 'returning'
+  const waterY = DECK_Y + layout.waterline * scale * 0.85
 
   const waveFast = useDerivedValue(() => [{ translateX: -((clock.value / (rough ? 30 : 50)) % 80) }, { translateY: 0 }])
   const waveSlow = useDerivedValue(() => [{ translateX: -((clock.value / 125) % 80) }])
@@ -77,8 +81,10 @@ export function BoatScene({ width, light, weather, mode, cls, captainHat }: Prop
   })
 
   // Funnel smoke drifts back from the stack; three puffs on a staggered cycle.
-  const stackX = boatX + (flip ? W * scale - (W * 0.62 + W * 0.07) * scale : (W * 0.62 + W * 0.07) * scale)
-  const stackY = DECK_Y - (24 + cls.sizeTier * 3 + 24 + cls.sizeTier * 4) * scale
+  const stack = layout.stack
+  const stackMid = stack ? stack.x + stack.w / 2 : 0
+  const stackX = boatX + (flip ? (W - stackMid) * scale : stackMid * scale)
+  const stackY = DECK_Y + (stack ? stack.y : 0) * scale
   const drift = flip ? 26 : -26
   const puffs = [usePuff(clock, 0, stackX, stackY, drift), usePuff(clock, 1, stackX, stackY, drift), usePuff(clock, 2, stackX, stackY, drift)]
   const flashVeil = useDerivedValue(() => flash.value * 0.12)
@@ -120,14 +126,6 @@ export function BoatScene({ width, light, weather, mode, cls, captainHat }: Prop
           </Group>
         </Group>
 
-        {mode === 'docked' && (
-          <Group>
-            <Rect x={0} y={DECK_Y - 30} width={64} height={SCENE_H - DECK_Y + 30} color="#5a3a2c" />
-            <Rect x={0} y={DECK_Y - 34} width={70} height={6} color="#8a5a3a" />
-            <Rect x={54} y={DECK_Y - 44} width={8} height={18} color="#2e1c19" />
-            <Path path={`M58 ${DECK_Y - 40} C 80 ${DECK_Y - 30}, 90 ${DECK_Y - 20}, ${boatX + 6} ${DECK_Y - 4}`} color="#c9b6ae" style="stroke" strokeWidth={1.5} />
-          </Group>
-        )}
 
         {atSea && <Path path={`M${150} ${DECK_Y + 22} h 140 M170 ${DECK_Y + 32} h 100 M196 ${DECK_Y + 42} h 50`} color={light.lamp} style="stroke" strokeWidth={2} opacity={light.glint} />}
 
@@ -140,12 +138,28 @@ export function BoatScene({ width, light, weather, mode, cls, captainHat }: Prop
           </Group>
         ) : (
           <Group transform={bob} origin={{ x: SCENE_W / 2, y: DECK_Y }}>
-            <BoatArt cls={cls} light={light} x={boatX} y={DECK_Y} scale={scale} flip={flip} captainHat={captainHat} />
+            <BoatArt cls={cls} light={light} x={boatX} y={DECK_Y} scale={scale} flip={flip} captainHat={captainHat} condition={condition} clock={clock} />
+          </Group>
+        )}
+
+        {/* The sea in front of her hull, so she sits in the water rather than on it. */}
+        <Rect x={0} y={waterY} width={SCENE_W} height={SCENE_H - waterY} color={light.sea} />
+        <Group transform={waveSlow}>
+          <Group transform={[{ translateY: waterY }]}>
+            <Path path={WAVES} color={light.seaLine} style="stroke" strokeWidth={1.6} opacity={0.8} />
+          </Group>
+        </Group>
+        {mode === 'docked' && (
+          <Group>
+            <Rect x={0} y={DECK_Y - 30} width={64} height={SCENE_H - DECK_Y + 30} color="#5a3a2c" />
+            <Rect x={0} y={DECK_Y - 34} width={70} height={6} color="#8a5a3a" />
+            <Rect x={54} y={DECK_Y - 44} width={8} height={18} color="#2e1c19" />
+            <Path path={`M58 ${DECK_Y - 40} C 80 ${DECK_Y - 30}, 90 ${DECK_Y - 20}, ${boatX + 6} ${DECK_Y - 4}`} color="#c9b6ae" style="stroke" strokeWidth={1.5} />
           </Group>
         )}
 
         {mode !== 'sunk' &&
-          cls.sizeTier >= 2 &&
+          stack &&
           puffs.map((p, i) => <Circle key={i} cx={p.cx} cy={p.cy} r={p.r} opacity={p.opacity} color={storm ? '#9a93ad' : '#e7dccf'} />)}
 
         <Group transform={waveFast}>

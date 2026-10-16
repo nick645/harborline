@@ -34,12 +34,12 @@ type Props = {
 }
 
 /** A small drawing of the boat for her card. */
-function BoatThumb({ cls }: { cls: ReturnType<typeof getBoatClass> }) {
+function BoatThumb({ cls, condition }: { cls: ReturnType<typeof getBoatClass>; condition: number }) {
   const W = boatWidth(cls)
   const scale = 60 / W
   return (
     <Canvas style={{ width: 64, height: 44 }}>
-      <BoatArt cls={cls} light={LIGHT.golden} x={2} y={32} scale={scale} />
+      <BoatArt cls={cls} light={LIGHT.day} x={2} y={32} scale={scale} condition={condition} />
     </Canvas>
   )
 }
@@ -64,7 +64,7 @@ export function BoatCard(props: Props) {
         accessibilityLabel={`Watch ${boat.nickname}`}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
       >
-        <BoatThumb cls={cls} />
+        <BoatThumb cls={cls} condition={boat.condition} />
         <View style={{ flex: 1 }}>
           <Row>
             <Title size={21}>{boat.nickname}</Title>

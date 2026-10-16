@@ -23,7 +23,7 @@ type TierStats = {
   price: number
 }
 
-const TIERS: Record<SizeTier, TierStats> = {
+export const TIERS: Record<SizeTier, TierStats> = {
   1: { capacity: 6, legSeconds: 40, fuelPerLeg: 8, fuelTankTrips: 5, price: 2000 },
   2: { capacity: 12, legSeconds: 50, fuelPerLeg: 14, fuelTankTrips: 6, price: 22000 },
   3: { capacity: 20, legSeconds: 70, fuelPerLeg: 24, fuelTankTrips: 7, price: 77000 },
