@@ -7,6 +7,8 @@ import { BOAT_CLASSES } from '../../../src/game/data/boats'
 import { BoatArt } from '../art/BoatArt'
 import { boatWidth } from '../art/boatGeometry'
 import { LIGHT, type Phase } from '../art/light'
+import { lookFor } from '../art/looks'
+import { useSceneClock } from '../art/clock'
 import { Button, Muted, Row } from './ui'
 
 const CELL_W = 168
@@ -15,6 +17,8 @@ const CELL_H = 120
 export function BoatGallery() {
   const [phase, setPhase] = useState<Phase>('day')
   const [worn, setWorn] = useState(false)
+  const [special, setSpecial] = useState(false)
+  const clock = useSceneClock()
   return (
     <View style={{ gap: 8 }}>
       <Row>
@@ -22,14 +26,15 @@ export function BoatGallery() {
           <Button key={p} small kind={p === phase ? 'primary' : 'secondary'} label={p} onPress={() => setPhase(p)} />
         ))}
         <Button small kind={worn ? 'primary' : 'secondary'} label="worn" onPress={() => setWorn(!worn)} />
+        <Button small kind={special ? 'primary' : 'secondary'} label="specials" onPress={() => setSpecial(!special)} />
       </Row>
       <Row style={{ gap: 6 }}>
-        {BOAT_CLASSES.map((cls) => {
+        {BOAT_CLASSES.filter((c) => !special || c.rarity === 'legendary' || c.rarity === 'mythic').map((cls) => {
           const scale = (CELL_W - 30) / boatWidth(cls)
           return (
             <View key={cls.id} style={{ width: CELL_W, gap: 2 }}>
               <Canvas style={{ width: CELL_W, height: CELL_H, backgroundColor: LIGHT[phase].sky, borderRadius: 8 }}>
-                <BoatArt cls={cls} light={LIGHT[phase]} x={20} y={CELL_H - 28} scale={scale} condition={worn ? 25 : 100} />
+                <BoatArt cls={cls} light={LIGHT[phase]} x={20} y={CELL_H - 28} scale={scale} condition={worn ? 25 : 100} captain={lookFor(cls.id)} people clock={clock} />
               </Canvas>
               <Muted>
                 {cls.name} · T{cls.sizeTier} {cls.rarity !== 'common' ? cls.rarity : ''}

@@ -45,7 +45,7 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
           weather={mode === 'docked' ? 'calm' : weather}
           mode={mode}
           cls={cls}
-          captainHat={captain ? lookFor(captain.id).hat : null}
+          captain={captain ? lookFor(captain.id) : null}
           condition={boat.condition}
         />
         <View style={[styles.pill, { backgroundColor: 'rgba(29,20,32,0.75)' }]}>

@@ -4,7 +4,7 @@
 import { Canvas, Circle, Group, Path, Rect, rect, rrect } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { BoatClass, Weather } from '../../../src/game/types'
-import type { HatKind } from './looks'
+import type { Look } from './looks'
 import { STORM, type Light } from './light'
 import { BoatArt } from './BoatArt'
 import { boatLayout } from './boatGeometry'
@@ -23,7 +23,8 @@ type Props = {
   weather: Weather
   mode: BoatMode
   cls: BoatClass
-  captainHat: HatKind | null
+  /** Your captain's look, if one is aboard. */
+  captain: Look | null
   /** Hull condition 0–100, shown as wear. */
   condition?: number
 }
@@ -46,7 +47,7 @@ function usePuff(clock: SharedValue<number>, k: number, x: number, y: number, dr
   }
 }
 
-export function BoatScene({ width, light, weather, mode, cls, captainHat, condition = 100 }: Props) {
+export function BoatScene({ width, light, weather, mode, cls, captain, condition = 100 }: Props) {
   const clock = useSceneClock()
   const s = width / SCENE_W
   const storm = weather === 'storm'
@@ -138,7 +139,7 @@ export function BoatScene({ width, light, weather, mode, cls, captainHat, condit
           </Group>
         ) : (
           <Group transform={bob} origin={{ x: SCENE_W / 2, y: DECK_Y }}>
-            <BoatArt cls={cls} light={light} x={boatX} y={DECK_Y} scale={scale} flip={flip} captainHat={captainHat} condition={condition} clock={clock} />
+            <BoatArt cls={cls} light={light} x={boatX} y={DECK_Y} scale={scale} flip={flip} captain={captain} people condition={condition} clock={clock} />
           </Group>
         )}
 

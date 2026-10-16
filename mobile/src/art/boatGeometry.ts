@@ -17,6 +17,16 @@ export interface Box {
   h: number
 }
 
+export type Pose = 'haul' | 'tiller' | 'wheel' | 'lookout' | 'coil' | 'wave'
+
+/** A place on deck for someone to stand and what they're doing there. */
+export interface Station {
+  x: number
+  pose: Pose
+  /** Facing the stern instead of the bow. */
+  aft?: boolean
+}
+
 export interface BoatLayout {
   W: number
   H: number
@@ -32,6 +42,15 @@ export interface BoatLayout {
   wheelhouse: Box
   /** The funnel, if she has one; smoke leaves from the middle of its top. */
   stack: Box | null
+  /** Where the captain stands on deck, or null when they're in the wheelhouse window. */
+  captain: Station | null
+  /** Deckhand places, in the order they fill up as the boat gets bigger. */
+  hands: Station[]
+}
+
+/** How many deckhands a boat of this tier shows (no gameplay effect yet). */
+export function handsFor(tier: number): number {
+  return Math.max(0, tier - 1)
 }
 
 /** A boat's drawn length in local units: bigger tiers are longer. */
@@ -133,7 +152,17 @@ export function boatLayout(cls: BoatClass): BoatLayout {
       break
     }
   }
-  return { W, H, kind, build, paint, waterline: H * 0.58, hullPath, sheerPath, deckY, wheelhouse, stack }
+  const st = (f: number, pose: Pose, aft = false): Station => ({ x: W * f, pose, aft })
+  const STATIONS: Record<Kind, { captain: Station | null; hands: Station[] }> = {
+    sail: { captain: st(0.38, 'haul'), hands: [st(0.07, 'tiller')] },
+    workboat: { captain: null, hands: [st(0.22, 'haul'), st(0.9, 'lookout'), st(0.08, 'coil', true)] },
+    trawler: { captain: null, hands: [st(0.12, 'haul', true), st(0.42, 'coil'), st(0.9, 'lookout')] },
+    freighter: { captain: null, hands: [st(0.92, 'lookout'), st(0.27, 'coil'), st(0.88, 'haul'), st(0.3, 'wave', true), st(0.95, 'coil')] },
+    taxi: { captain: null, hands: [st(0.9, 'lookout')] },
+    ferry: { captain: null, hands: [st(0.88, 'lookout'), st(0.06, 'coil', true)] },
+    liner: { captain: null, hands: [st(0.9, 'lookout'), st(0.06, 'coil', true), st(0.94, 'wave'), st(0.04, 'haul', true), st(0.86, 'coil')] },
+  }
+  return { W, H, kind, build, paint, waterline: H * 0.58, hullPath, sheerPath, deckY, wheelhouse, stack, ...STATIONS[kind] }
 }
 
 export function linerDecks(tier: number, build: Build): number {

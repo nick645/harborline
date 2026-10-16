@@ -8,8 +8,10 @@ import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, Rounde
 import { useDerivedValue, useSharedValue, type SharedValue } from 'react-native-reanimated'
 import type { BoatClass } from '../../../src/game/types'
 import type { Light } from './light'
-import { HAT_PATHS, type HatKind } from './looks'
-import { boatLayout, linerDecks, type BoatLayout, type Box } from './boatGeometry'
+import { lookFor, type Look } from './looks'
+import { DeckFigure } from './DeckFigure'
+import { SPECIALS, type Ctx } from './Specials'
+import { boatLayout, handsFor, linerDecks, type BoatLayout, type Box } from './boatGeometry'
 import { hash, mix, shade, tint } from './paint'
 
 const TRIM: Record<BoatClass['rarity'], string | null> = {
@@ -35,18 +37,17 @@ type Props = {
   scale?: number
   /** Facing left (heading home) instead of right. */
   flip?: boolean
-  /** Silhouette of the captain in the wheelhouse window, if there is one. */
-  captainHat?: HatKind | null
+  /** Your captain, at work on deck or at the wheel; null for none aboard. */
+  captain?: Look | null
+  /** Show the people aboard (captain and deckhands). Off for small thumbnails. */
+  people?: boolean
   /** Hull condition 0–100: rust shows below 60, patches below 35. */
   condition?: number
   /** Scene clock for the flag and lamps; without one the boat holds still. */
   clock?: SharedValue<number>
 }
 
-/** Everything a part of the drawing needs. */
-type Ctx = { L: BoatLayout; tier: number; lit: (c: string) => string; light: Light; seed: number; condition: number }
-
-export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captainHat, condition = 100, clock }: Props) {
+export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captain = null, people = false, condition = 100, clock }: Props) {
   const L = useMemo(() => boatLayout(cls), [cls])
   const hullClip = useMemo(() => Skia.Path.MakeFromSVGString(L.hullPath)!, [L])
   const still = useSharedValue(0)
@@ -58,6 +59,7 @@ export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captainHat,
   const lit = (c: string) => mix(c, light.silhouette, light.dim)
   const ctx: Ctx = { L, tier: cls.sizeTier, lit, light, seed: hash(cls.id), condition }
   const trim = TRIM[cls.rarity]
+  const Special = SPECIALS[cls.id]
   const paint = lit(L.paint)
   const transform = [{ translateX: x + (flip ? W * scale : 0) }, { translateY: y }, { scaleX: flip ? -scale : scale }, { scaleY: scale }]
   const staffY = L.deckY(1)
@@ -70,9 +72,14 @@ export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captainHat,
         </Circle>
       )}
 
+      {Special ? (
+        <Special ctx={ctx} clock={clk} captain={captain} people={people} />
+      ) : (
+        <>
       <Works ctx={ctx} />
       {L.stack && <Stack box={L.stack} ctx={ctx} trim={trim} />}
-      <Wheelhouse ctx={ctx} captainHat={captainHat} />
+      <Wheelhouse ctx={ctx} captain={people ? captain : null} clock={clk} />
+      {people && <People ctx={ctx} captain={captain} clock={clk} />}
 
       {/* Hull */}
       <Path path={L.hullPath}>
@@ -100,11 +107,13 @@ export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captainHat,
         <Path path={`M1 ${staffY - 22} L -15 ${staffY - 19} L 1 ${staffY - 15} Z`} color={lit(trim ?? '#c2452a')} />
       </Group>
       <MastLamp ctx={ctx} glow={glow} />
+        </>
+      )}
     </Group>
   )
 }
 
-function Wheelhouse({ ctx, captainHat }: { ctx: Ctx; captainHat?: HatKind | null }) {
+function Wheelhouse({ ctx, captain, clock }: { ctx: Ctx; captain: Look | null; clock: SharedValue<number> }) {
   const { L, lit, light } = ctx
   const b = L.wheelhouse
   const base = L.kind === 'sail' || L.kind === 'workboat' ? '#e2d5bd' : CABIN
@@ -128,11 +137,60 @@ function Wheelhouse({ ctx, captainHat }: { ctx: Ctx; captainHat?: HatKind | null
           <RoundedRect key={`${f}-${i}`} x={b.x + 3 + i * (span / n)} y={wy} width={span / n - 2} height={winH} r={1.2} color={light.window} />
         ))
       })}
-      {captainHat && (
-        <Group transform={[{ translateX: b.x + b.w * 0.55 - 6 }, { translateY: b.y + 1 }, { scale: 0.42 }]}>
-          <Oval x={16} y={26} width={24} height={28} color="#3a2630" />
-          <Path path={HAT_PATHS[captainHat]} color="#3a2630" />
+      {captain && !L.captain && (
+        // At the wheel, seen through the windows: clipped to the window band.
+        <Group clip={{ x: b.x + 1, y: b.y + 3, width: b.w - 2, height: winH + 2 }}>
+          <DeckFigure
+            look={captain}
+            pose="wheel"
+            x={b.x + b.w * 0.5}
+            y={b.y + b.h}
+            size={((b.h - 4 - winH / 2) * 32) / 25.2}
+            clock={clock}
+            lit={lit}
+          />
+          <Rect x={b.x} y={b.y} width={b.w} height={b.h} color={light.window} opacity={0.22} />
         </Group>
+      )}
+    </Group>
+  )
+}
+
+/** The captain at their deck station (small boats) and deckhands by size. */
+function People({ ctx, captain, clock }: { ctx: Ctx; captain: Look | null; clock: SharedValue<number> }) {
+  const { L, tier, lit, seed } = ctx
+  const size = 30 - tier * 2
+  const hands = L.hands.slice(0, handsFor(tier))
+  const mast = mastTop(L)
+  return (
+    <Group>
+      {hands.map((h, i) => (
+        <DeckFigure
+          key={i}
+          look={lookFor(`hand-${seed}-${i}`)}
+          pose={h.pose}
+          aft={h.aft}
+          x={h.x}
+          y={L.deckY(h.x)}
+          size={size}
+          clock={clock}
+          offset={i * 911}
+          lit={lit}
+          lineTo={mast ? { x: (h.aft ? -1 : 1) * (mast.x - h.x), y: mast.y - L.deckY(h.x) } : undefined}
+        />
+      ))}
+      {captain && L.captain && (
+        <DeckFigure
+          look={captain}
+          pose={L.captain.pose}
+          aft={L.captain.aft}
+          x={L.captain.x}
+          y={L.deckY(L.captain.x)}
+          size={size}
+          clock={clock}
+          lit={lit}
+          lineTo={mast ? { x: mast.x - L.captain.x, y: mast.y + 6 - L.deckY(L.captain.x) } : undefined}
+        />
       )}
     </Group>
   )
