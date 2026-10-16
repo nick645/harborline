@@ -1,7 +1,7 @@
 // Pure economy formulas. No state mutation, no randomness.
 
 import type { BoatClass, Port, RouteDef } from './types'
-import { BOAT_CLASSES } from './data/boats'
+import { BOAT_CLASSES, TIERS } from './data/boats'
 import { MAP_UNITS_PER_DISTANCE, PORTS } from './data/ports'
 import {
   LOW_CONDITION_PAYOUT_MULT,
@@ -12,6 +12,8 @@ import {
   SELL_RATE,
   SALVAGE_MIN,
   SALVAGE_RATE,
+  HAND_FEE_SHARE,
+  SHORT_HANDED_DURATION,
 } from './data/economy'
 
 const portsById = new Map(PORTS.map((p) => [p.id, p]))
@@ -80,6 +82,21 @@ export function repairCostPerPoint(boatClass: BoatClass, mult = 1): number {
 }
 
 /** What a boat is worth for salvage: its price (starters: 0), or for crafted boats its tier's common price. */
+/** Deckhands a boat of this class needs to sail at full speed. */
+export function handsNeeded(boatClass: BoatClass): number {
+  return boatClass.sizeTier - 1
+}
+
+/** Coins to sign on one deckhand for a boat of this class. */
+export function handFee(boatClass: BoatClass): number {
+  return Math.round(TIERS[boatClass.sizeTier].price * HAND_FEE_SHARE)
+}
+
+/** Trip-time multiplier for a boat sailing with this many hands. */
+export function shortHandedMult(boatClass: BoatClass, hands: number): number {
+  return 1 + Math.max(0, handsNeeded(boatClass) - hands) * SHORT_HANDED_DURATION
+}
+
 export function boatValue(boatClass: BoatClass): number {
   if (boatClass.rarity === 'common' || boatClass.rarity === 'rare') return boatClass.price
   return Math.max(0, ...BOAT_CLASSES.filter((c) => c.sizeTier === boatClass.sizeTier && c.rarity === 'common').map((c) => c.price))

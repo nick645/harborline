@@ -50,4 +50,10 @@ export const STANDARD_SCRAP_VALUE = 10
 /** Spare copies of a rare-or-better part, of one rarity and slot, melt into one re-roll. */
 export const MELT_COST = 3
 
+/** Deckhands: a boat of tier t needs t − 1 of them. Each is signed on once, for this share of
+ * the boat's tier price; there are no wages, so being away never costs anything. */
+export const HAND_FEE_SHARE = 0.05
+/** Each missing hand makes trips this much longer. Short-handed boats still sail. */
+export const SHORT_HANDED_DURATION = 0.2
+
 export const LOG_LIMIT = 30

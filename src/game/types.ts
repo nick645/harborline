@@ -72,6 +72,8 @@ export interface Boat {
   etaMs: number | null
   /** While docked: when docked-time effects were last settled. Null at sea or sunk. */
   dockedAt: number | null
+  /** Deckhands signed on. Absent in older saves, which reads as none. */
+  hands?: number
   /** Managed boats only: don't try to leave before this time (weather or pay wasn't right). */
   autoWaitUntil?: number
 }

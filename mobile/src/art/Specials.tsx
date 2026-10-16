@@ -6,14 +6,13 @@
 import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, Skia, vec } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { BoatLayout, Pose } from './boatGeometry'
-import { handsFor } from './boatGeometry'
 import type { Light } from './light'
 import { lookFor, type Look } from './looks'
 import { DeckFigure } from './DeckFigure'
 import { shade, tint } from './paint'
 
 /** Everything a part of a boat drawing needs. */
-export type Ctx = { L: BoatLayout; tier: number; lit: (c: string) => string; light: Light; seed: number; condition: number }
+export type Ctx = { L: BoatLayout; tier: number; lit: (c: string) => string; light: Light; seed: number; condition: number; hands: number }
 
 export type SP = { ctx: Ctx; clock: SharedValue<number>; captain: Look | null; people: boolean }
 
@@ -52,7 +51,7 @@ function Aboard({ p, captainAt, hands = [], dim = 1 }: { p: SP; captainAt?: { x:
   const size = 30 - tier * 2
   return (
     <Group opacity={dim}>
-      {hands.slice(0, handsFor(tier)).map((h, i) => (
+      {hands.slice(0, p.ctx.hands).map((h, i) => (
         <DeckFigure key={i} look={lookFor(`hand-${seed}-${i}`)} pose={h.pose} aft={h.aft} x={h.x} y={h.y ?? L.deckY(h.x)} size={size} clock={p.clock} offset={i * 911} lit={lit} />
       ))}
       {p.captain && captainAt && (

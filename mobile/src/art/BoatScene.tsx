@@ -31,6 +31,8 @@ type Props = {
   captain: Look | null
   /** Hull condition 0–100, shown as wear. */
   condition?: number
+  /** Deckhands aboard. */
+  hands?: number
 }
 
 /** How each weather looks. `k` runs 0 (calm) to 3 (storm). */
@@ -111,7 +113,7 @@ function usePuff(clock: SharedValue<number>, k: number, x: number, y: number, dr
   }
 }
 
-export function BoatScene({ width, light, weather, mode, cls, captain, condition = 100 }: Props) {
+export function BoatScene({ width, light, weather, mode, cls, captain, condition = 100, hands }: Props) {
   const clock = useSceneClock()
   const s = width / SCENE_W
   const m = MOODS[weather]
@@ -316,7 +318,7 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
           </Group>
         ) : (
           <Group transform={bob} origin={{ x: SCENE_W / 2, y: DECK_Y }}>
-            <BoatArt cls={cls} light={light} x={boatX} y={DECK_Y} scale={scale} flip={flip} captain={captain} people condition={condition} clock={clock} />
+            <BoatArt cls={cls} light={light} x={boatX} y={DECK_Y} scale={scale} flip={flip} captain={captain} people hands={hands} condition={condition} clock={clock} />
           </Group>
         )}
 

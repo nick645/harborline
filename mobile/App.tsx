@@ -5,7 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
-import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat } from '../src/game/state'
+import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat, signOnHands } from '../src/game/state'
 import { assignCaptain, buyUpgrade, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName } from '../src/game/parts'
 import { seasonAt, seasonEndsAt } from '../src/game/weather'
@@ -108,6 +108,7 @@ function Harbor() {
       onSalvage={() => act((g, at) => salvageBoat(g, b.id, at))}
       onCaptain={(captainId) => act((g) => assignCaptain(g, captainId, b.id))}
       onManage={(managerId) => act((g) => setManaged(g, b.id, managerId))}
+      onSignOn={() => act((g, at) => signOnHands(g, b.id, at))}
     />
   )
 

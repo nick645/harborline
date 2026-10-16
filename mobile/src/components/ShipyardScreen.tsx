@@ -4,6 +4,7 @@ import { shopClasses, topTier } from '../../../src/game/state'
 import { getAbility } from '../../../src/game/abilities'
 import { hasParts, partName } from '../../../src/game/parts'
 import { fleetCap } from '../../../src/game/upgrades'
+import { handFee, handsNeeded } from '../../../src/game/economy'
 import { coins } from '../../../src/format'
 import { useTheme } from '../theme'
 import { Body, Button, Card, Heading, Muted, Row, Tag } from './ui'
@@ -38,6 +39,11 @@ export function ShipyardScreen({ game, onBuy }: { game: GameState; onBuy: (class
                         {c.track === 'cargo' ? 'Cargo' : 'Passenger'} · cap {c.capacity} · fuel for {c.fuelTankTrips} trips
                       </Muted>
                       {ability && <Muted>{ability.description}</Muted>}
+                      {handsNeeded(c) > 0 && (
+                        <Muted>
+                          Needs {handsNeeded(c)} deckhand{handsNeeded(c) === 1 ? '' : 's'} · {coins(handFee(c))}c each, once
+                        </Muted>
+                      )}
                       {c.requiredParts.length > 0 && (
                         <Muted style={{ color: hasPart ? t.good : t.muted }}>
                           {hasPart ? '✓ ' : 'Needs '}

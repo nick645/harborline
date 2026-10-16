@@ -42,13 +42,15 @@ type Props = {
   captain?: Look | null
   /** Show the people aboard (captain and deckhands). Off for small thumbnails. */
   people?: boolean
+  /** Deckhands aboard; defaults to a full complement. */
+  hands?: number
   /** Hull condition 0–100: rust shows below 60, patches below 35. */
   condition?: number
   /** Scene clock for the flag and lamps; without one the boat holds still. */
   clock?: SharedValue<number>
 }
 
-export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captain = null, people = false, condition = 100, clock }: Props) {
+export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captain = null, people = false, hands, condition = 100, clock }: Props) {
   const L = useMemo(() => boatLayout(cls), [cls])
   const hullClip = useMemo(() => Skia.Path.MakeFromSVGString(L.hullPath)!, [L])
   const still = useSharedValue(0)
@@ -58,7 +60,7 @@ export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captain = n
 
   const { W, H } = L
   const lit = (c: string) => mix(c, light.silhouette, light.dim)
-  const ctx: Ctx = { L, tier: cls.sizeTier, lit, light, seed: hash(cls.id), condition }
+  const ctx: Ctx = { L, tier: cls.sizeTier, lit, light, seed: hash(cls.id), condition, hands: hands ?? handsFor(cls.sizeTier) }
   const trim = TRIM[cls.rarity]
   const Special = SPECIALS[cls.id]
   const paint = lit(L.paint)
@@ -161,7 +163,7 @@ function Wheelhouse({ ctx, captain, clock }: { ctx: Ctx; captain: Look | null; c
 function People({ ctx, captain, clock }: { ctx: Ctx; captain: Look | null; clock: SharedValue<number> }) {
   const { L, tier, lit, seed } = ctx
   const size = 30 - tier * 2
-  const hands = L.hands.slice(0, handsFor(tier))
+  const hands = L.hands.slice(0, ctx.hands)
   const mast = mastTop(L)
   return (
     <Group>

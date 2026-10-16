@@ -95,6 +95,9 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   are **Sleeper / All talk / True to form**. Reputation limits boat tiers (rep r sails r−1..r+1)
   and drifts toward true ability every 10 voyages. The quay offers captains around your level.
   Managers hire and fire crew for their boats; the player can take over or switch that off.
+- Deckhands (user-approved 2026-10-16): tier t needs t − 1; one-off fee of 5% of tier price per
+  hand, no wages; short-handed = +20% trip time per missing hand, never blocked; managers sign
+  them on; not characters. Sim: first tier 2 unchanged at ~4.85 h, tier 3 13.5 → 13.8 h.
 
 ## Originality
 

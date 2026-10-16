@@ -17,10 +17,12 @@ import {
   sellBoat,
   settle,
   settleAway,
+  signOnHands,
+  GameError,
 } from './state'
 import { createRng, rollConditionLoss } from './rolls'
 import { generateCaptain } from './captains'
-import { getBoatClass, repairCostPerPoint, routeDistance, voyagePayout } from './economy'
+import { getBoatClass, handFee, handsNeeded, repairCostPerPoint, routeDistance, voyagePayout } from './economy'
 import { missingAbilityIds } from './abilities'
 import { naturalWeather, seasonAt, stormAlerts } from './weather'
 import { upcomingAlerts } from './alerts'
@@ -487,5 +489,32 @@ describe('save', () => {
     expect(deserialize(serialize(s))).toEqual(s)
     expect(deserialize('{nope')).toBeNull()
     expect(deserialize(JSON.stringify({ ...s, version: 999 }))).toBeNull()
+  })
+})
+
+describe('deckhands', () => {
+  it('bigger boats need hands; short-handed trips run longer; signing on is a one-off fee', () => {
+    let s = newGame(9, T0)
+    const id = give(s, 'coastal-trawler') // tier 3: needs 2 hands
+    const cls = getBoatClass('coastal-trawler')
+    expect(handsNeeded(cls)).toBe(2)
+    expect(handsNeeded(getBoatClass('skiff'))).toBe(0)
+    const route = ROUTES[1].id
+    const short = quoteVoyage(s, id, route, T0, 'true')
+    expect(short.handsMissing).toBe(2)
+
+    s.player.coins = 100_000
+    const before = s.player.coins
+    s = signOnHands(s, id, T0)
+    expect(s.player.coins).toBe(before - 2 * handFee(cls))
+    expect(s.player.ownedBoats.find((b) => b.id === id)!.hands).toBe(2)
+    const full = quoteVoyage(s, id, route, T0, 'true')
+    expect(full.handsMissing).toBe(0)
+    // Two missing hands at +20% each.
+    expect(short.durationMs / full.durationMs).toBeCloseTo(1.4, 2)
+    expect(() => signOnHands(s, id, T0)).toThrow(GameError)
+    // Old saves have no hands field: read as none.
+    delete s.player.ownedBoats.find((b) => b.id === id)!.hands
+    expect(quoteVoyage(s, id, route, T0, 'true').handsMissing).toBe(2)
   })
 })

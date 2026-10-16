@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Boat, GameState } from '../../../src/game/types'
-import { canBeSold, getBoatClass, getPort, sellPrice } from '../../../src/game/economy'
+import { canBeSold, getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../../../src/game/economy'
 import { getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
 import { abilityOf } from '../../../src/game/abilities'
 import { availableCaptains, captainViewById, knownCrewEffect, managersFor } from '../../../src/game/crew'
@@ -28,6 +28,7 @@ type Props = {
   onCaptain: (captainId: string) => void
   /** Hand her to a manager, or (null) take her back. */
   onManage: (managerId: string | null) => void
+  onSignOn: () => void
   /** Open the live view of this boat; absent when already on it. */
   onOpen?: () => void
   onOpenCaptain: (captainId: string) => void
@@ -105,7 +106,7 @@ export function BoatCard(props: Props) {
   )
 }
 
-function CrewLine({ game, boat, now, onCaptain, onManage, onOpenCaptain }: Props) {
+function CrewLine({ game, boat, now, onCaptain, onManage, onSignOn, onOpenCaptain }: Props) {
   const t = useTheme()
   const captain = captainViewById(game, boat.captainId)
   const effect = knownCrewEffect(game, boat.id, now)
@@ -134,6 +135,7 @@ function CrewLine({ game, boat, now, onCaptain, onManage, onOpenCaptain }: Props
           No captain aboard: she can’t sail.{spare.length === 0 ? ' Hire one in Captains.' : ''}
         </Text>
       )}
+      <Hands game={game} boat={boat} onSignOn={onSignOn} />
       {manager && (
         <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
           <Muted style={{ flex: 1 }}>
@@ -158,6 +160,26 @@ function CrewLine({ game, boat, now, onCaptain, onManage, onOpenCaptain }: Props
         </Row>
       )}
     </View>
+  )
+}
+
+/** Deckhands: how many she has, and a button to sign on the rest. */
+function Hands({ game, boat, onSignOn }: { game: GameState; boat: Boat; onSignOn: () => void }) {
+  const t = useTheme()
+  const cls = getBoatClass(boat.classId)
+  const need = handsNeeded(cls)
+  if (need === 0 || boat.state === 'sunk') return null
+  const have = boat.hands ?? 0
+  const missing = need - have
+  const cost = missing * handFee(cls)
+  return (
+    <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+      <Muted style={{ flex: 1, color: missing ? t.bad : t.muted }}>
+        Deckhands {have}/{need}
+        {missing ? ` · short-handed, trips take ${Math.round(missing * 20)}% longer` : ''}
+      </Muted>
+      {missing > 0 && <Button small kind="secondary" label={`Sign on ${missing} · ${coins(cost)}c`} disabled={game.player.coins < cost} onPress={onSignOn} />}
+    </Row>
   )
 }
 

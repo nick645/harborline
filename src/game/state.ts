@@ -31,11 +31,14 @@ import {
   boatValue,
   canBeSold,
   getBoatClass,
+  handFee,
+  handsNeeded,
   repairCostPerPoint,
   roundTripMs,
   routeDistance,
   salvageCost,
   sellPrice,
+  shortHandedMult,
   voyagePayout,
 } from './economy'
 import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick } from './rolls'
@@ -220,7 +223,9 @@ export function quoteVoyage(state: GameState, boatId: string, routeId: string, t
     grossMult,
     fuelMult: mods.fuelMult * (1 - upgradeValue(state, 'fuel-depot')),
   })
-  const durationMs = Math.round(roundTripMs(ctx.cls, distance) * (h.durationMult?.(ctx) ?? 1) * mods.durationMult)
+  const durationMs = Math.round(
+    roundTripMs(ctx.cls, distance) * (h.durationMult?.(ctx) ?? 1) * mods.durationMult * shortHandedMult(ctx.cls, boat.hands ?? 0),
+  )
   const lossRisk = weather.lossRisk * (h.lossRiskMult?.(ctx) ?? 1) * mods.lossRiskMult
   // Worst roll this weather can deal on this hull: if it would reach 0, the boat could sink.
   const wear = WEAR_MULTIPLIERS.find((w) => boat.condition < w.below)?.mult ?? 1
@@ -241,6 +246,7 @@ export function quoteVoyage(state: GameState, boatId: string, routeId: string, t
     weather: ctx.weather,
     lossRisk,
     perMinute: (payout / durationMs) * 60_000,
+    handsMissing: Math.max(0, handsNeeded(ctx.cls) - (boat.hands ?? 0)),
     blocked: h.departureBlock?.(t) ?? refusal,
   }
 }
@@ -355,6 +361,22 @@ export function craftBoat(state: GameState, classId: string, now: number): GameS
     boat.captainId = c.id
     log(s, now, 'captain', `${c.name} came aboard with her, bonded to the ship for good`)
   }
+  return s
+}
+
+/** Sign on the deckhands a boat is missing, all at once. They stay with her until she's sold. */
+export function signOnHands(state: GameState, boatId: string, now: number): GameState {
+  const boat = getBoat(state, boatId)
+  const cls = getBoatClass(boat.classId)
+  const missing = handsNeeded(cls) - (boat.hands ?? 0)
+  if (missing <= 0) throw new GameError('She has all the hands she needs')
+  if (boat.state === 'sunk') throw new GameError('Raise her first')
+  const cost = missing * handFee(cls)
+  if (state.player.coins < cost) throw new GameError('Not enough coins')
+  const s = structuredClone(state)
+  s.player.coins -= cost
+  getBoat(s, boatId).hands = handsNeeded(cls)
+  log(s, now, 'info', `Signed on ${missing} deckhand${missing === 1 ? '' : 's'} for ${boat.nickname}`)
   return s
 }
 
@@ -687,7 +709,17 @@ function settleInPlace(s: GameState, now: number) {
 function autoDepart(s: GameState, boat: Boat, at: number) {
   accrueDocked(s, boat, at)
   const manager = managerOf(s, boat)
-  if (manager && manager.handlesCrew !== false) manageCrew(s, boat, manager, at)
+  if (manager && manager.handlesCrew !== false) {
+    manageCrew(s, boat, manager, at)
+    // Managers sign on missing hands when the coins are there.
+    const cls = getBoatClass(boat.classId)
+    const missing = handsNeeded(cls) - (boat.hands ?? 0)
+    if (missing > 0 && s.player.coins >= missing * handFee(cls)) {
+      s.player.coins -= missing * handFee(cls)
+      boat.hands = handsNeeded(cls)
+      log(s, at, 'info', `${manager.name} signed on ${missing} deckhand${missing === 1 ? '' : 's'} for ${boat.nickname}`)
+    }
+  }
   if (boat.condition < AUTOMATED_REPAIR_BELOW) repairInPlace(s, boat)
   const q = quoteVoyage(s, boat.id, boat.currentRoute!, at, 'true')
   if (q.blocked || q.payout <= 0 || q.canSink) {

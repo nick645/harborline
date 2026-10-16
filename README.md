@@ -89,6 +89,12 @@ scripts/sim.ts       balance harness
 - **Away time** earns exactly like present time, at full rate, but only for trips already queued. Coming back shows what finished and what sank.
 - The RNG seed and state are stored in the save, so a session can be replayed.
 
+## Deckhands
+
+- A boat of tier *t* needs *t − 1* deckhands (none on tier 1, five on a tier-6). Sign them on from the boat card for a one-off fee of 5% of the boat's tier price each; there are no wages, so time away never costs anything.
+- Short-handed boats still sail, but each missing hand makes trips 20% longer. Managers sign on missing hands for the boats they run when the coins are there. Hands stay with their boat and go when she's sold.
+- Deckhands aren't characters: they have no hidden traits. Captains are the people you scout.
+
 ## Captains
 
 Every captain starts mostly unknown. Only the sea tells you who they really are.
