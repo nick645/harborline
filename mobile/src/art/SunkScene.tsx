@@ -60,7 +60,7 @@ export function SunkScene({ width, light, cls, captain }: { width: number; light
   const scale = (150 + cls.sizeTier * 10) / W
   const fish = (n: number, color: string) =>
     Array.from({ length: n }, (_, i) => (
-      <Path key={i} path={`M${i * 14} ${(i % 2) * 8} c 4 -3, 9 -3, 12 0 c -3 3, -8 3, -12 0 Z m 12 0 l 4 -3 l 0 6 Z`} color={color} opacity={0.75} />
+      <Path key={i} path={`M${i * 14} ${(i % 2) * 8} c 4 -3, 9 -3, 12 0 c -3 3, -8 3, -12 0 Z m 0 0 l -4 -3 l 0 6 Z`} color={color} opacity={0.75} />
     ))
 
   return (
