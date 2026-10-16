@@ -54,7 +54,7 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
               <Rect x={294} y={50} width={12} height={18} color={light.lamp} opacity={flicker} />
               <Circle cx={300} cy={59} r={34} color={light.lamp} opacity={0.12} />
             </Group>
-            <Figure look={look} x={60} y={96} scale={1.75} clock={clock} rimLight={light.lamp} />
+            <Figure look={look} x={36} y={42} scale={2.25} clock={clock} rimLight={light.lamp} wind />
             <Rect x={0} y={226} width={W} height={H - 226} color="#3a2420" />
             <Group transform={[{ translateX: 252 }, { translateY: 236 }]}>
               <Circle cx={0} cy={0} r={44} color="#8a5a3a" style="stroke" strokeWidth={8} />
@@ -84,16 +84,16 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
               <Rect x={-6} y={-10} width={12} height={16} color={light.lamp} opacity={flicker} />
               <Circle cx={0} cy={-2} r={40} color={light.lamp} opacity={0.14} />
             </Group>
-            <Figure look={look} x={34} y={88} scale={1.6} clock={clock} rimLight={light.lamp} />
+            <Figure look={look} x={14} y={30} scale={2.25} clock={clock} rimLight={light.lamp} />
             <Rect x={0} y={214} width={W} height={H - 214} color="#3a2420" />
             <Rect x={0} y={208} width={W} height={10} color="#6e4733" />
-            <Group transform={[{ translateX: 128 }, { translateY: 200 }]}>
+            <Group transform={[{ translateX: 164 }, { translateY: 200 }]}>
               <Path path="M-12 0 v -26 h 24 v 26 Z" color="#c98a5b" />
               <Path path="M12 -20 c 10 0, 10 14, 0 14" color="#6e4733" style="stroke" strokeWidth={3} />
               <Rect x={-12} y={-26} width={24} height={5} color="#fff3dc" />
             </Group>
-            <Circle cx={126} cy={steamA.cy} r={steamA.r} opacity={steamA.opacity} color="#fff3dc" />
-            <Circle cx={132} cy={steamB.cy} r={steamB.r} opacity={steamB.opacity} color="#fff3dc" />
+            <Circle cx={162} cy={steamA.cy} r={steamA.r} opacity={steamA.opacity} color="#fff3dc" />
+            <Circle cx={168} cy={steamB.cy} r={steamB.r} opacity={steamB.opacity} color="#fff3dc" />
           </Group>
         )}
       </Group>
