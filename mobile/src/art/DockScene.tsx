@@ -4,7 +4,7 @@
 // a lamp post, crates, gulls, the far shore. Tap the captain to open them. Design space
 // matches BoatScene (358 × 320).
 
-import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, vec, rect, rrect } from '@shopify/react-native-skia'
 import { Pressable, View } from 'react-native'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { BoatClass } from '../../../src/game/types'

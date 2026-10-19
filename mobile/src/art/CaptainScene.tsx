@@ -1,7 +1,7 @@
 // Your captain where they are right now: at the helm of their boat, or ashore at the tavern
 // window with something warm. Design space is 358 × 280.
 
-import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, vec } from '@shopify/react-native-skia'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { Light } from './light'
 import type { Look } from './looks'
@@ -16,7 +16,6 @@ export type CaptainPlace = 'helm' | 'port'
 
 export function CaptainScene({ width, height, light, look, place }: { width: number; height?: number; light: Light; look: Look; place: CaptainPlace }) {
   const clock = useSceneClock()
-  const s = width / W
   const roll = useDerivedValue(() => [{ translateY: Math.sin(clock.value / 540) * 5 }])
   const sway = useDerivedValue(() => [{ rotate: Math.sin(clock.value / 640) * 0.035 }])
   const flicker = useDerivedValue(() => 0.85 + 0.15 * Math.sin(clock.value / 300))

@@ -4,7 +4,7 @@
 // magenta lightning take over the warm harbour light. Design space is 358 × 320.
 
 import { useMemo } from 'react'
-import { Canvas, Circle, Group, LinearGradient, Path, Rect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Canvas, Circle, Group, LinearGradient, Path, Rect, vec, rect, rrect } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { BoatClass, Weather } from '../../../src/game/types'
 import type { Look } from './looks'

@@ -3,7 +3,7 @@
 // they work, and your captains ashore wandering about. Design space is 358 × 270.
 
 import type { ReactNode } from 'react'
-import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, Text as SkText, matchFont, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, Text as SkText, matchFont, vec } from '@shopify/react-native-skia'
 import { Platform } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { RegionId } from '../../../src/game/data/ports'
@@ -199,7 +199,6 @@ function Upgrades({ up, lit, clock, wall, roof }: { up: Record<string, number>; 
 
 export function HomeScene({ width, height, light, look }: { width: number; height?: number; light: Light; look: HomeLookProps }) {
   const clock = useSceneClock()
-  const s = width / W
   const st = REGION_STYLE[look.region]
   const lit = (c: string) => mix(c, light.silhouette, light.dim * 0.8)
   const flicker = useDerivedValue(() => 0.85 + 0.15 * Math.sin(clock.value / 300))

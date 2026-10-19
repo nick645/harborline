@@ -3,7 +3,7 @@
 // pass. While her captain is still waiting, they cling to a plank up at the surface, waving.
 // Design space matches BoatScene (358 × 320).
 
-import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, vec, rect, rrect } from '@shopify/react-native-skia'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { BoatClass } from '../../../src/game/types'
 import type { Light } from './light'

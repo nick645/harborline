@@ -3,7 +3,7 @@
 // standing in their own look. The one you're looking at stands in a pool of lamplight.
 // Design space is 358 × 280; tap targets are real buttons laid over the canvas.
 
-import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import { Pressable, View } from 'react-native'
 import { useDerivedValue } from 'react-native-reanimated'
 import { getBoatClass } from '../../../src/game/economy'
@@ -15,7 +15,8 @@ import { FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
 import { BoatArt } from './BoatArt'
 import { useSceneClock } from './clock'
-import { Stage, stageFrame } from './Stage'
+import { Stage } from './Stage'
+import { stageFrame } from './stageFrame'
 import { mix, shade } from './paint'
 
 const W = 358

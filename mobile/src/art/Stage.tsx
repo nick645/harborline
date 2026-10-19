@@ -4,9 +4,10 @@
 // whatever room a page has without stretching or leaving bands.
 
 import type { ReactNode } from 'react'
-import { Canvas, Circle, Group, LinearGradient, Path, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Canvas, Circle, Group, LinearGradient, Path, Rect, RoundedRect, vec, rect, rrect } from '@shopify/react-native-skia'
 import { useDerivedValue } from 'react-native-reanimated'
 import { useSceneClock } from './clock'
+import { stageFrame } from './stageFrame'
 
 export function Stage({
   width,
@@ -50,26 +51,6 @@ export function Stage({
       </Group>
     </Canvas>
   )
-}
-
-/**
- * How a scene sits in its frame. Scale up until the scene's height fits (cropping a little off
- * the sides), never cropping more than a fifth of the width; past that the sky extends above.
- * Overlays (tap targets) use this to land on the drawing: screen x = (sceneX − cropX) · s,
- * screen y = (sceneY + above) · s.
- */
-export function stageFrame(width: number, height: number | undefined, W: number, H: number) {
-  const fit = width / W
-  const cover = height ? Math.min(height / H, fit * 1.25) : fit
-  const s = Math.max(fit, cover)
-  const visibleW = width / s
-  const cropX = (W - visibleW) / 2
-  const want = height ? height / s : H
-  const extra = Math.max(0, want - H)
-  // Most of the extra goes above, so the action stays near the bottom of the frame like a stage.
-  const above = extra * 0.7
-  const below = extra - above
-  return { s, visibleW, cropX, above, below, total: H + extra }
 }
 
 /** What fills the open sky above a scene: stars at night, clouds and gulls by day; beams indoors. */

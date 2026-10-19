@@ -5,7 +5,7 @@
 // figure is drawn at the same scale, a little smaller toward the back of the room.
 // Tap anyone you could hire to step closer. Design space is 358 × 290.
 
-import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import { Pressable, View } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Light } from './light'
@@ -19,7 +19,8 @@ import type { RegionId } from '../../../src/game/data/ports'
 import { Figure, FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
 import { useSceneClock } from './clock'
-import { Stage, stageFrame } from './Stage'
+import { Stage } from './Stage'
+import { stageFrame } from './stageFrame'
 
 const W = 358
 const H = 290

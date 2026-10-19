@@ -2,7 +2,7 @@
 // lines, checking the manifest, swinging a lantern. One of your boats is moored behind them.
 // Tap a captain to open them. Design space is 358 × 240.
 
-import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import { Pressable, View } from 'react-native'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { BoatClass } from '../../../src/game/types'
@@ -13,7 +13,8 @@ import { boatWidth } from './boatGeometry'
 import { FIGURE_FULL_H } from './Figure'
 import { Walker } from './Walker'
 import { useSceneClock } from './clock'
-import { Stage, stageFrame } from './Stage'
+import { Stage } from './Stage'
+import { stageFrame } from './stageFrame'
 import { mix } from './paint'
 
 const W = 358

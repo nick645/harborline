@@ -3,7 +3,7 @@
 // the waterfront as many as its size (village, town, city), coloured and shaped from the
 // port's own seed so no two look alike, and its people on the quay. Design space 358 × 210.
 
-import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, vec, rect, rrect } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Port } from '../../../src/game/types'
 import type { RegionId } from '../../../src/game/data/ports'
