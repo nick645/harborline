@@ -94,6 +94,7 @@ export function TavernScene({
     return d
   })
   const sparkleOpacity = useDerivedValue(() => 0.7 + 0.3 * Math.sin(clock.value / 200))
+  const spotGlow = useDerivedValue(() => 0.85 + 0.15 * Math.sin(clock.value / 900))
 
   // Who sits where: hands in their seats, regulars filling the rest.
   const seated = SEATS.map((x, i) => {
@@ -105,6 +106,14 @@ export function TavernScene({
   const mug = (id: string): Look => ({ ...lookFor(id), prop: 'mug' })
   const seatHead = TABLE_Y - 49 - 4
   const walkTop = FRONT_FOOT - FIGURE_FULL_H * WALK_SCALE
+  // Where the selected person is, for the soft light over them.
+  const seat = seated.find((p) => p.hand && p.hand.id === selectedId)
+  const extraIdx = extraHands.findIndex((h) => h.id === selectedId)
+  const spot =
+    seat ? { x: seat.x + SEAT_W / 2, y: TABLE_Y + 2, w: 30 }
+    : extraIdx >= 0 ? { x: 110 + extraIdx * 40 + 17, y: FRONT_FOOT, w: 70 }
+    : captain && captain.id === selectedId ? { x: CAPTAIN_X + 20, y: FRONT_FOOT, w: 34 }
+    : null
 
   return (
     <View style={{ width, height: H * s }}>
@@ -176,6 +185,18 @@ export function TavernScene({
           </Rect>
           <Path path="M0 206 h 358 M0 230 h 358 M0 258 h 358 M60 190 v 16 M180 206 v 24 M300 190 v 16 M120 230 v 28 M240 230 v 28" color="#2e1c19" style="stroke" strokeWidth={1} />
 
+          {/* A soft light falling on whoever you're looking at */}
+          {spot && (
+            <Group opacity={spotGlow}>
+              <Path path={`M${spot.x - 12} 0 L ${spot.x + 12} 0 L ${spot.x + spot.w} ${spot.y} L ${spot.x - spot.w} ${spot.y} Z`}>
+                <LinearGradient start={vec(0, 0)} end={vec(0, spot.y)} colors={[`${light.lamp}10`, `${light.lamp}70`]} />
+              </Path>
+              <Oval x={spot.x - spot.w - 6} y={spot.y - 6} width={(spot.w + 6) * 2} height={12}>
+                <RadialGradient c={vec(spot.x, spot.y)} r={spot.w + 6} colors={[`${light.lamp}aa`, `${light.lamp}00`]} />
+              </Oval>
+            </Group>
+          )}
+
           {/* The long table, with everyone on the far bench */}
           <Rect x={TABLE_X0 + 6} y={TABLE_Y - 18} width={TABLE_X1 - TABLE_X0 - 12} height={10} color="#4a2a1e" />
           {seated.map((p, i) => (
@@ -225,6 +246,11 @@ export function TavernScene({
           {extraHands.map((h, i) => (
             <Walker key={h.id} look={mug(h.id)} clock={clock} x0={70 + i * 40} x1={150 + i * 40} footY={FRONT_FOOT} scale={WALK_SCALE} speed={12} pauseMs={4400} offset={i * 1500} rimLight={h.id === selectedId ? light.lamp : undefined} />
           ))}
+          {spot && (
+            <Circle cx={spot.x} cy={spot.y - (seat ? 28 : 52)} r={seat ? 26 : 40} opacity={spotGlow}>
+              <RadialGradient c={vec(spot.x, spot.y - (seat ? 28 : 52))} r={seat ? 26 : 40} colors={[`${light.lamp}50`, `${light.lamp}00`]} />
+            </Circle>
+          )}
         </Group>
       </Canvas>
 
