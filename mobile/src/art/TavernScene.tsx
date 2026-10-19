@@ -11,6 +11,10 @@ import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Light } from './light'
 import { lookFor, type Look } from './looks'
 import { REGION_STYLE } from './regionStyle'
+import type { TavernLook } from '../homeTavern'
+import type { Hanging } from '../../../src/game/data/home'
+import { Text as SkText, matchFont } from '@shopify/react-native-skia'
+import { Platform } from 'react-native'
 import type { RegionId } from '../../../src/game/data/ports'
 import { Figure, FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
@@ -63,6 +67,58 @@ function Seated({ look, x, clock, offset, rim }: { look: Look; x: number; clock:
   )
 }
 
+const font = matchFont({ fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }), fontSize: 8.5, fontStyle: 'italic', fontWeight: 'bold' })
+
+/** What hangs on the wall between the window and the shelves. */
+function WallHanging({ kind }: { kind: Hanging }) {
+  const x = 208
+  const y = 84
+  switch (kind) {
+    case 'none':
+      return null
+    case 'wheel':
+      return (
+        <Group>
+          <Circle cx={x} cy={y} r={13} color="#8a5a3a" style="stroke" strokeWidth={3} />
+          <Circle cx={x} cy={y} r={3.5} color="#8a5a3a" />
+          <Path path={Array.from({ length: 8 }, (_, i) => `M${x} ${y} l ${Math.cos((i * Math.PI) / 4) * 18} ${Math.sin((i * Math.PI) / 4) * 18}`).join(' ')} color="#8a5a3a" style="stroke" strokeWidth={2.2} strokeCap="round" />
+        </Group>
+      )
+    case 'fish':
+      return (
+        <Group>
+          <RoundedRect x={x - 20} y={y - 9} width={40} height={18} r={3} color="#5a3a2a" />
+          <Path path={`M${x - 14} ${y} C ${x - 8} ${y - 8}, ${x + 6} ${y - 8}, ${x + 10} ${y} C ${x + 6} ${y + 8}, ${x - 8} ${y + 8}, ${x - 14} ${y} Z M${x + 10} ${y} l 6 -6 l 0 12 Z`} color="#5a8aa0" />
+          <Circle cx={x - 8} cy={y - 1} r={1.4} color="#1d1218" />
+        </Group>
+      )
+    case 'oars':
+      return (
+        <Group>
+          <Path path={`M${x - 18} ${y - 22} L ${x + 18} ${y + 22} M${x + 18} ${y - 22} L ${x - 18} ${y + 22}`} color="#a0704a" style="stroke" strokeWidth={2.6} strokeCap="round" />
+          <Path path={`M${x + 12} ${y + 14} l 10 12 l 4 -4 Z M${x - 12} ${y + 14} l -10 12 l -4 -4 Z`} color="#c98a5b" />
+        </Group>
+      )
+    case 'painting':
+      return (
+        <Group>
+          <Rect x={x - 18} y={y - 14} width={36} height={28} color="#c9a24a" />
+          <Rect x={x - 15} y={y - 11} width={30} height={22} color="#5a7f9a" />
+          <Rect x={x - 15} y={y + 3} width={30} height={8} color="#3d5a73" />
+          <Path path={`M${x - 8} ${y + 4} h 14 l -2 3 h -10 Z M${x} ${y + 4} v -12 l -7 10 Z`} color="#f3e7d8" />
+        </Group>
+      )
+    case 'flag':
+      return (
+        <Group>
+          <Path path={`M${x - 20} ${y - 14} H ${x + 20} V ${y + 10} L ${x} ${y + 16} L ${x - 20} ${y + 10} Z`} color="#7a1f2a" />
+          <Path path={`M${x - 8} ${y - 4} l 8 -6 l 8 6 l -8 6 Z`} color="#e6a53a" />
+          <Path path={`M${x - 20} ${y - 14} H ${x + 20}`} color="#4a2e22" style="stroke" strokeWidth={2} />
+        </Group>
+      )
+  }
+}
+
 export function TavernScene({
   width,
   light,
@@ -71,6 +127,7 @@ export function TavernScene({
   selectedId,
   onSelect,
   region = 'bay',
+  custom,
 }: {
   width: number
   light: Light
@@ -80,6 +137,8 @@ export function TavernScene({
   onSelect: (id: string) => void
   /** Where the hands are from; regulars and barkeep dress like the bay. */
   region?: RegionId
+  /** Your own tavern's look, at home. */
+  custom?: TavernLook
 }) {
   const clock = useSceneClock()
   const s = width / W
@@ -127,7 +186,7 @@ export function TavernScene({
         <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
           {/* Back wall, beams and a window */}
           <Rect x={0} y={0} width={W} height={BACK}>
-            <LinearGradient start={vec(0, 0)} end={vec(0, BACK)} colors={REGION_STYLE[region].tavernWall} />
+            <LinearGradient start={vec(0, 0)} end={vec(0, BACK)} colors={[...(custom?.wall ?? REGION_STYLE[region].tavernWall)]} />
           </Rect>
           {Array.from({ length: 9 }, (_, i) => (
             <Path key={i} path={`M${i * 42 + 10} 0 V ${BACK}`} color="#3a2420" style="stroke" strokeWidth={1} opacity={0.5} />
@@ -137,6 +196,14 @@ export function TavernScene({
           <Circle cx={152} cy={50} r={8} color={light.sun} />
           <Rect x={110} y={70} width={64} height={14} color={light.sea} />
           <Path path="M110 34 h 64 v 50 h -64 Z M142 34 v 50 M110 59 h 64" color="#2e1c19" style="stroke" strokeWidth={3.5} />
+          {custom && font && (
+            <Group>
+              <RoundedRect x={92} y={21} width={100} height={12} r={3} color="#2a1e18" />
+              <RoundedRect x={92} y={21} width={100} height={12} r={3} color="#d9a441" style="stroke" strokeWidth={0.8} />
+              <SkText x={142 - font.measureText(custom.name).width / 2} y={30.5} text={custom.name} font={font} color="#f3e7d8" />
+            </Group>
+          )}
+          {custom && <WallHanging kind={custom.hanging} />}
 
           {/* The hearth, back left */}
           <Path path={`M4 ${BACK} V 104 C 4 88, 14 80, 40 80 C 66 80, 76 88, 76 104 V ${BACK} Z`} color="#5b5452" />
@@ -174,7 +241,7 @@ export function TavernScene({
           ))}
 
           {/* Lamps */}
-          {[90, 200].map((x) => (
+          {[90, 186].map((x) => (
             <Group key={x}>
               <Path path={`M${x} 20 v 20`} color="#2e1c19" style="stroke" strokeWidth={1.3} />
               <Rect x={x - 6} y={40} width={12} height={12} color="#2e1c19" />
@@ -187,7 +254,7 @@ export function TavernScene({
 
           {/* Floor */}
           <Rect x={0} y={BACK} width={W} height={H - BACK}>
-            <LinearGradient start={vec(0, BACK)} end={vec(0, H)} colors={REGION_STYLE[region].tavernFloor} />
+            <LinearGradient start={vec(0, BACK)} end={vec(0, H)} colors={[...(custom?.floor ?? REGION_STYLE[region].tavernFloor)]} />
           </Rect>
           <Path path="M0 206 h 358 M0 230 h 358 M0 258 h 358 M60 190 v 16 M180 206 v 24 M300 190 v 16 M120 230 v 28 M240 230 v 28" color="#2e1c19" style="stroke" strokeWidth={1} />
 
@@ -214,6 +281,12 @@ export function TavernScene({
           ))}
           <Rect x={TABLE_X0} y={TABLE_Y} width={TABLE_X1 - TABLE_X0} height={12} color="#8a5a3a" />
           <Rect x={TABLE_X0} y={TABLE_Y} width={TABLE_X1 - TABLE_X0} height={2} color="#c98a5b" opacity={0.8} />
+          {custom?.cloth && (
+            <Group>
+              <Rect x={TABLE_X0 + 16} y={TABLE_Y - 1} width={TABLE_X1 - TABLE_X0 - 32} height={9} color={custom.cloth} />
+              <Path path={Array.from({ length: Math.floor((TABLE_X1 - TABLE_X0 - 32) / 6) }, (_, i) => `M${TABLE_X0 + 18 + i * 6} ${TABLE_Y + 8} v 3`).join(' ')} color={custom.cloth} style="stroke" strokeWidth={1.4} />
+            </Group>
+          )}
           <Path path={`M${TABLE_X0 + 60} ${TABLE_Y + 2} v 10 M${TABLE_X0 + 130} ${TABLE_Y + 2} v 10 M${TABLE_X0 + 190} ${TABLE_Y + 2} v 10`} color="#5a3424" style="stroke" strokeWidth={1} />
           {/* On the table: mugs, a plate, a candle */}
           {[100, 146, 214, 262].map((x, i) => (

@@ -223,7 +223,20 @@ export interface Player {
   /** Highest boat tier ever owned: unlocks manager roles and grows the fleet cap. */
   maxTierReached: number
   /** How you've made your home harbour look. Cosmetic. */
-  homeStyle?: { name?: string; wall?: string; roof?: string; sign?: string; bunting?: number; decor?: (string | null)[] }
+  homeStyle?: {
+    name?: string
+    wall?: string
+    roof?: string
+    sign?: string
+    bunting?: number
+    decor?: (string | null)[]
+    /** The home tavern: its name, panelling, floor, tablecloth and what hangs on the wall. */
+    tavernName?: string
+    tavernWall?: number
+    tavernFloor?: number
+    cloth?: string
+    hanging?: string
+  }
   /** Things you've done that unlock decorations. */
   milestones?: string[]
   /** Where the fleet sails from. Absent in older saves: Saltmarsh Quay. */

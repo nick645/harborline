@@ -701,6 +701,9 @@ describe('customizing home', () => {
     expect(s.player.homeStyle).toMatchObject({ name: 'Lamplight Wharf', wall: '#2f5d62', bunting: 2 })
     expect(() => styleHome(s, { wall: '#ff00ff' })).toThrow(GameError)
     expect(() => styleHome(s, { name: 'x'.repeat(40) })).toThrow(GameError)
+    s = styleHome(s, { tavernName: 'The Salt Cellar', tavernWall: 2, cloth: '#b8423a', hanging: 'wheel' })
+    expect(s.player.homeStyle).toMatchObject({ tavernName: 'The Salt Cellar', tavernWall: 2, cloth: '#b8423a', hanging: 'wheel' })
+    expect(() => styleHome(s, { hanging: 'kraken' })).toThrow(GameError)
   })
 
   it('places earned decorations, one of each, and keeps the rest locked', () => {

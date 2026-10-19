@@ -8,8 +8,7 @@ import { DEVELOPMENT_KNOWN_AFTER } from '../../../src/game/data/captains'
 import { CaptainScene } from '../art/CaptainScene'
 import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
-import { REGION_STYLE } from '../art/regionStyle'
-import { getPortDef, homeOf } from '../../../src/game/regions'
+import { homeTavern } from '../homeTavern'
 import { fonts, useTheme } from '../theme'
 import { Anchors, Body, Button, Card, Muted, Row, Tag, Title } from '../components/ui'
 
@@ -42,7 +41,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
       ? atSea
         ? `At the helm of ${boat.nickname}`
         : `Aboard ${boat.nickname}, in port`
-      : `Ashore, at ${REGION_STYLE[getPortDef(homeOf(game)).region].tavern}`
+      : `Ashore, at ${homeTavern(game).name}`
 
   return (
     <View style={{ gap: 12 }}>

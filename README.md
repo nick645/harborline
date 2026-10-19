@@ -105,6 +105,7 @@ scripts/sim.ts       balance harness
 
 - The phone's tabs: **Fleet** (map and boats) · **Captains** (your captains) · **Ports** (every charted port: its town, quay, tavern and harbour office) · **Shipyard** · **Home** (your harbour, upgrades, workshop and log).
 - Home is yours to dress: name it, pick wall, roof and sign colours and the bunting, and place decorations on three spots on the quay. Decorations are earned: flower barrels from the start, an old anchor (own three boats), a storm flag (bring a boat home from a storm), a wreck figurehead (raise a sunk boat), a harbour bell (chart new waters), a lantern arch (own a tier 3 boat), a statue (build a legendary or mythic). All cosmetic.
+- **Your tavern** too: give it a name (on the quay and over the window), pick its wall panelling, floor and tablecloth, and what hangs on the wall (a ship's wheel, a mounted fish, crossed oars, a painting, an old flag). Other ports keep their region's tavern.
 - Port upgrades show in the scene (slipway, mooring posts, fuel tanks, salvage crane, scout hut, radar mast), and your captains ashore wander the quay.
 
 ## Deckhands and the tavern

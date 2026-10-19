@@ -104,7 +104,8 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
 - Phone tabs (user-approved 2026-10-18): Fleet · Captains (your roster) · Ports (chips for every
   charted port → town, quay, tavern, harbour office) · Shipyard · Home (customizable harbour:
   name, colours, bunting, earned decorations in 3 spots, upgrades drawn in the scene, captains
-  ashore; then upgrades, workshop, log). Home customization is cosmetic (`src/game/home.ts`).
+  ashore; your own tavern: name, panelling, floor, tablecloth, wall hanging; then upgrades,
+  workshop, log). Home customization is cosmetic (`src/game/home.ts`).
 - Lost at sea (user-approved 2026-10-16): a sunk boat's captain is lost if she isn't raised within
   6 h (absolute time, runs while away); the wreck stays salvageable; bonded captains are spared;
   managed boats get no exception. Phone warns 1 h before; the sunk boat shows an underwater scene.

@@ -8,6 +8,10 @@ import type { RegionId } from '../../../src/game/data/ports'
 import { getPortDef, homeOf } from '../../../src/game/regions'
 
 const portRegion = (portId?: string): RegionId => (portId ? getPortDef(portId).region : 'bay')
+
+/** The tavern's name at a port: yours at home, the region's elsewhere. */
+const tavernName = (game: GameState, portId?: string) =>
+  (portId ?? homeOf(game)) === homeOf(game) ? homeTavern(game).name : REGION_STYLE[getPortDef(portId!).region].tavern
 import { getBoatClass, handFee } from '../../../src/game/economy'
 import { DRINK_WATCHES } from '../../../src/game/data/hands'
 import { SCOUT_ACTIONS, type ScoutAction } from '../../../src/game/data/captains'
@@ -15,6 +19,7 @@ import { coins, duration } from '../../../src/format'
 import { QuayScene } from '../art/QuayScene'
 import { TavernScene } from '../art/TavernScene'
 import { REGION_STYLE } from '../art/regionStyle'
+import { homeTavern } from '../homeTavern'
 import { WorkScene } from '../art/WorkScene'
 import { Figure } from '../art/Figure'
 import { useSceneClock } from '../art/clock'
@@ -104,6 +109,7 @@ function Tavern(props: Props) {
         light={lightAt(now)}
         hands={hands}
         region={region}
+        custom={(props.portId ?? homeOf(game)) === homeOf(game) ? homeTavern(game) : undefined}
         captain={captain}
         selectedId={selCaptain?.id ?? selHand?.id ?? null}
         onSelect={(id) => {
@@ -172,7 +178,7 @@ function Quay(props: Props) {
       <Watches game={game} now={now} />
       <Pressable onPress={() => props.onView('tavern')} accessibilityRole="button">
         <Muted>
-          Tap {REGION_STYLE[region].tavern} to go inside: deckhands drink there{people.captain ? <Text style={{ color: t.legendary }}>, and someone unusual is by the fire ✦</Text> : ''}.
+          Tap {tavernName(game, props.portId)} to go inside: deckhands drink there{people.captain ? <Text style={{ color: t.legendary }}>, and someone unusual is by the fire ✦</Text> : ''}.
         </Muted>
       </Pressable>
       {recruits.length > 0 ? (
@@ -210,7 +216,7 @@ function RecruitCard({ game, now, onScout, onHire, sel, portId, rare = false }: 
       ))}
       {!(sel.skillBand[0] <= 1 && sel.skillBand[1] >= 100) && <SkillRange band={sel.skillBand} />}
       {sel.verdict && <Tag label={VERDICT[sel.verdict]} color={sel.verdict === 'sleeper' ? t.good : sel.verdict === 'all-talk' ? t.bad : t.muted} dark />}
-      {moment && <Moment c={sel} action={moment} tavern={REGION_STYLE[portRegion(portId ?? homeOf(game))].tavern} />}
+      {moment && <Moment c={sel} action={moment} tavern={tavernName(game, portId)} />}
       <Row>
         {(Object.keys(SCOUT_ACTIONS) as ScoutAction[]).map((a) => (
           <Button

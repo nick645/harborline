@@ -4,8 +4,11 @@
 import { useState, type ReactNode } from 'react'
 import { Pressable, Text, TextInput, useWindowDimensions, View } from 'react-native'
 import type { GameState } from '../../../src/game/types'
-import { DECOR, DECOR_SLOTS, HOME_BUNTING, HOME_NAME_MAX, HOME_ROOFS, HOME_SIGNS, HOME_WALLS, type DecorId } from '../../../src/game/data/home'
-import { decorUnlocked } from '../../../src/game/home'
+import { DECOR, DECOR_SLOTS, HANGINGS, HOME_BUNTING, HOME_NAME_MAX, HOME_ROOFS, HOME_SIGNS, HOME_WALLS, TAVERN_CLOTHS, TAVERN_FLOORS, TAVERN_NAME_MAX, TAVERN_WALLS, type DecorId } from '../../../src/game/data/home'
+import { decorUnlocked, type styleHome } from '../../../src/game/home'
+import { portPeople } from '../../../src/game/crew'
+import { TavernScene } from '../art/TavernScene'
+import { homeTavern } from '../homeTavern'
 import { boatOfCaptain } from '../../../src/game/crew'
 import { getPortDef, homeOf } from '../../../src/game/regions'
 import { HomeScene } from '../art/HomeScene'
@@ -17,7 +20,7 @@ import { Body, Card, Heading, Muted, Row, Title } from '../components/ui'
 type Props = {
   game: GameState
   now: number
-  onStyle: (patch: { name?: string; wall?: string; roof?: string; sign?: string; bunting?: number }) => void
+  onStyle: (patch: Parameters<typeof styleHome>[1]) => void
   onPlace: (slot: number, id: DecorId | null) => void
   /** Upgrades and workshop. */
   works: ReactNode
@@ -53,6 +56,27 @@ export function HomeScreen({ game, now, onStyle, onPlace, works, log }: Props) {
   const name = style.name ?? home.name
   const [draft, setDraft] = useState(name)
   const [slot, setSlot] = useState(0)
+  const tavern = homeTavern(game)
+  const [tavernDraft, setTavernDraft] = useState(tavern.name)
+  const people = portPeople(game, homeOf(game))
+  const twoTone = (pairs: readonly (readonly [string, string])[], value: number | undefined, onPick: (i: number) => void, label: string) => (
+    <Row style={{ gap: 6 }}>
+      <Muted style={{ width: 44 }}>{label}</Muted>
+      {pairs.map(([a, b], i) => (
+        <Pressable
+          key={i}
+          onPress={() => onPick(i)}
+          accessibilityRole="button"
+          accessibilityLabel={`${label} ${i + 1}`}
+          accessibilityState={{ selected: value === i }}
+          style={{ width: 28, height: 28, borderRadius: 6, overflow: 'hidden', borderWidth: value === i ? 3 : 1, borderColor: value === i ? t.accent : t.border }}
+        >
+          <View style={{ flex: 1, backgroundColor: a }} />
+          <View style={{ flex: 1, backgroundColor: b }} />
+        </Pressable>
+      ))}
+    </Row>
+  )
   const decor = (style.decor ?? Array.from({ length: DECOR_SLOTS }, () => null)) as (DecorId | null)[]
   const look = {
     name,
@@ -113,6 +137,42 @@ export function HomeScreen({ game, now, onStyle, onPlace, works, log }: Props) {
               {set.slice(0, 3).map((c, j) => (
                 <View key={j} style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: c }} />
               ))}
+            </Pressable>
+          ))}
+        </Row>
+      </Card>
+
+      <Heading>Your tavern</Heading>
+      <TavernScene width={Math.min(width - 24, 720)} light={lightAt(now)} hands={people.hands} captain={people.captain} selectedId={null} onSelect={() => undefined} region={home.region} custom={tavern} />
+      <Card>
+        <Row style={{ flexWrap: 'nowrap' }}>
+          <Muted style={{ width: 44 }}>Name</Muted>
+          <TextInput
+            value={tavernDraft}
+            onChangeText={setTavernDraft}
+            onEndEditing={() => tavernDraft.trim() !== tavern.name && onStyle({ tavernName: tavernDraft })}
+            maxLength={TAVERN_NAME_MAX}
+            placeholder={st.tavern}
+            placeholderTextColor={t.muted}
+            returnKeyType="done"
+            accessibilityLabel="Tavern name"
+            style={{ flex: 1, color: t.text, fontFamily: fonts.semibold, fontSize: 16, borderBottomWidth: 1, borderBottomColor: t.border, paddingVertical: 6 }}
+          />
+        </Row>
+        {twoTone(TAVERN_WALLS, style.tavernWall, (i) => onStyle({ tavernWall: i }), 'Walls')}
+        {twoTone(TAVERN_FLOORS, style.tavernFloor, (i) => onStyle({ tavernFloor: i }), 'Floor')}
+        <Swatches label="Cloth" colors={TAVERN_CLOTHS} value={tavern.cloth ?? ''} onPick={(c) => onStyle({ cloth: c })} />
+        <Row style={{ gap: 6 }}>
+          <Muted style={{ width: 44 }}>Wall</Muted>
+          {HANGINGS.map((h) => (
+            <Pressable
+              key={h.id}
+              onPress={() => onStyle({ hanging: h.id })}
+              accessibilityRole="button"
+              accessibilityState={{ selected: tavern.hanging === h.id }}
+              style={{ paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, borderWidth: tavern.hanging === h.id ? 2 : 1, borderColor: tavern.hanging === h.id ? t.accent : t.border }}
+            >
+              <Text style={{ color: t.text, fontFamily: fonts.medium, fontSize: 12 }}>{h.name}</Text>
             </Pressable>
           ))}
         </Row>
