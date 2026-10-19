@@ -1,9 +1,10 @@
 import type { RouteDef } from '../types'
+import { HOME_PORT_ID, PORTS } from './ports'
 
-// Phase 1: every voyage is a round trip out of the home port.
-export const ROUTES: RouteDef[] = [
-  { id: 'saltmarsh-gullwick', portA: 'saltmarsh', portB: 'gullwick' },
-  { id: 'saltmarsh-brindle', portA: 'saltmarsh', portB: 'brindle' },
-  { id: 'saltmarsh-cobble', portA: 'saltmarsh', portB: 'cobble' },
-  { id: 'saltmarsh-farhaven', portA: 'saltmarsh', portB: 'farhaven' },
-]
+// Every voyage is a round trip out of the home port, so there's one route to each other port.
+// Route ids are `home-port`, which keeps the weather the bay's routes have always had.
+export const ROUTES: RouteDef[] = PORTS.filter((p) => p.id !== HOME_PORT_ID).map((p) => ({
+  id: `${HOME_PORT_ID}-${p.id}`,
+  portA: HOME_PORT_ID,
+  portB: p.id,
+}))

@@ -26,6 +26,7 @@ import { getBoatClass, handFee, handsNeeded, repairCostPerPoint, routeDistance, 
 import { missingAbilityIds } from './abilities'
 import { naturalWeather, seasonAt, stormAlerts } from './weather'
 import { upcomingAlerts } from './alerts'
+import { chartingNext, regionOpen } from './regions'
 import { buyDrink, handView, hireHand } from './crew'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
@@ -103,7 +104,9 @@ describe('economy', () => {
   })
 
   it('places routes near the intended distances', () => {
-    expect(ROUTES.map(routeDistance)).toEqual([6, 10.1, 14.1, 20.2])
+    expect(ROUTES.slice(0, 4).map(routeDistance)).toEqual([6, 10.1, 14.1, 20.2])
+    // Every farther region sits beyond the bay.
+    expect(Math.min(...ROUTES.slice(4).map(routeDistance))).toBeGreaterThan(24)
   })
 })
 
@@ -537,6 +540,25 @@ describe('deckhands', () => {
     expect(quoteVoyage(s, id, route, T0, 'true').durationMs).toBe(quoteVoyage(s, id, route, T0).durationMs)
   })
 
+  it('hands gain voyages on every completed trip, and show their trait in time', () => {
+    let s = newGame(9, T0)
+    const id = give(s, 'harbor-skiff')
+    s.player.coins = 100_000
+    s = hireHand(s, s.tavern!.hands[0].id, id, T0)
+    const route = ROUTES[0].id
+    let t = timeWith(s, route, 'calm')
+    for (let i = 0; i < 5; i++) {
+      const q = quoteVoyage(s, id, route, t, 'true')
+      s = assignRoute(s, id, route, t)
+      t += q.durationMs
+      s = settle(s, t)
+      t = timeWith(s, route, 'calm', t)
+    }
+    const h = s.player.deckhands!.find((x) => x.boatId === id)!
+    expect(h.voyages).toBe(5)
+    expect(h.known).toBe(true)
+  })
+
   it('a drink reveals a hand; old saves get real hands for their count', () => {
     let s = newGame(9, T0)
     const h = s.tavern!.hands[0]
@@ -608,5 +630,42 @@ describe('lost at sea', () => {
     t.player.roster.find((c) => c.id === w.captainId)!.bonded = true
     expect(adriftDeadline(t, w)).toBeNull()
     expect(settle(t, T0 + 2 * CAPTAIN_ADRIFT_MS).player.roster.some((c) => c.id === w.captainId)).toBe(true)
+  })
+})
+
+describe('charting the map', () => {
+  it('starts with the bay; trips to its outer ports chart the Fogbanks open', () => {
+    let s = newGame(4, T0)
+    expect(s.routes.map((r) => r.portB)).toEqual(['gullwick', 'brindle', 'cobble', 'farhaven'])
+    const boat = s.player.ownedBoats[0]
+    expect(() => assignRoute(s, boat.id, 'saltmarsh-mistle', T0)).toThrow(GameError)
+    expect(chartingNext(s)).toMatchObject({ id: 'fogbanks', points: 0, needed: 150 })
+    // Most of the way there already; a few more trips to Farhaven finish it.
+    s.charts = { fogbanks: 140 }
+
+    // Sail to Farhaven until the chart fills.
+    let t = T0
+    for (let i = 0; i < 60 && !regionOpen(s, 'fogbanks'); i++) {
+      s.player.ownedBoats[0].condition = 100
+      const q = quoteVoyage(s, boat.id, 'saltmarsh-farhaven', t, 'true')
+      if (q.blocked) {
+        t += 600_000
+        continue
+      }
+      s = assignRoute(s, boat.id, 'saltmarsh-farhaven', t)
+      t += q.durationMs
+      s = settle(s, t)
+      if (s.player.ownedBoats[0].state === 'sunk') {
+        s.player.coins += 10_000
+        s = salvageBoat(s, boat.id, t)
+      }
+    }
+    expect(regionOpen(s, 'fogbanks')).toBe(true)
+    expect(s.routes.some((r) => r.portB === 'mistle')).toBe(true)
+    expect(chartingNext(s)?.id).toBe('sunward')
+    // Their quays and taverns have people in them, sized by the port.
+    expect(s.portPools!.greyhollow.recruits).toHaveLength(3)
+    expect(s.portPools!.mistle.hands).toHaveLength(2)
+    expect(s.portPools!.mistle.recruits[0].region).toBe('fogbanks')
   })
 })

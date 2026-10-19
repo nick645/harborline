@@ -33,10 +33,11 @@ import { fleetCap } from '../src/game/upgrades'
 import { assignCaptain, hireCaptain, hireHand } from '../src/game/crew'
 import { handCount } from '../src/game/hands'
 import { willSail } from '../src/game/captains'
-import { ROUTES } from '../src/game/data/routes'
 import { LOW_CONDITION_THRESHOLD, STARTING_COINS, WEAR_MULTIPLIERS } from '../src/game/data/economy'
 import { WEATHER, WEATHER_SLOT_MS } from '../src/game/data/weather'
 import { routeWeather } from '../src/game/weather'
+import { regionOpen } from '../src/game/regions'
+import type { RegionId } from '../src/game/data/ports'
 
 const args = parseArgs(process.argv.slice(2))
 const MINUTES = Number(args.minutes ?? 360)
@@ -124,6 +125,7 @@ type RunResult = {
   crafted: number
   firstCraftMin: number | null
   captainsHired: number
+  regionOpenMin: Record<string, number | null>
 }
 
 /** Worst plausible damage for one trip in this weather at this condition (top of the ±50% roll). */
@@ -190,7 +192,7 @@ function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPo
     const chaser =
       condition >= LOW_CONDITION_THRESHOLD && (policy === 'all-in' || (policy === 'bait' && isStarter(boat.classId)))
     const cautious = policy === 'safe' || (policy === 'bait' && !chaser)
-    const quotes = ROUTES.map((r) => ({ r, q: quoteVoyage(s, boat.id, r.id, t) })).filter(({ q }) => !q.blocked)
+    const quotes = s.routes.map((r) => ({ r, q: quoteVoyage(s, boat.id, r.id, t) })).filter(({ q }) => !q.blocked)
     const storms = quotes.filter(({ q }) => roughWater(q.weather)).sort((a, b) => WEATHER[b.q.weather].payoutMult - WEATHER[a.q.weather].payoutMult)
     let pick = chaser ? storms[0] : undefined
     if (!pick) {
@@ -239,6 +241,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     crafted: 0,
     firstCraftMin: null,
     captainsHired: 0,
+    regionOpenMin: { fogbanks: null, sunward: null, ironcliffs: null, lantern: null },
   }
   let spent = 0
   let t = T0
@@ -266,6 +269,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     if (res.firstPurchaseMin === null && s.player.ownedBoats.length > boatsBefore) res.firstPurchaseMin = min
     const tier = maxTier(s)
     for (let k = 2; k <= tier; k++) res.tierReachedMin[k] ??= min
+    for (const r of Object.keys(res.regionOpenMin)) if (regionOpen(s, r as RegionId)) res.regionOpenMin[r] ??= min
 
     // Wake at the next boat event, or when the weather turns if every boat is waiting it out.
     const etas = s.player.ownedBoats.map((b) => b.etaMs).filter((x): x is number => x !== null)
@@ -327,6 +331,7 @@ if (MODE === 'storms') {
     for (const k of [2, 3, 4]) {
       row(`first tier ${k} boat`, results.map((r) => r.tierReachedMin[k]))
     }
+    for (const r of ['fogbanks', 'sunward', 'ironcliffs', 'lantern']) row(`${r} charted`, results.map((x) => x.regionOpenMin[r]))
     row('tier at end', results.map((r) => r.finalTier), 'tier')
     row('boats at end', results.map((r) => r.finalBoats), 'boats')
     row('captains hired', results.map((r) => r.captainsHired), '  ')

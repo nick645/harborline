@@ -422,6 +422,8 @@ export interface CaptainView {
   handlesCrew: boolean
   /** A rare tavern find. */
   rare: boolean
+  /** Where they're from, which shows in how they dress. */
+  region: import('./data/ports').RegionId
 }
 
 export function captainView(c: Captain): CaptainView {
@@ -450,5 +452,6 @@ export function captainView(c: Captain): CaptainView {
     hiredBy: c.hiredBy ?? null,
     handlesCrew: c.handlesCrew !== false,
     rare: !!c.rare,
+    region: c.region ?? 'bay',
   }
 }

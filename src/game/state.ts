@@ -47,6 +47,8 @@ import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, r
 import { hooksOf, type TripContext } from './abilities'
 import { routeWeather, weatherSlot } from './weather'
 import { handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
+import { chartTrip, getPortDef, portOpen, refreshPortPools } from './regions'
+import { getRegion } from './data/ports'
 import { countParts, dropChances, getPart, hasParts, partName, pickPart, takeParts } from './parts'
 import {
   captainMods,
@@ -76,7 +78,8 @@ export class GameError extends Error {
 
 export function newGame(seed: number, now: number): GameState {
   const rng = createRng(seed)
-  const routes: Route[] = ROUTES.map((r) => ({
+  // Only routes into open waters; the rest are added as their regions are charted.
+  const routes: Route[] = ROUTES.filter((r) => getPortDef(r.portB).region === 'bay').map((r) => ({
     ...r,
     demandCargo: rollDemand(rng),
     demandPassenger: rollDemand(rng),
@@ -109,6 +112,7 @@ export function newGame(seed: number, now: number): GameState {
   state.player.ownedBoats[0].captainId = first.id
   refreshRecruitPool(state, now, scoutLevel(state))
   refreshTavern(state, now)
+  refreshPortPools(state, now)
   return state
 }
 
@@ -227,6 +231,7 @@ export function quoteVoyage(state: GameState, boatId: string, routeId: string, t
     mods.demandMult
   const grossMult =
     weather.payoutMult *
+    getRegion(getPortDef(route.portB).region).payout *
     (h.payoutMult?.(ctx) ?? 1) *
     auraPayoutMult(state, boat, routeId) *
     mods.payoutMult *
@@ -315,7 +320,8 @@ export function assignRoute(state: GameState, boatId: string, routeId: string, n
   if (manager && boat.currentRoute) throw new GameError(`${manager.name} is running this boat; take it back first`)
   const tank = getBoatClass(boat.classId).fuelTankTrips
   if (!Number.isInteger(trips) || trips < 1 || trips > tank) throw new GameError(`Trips must be 1–${tank}`)
-  getRoute(s, routeId)
+  const route = getRoute(s, routeId)
+  if (!portOpen(s, route.portB)) throw new GameError("Those waters aren't charted yet")
   const q = quoteVoyage(s, boatId, routeId, now, 'true')
   if (q.blocked) {
     // A refusal at the gangway is how a superstitious captain gives themselves away.
@@ -458,16 +464,26 @@ export function settleAway(state: GameState, now: number): { state: GameState; r
   const coinsBefore = s.player.coins
   const awayMs = Math.max(0, now - s.player.lastSeenAt)
   migrateHands(s)
+  ensureRoutes(s)
   const outcome = settleInPlace(s, now)
   for (const b of s.player.ownedBoats) accrueDocked(s, b, now)
   s.player.scoutingLevel = scoutLevel(s)
   refreshRecruitPool(s, now, s.player.scoutingLevel)
   refreshTavern(s, now)
+  refreshPortPools(s, now)
   s.player.lastSeenAt = Math.max(s.player.lastSeenAt, now)
   return { state: s, report: { awayMs, coinsEarned: s.player.coins - coinsBefore, ...outcome } }
 }
 
 // ---------- internals (mutate the given state) ----------
+
+/** Every open port has a route from home, with its own demand; add any that are missing. */
+function ensureRoutes(s: GameState) {
+  for (const r of ROUTES) {
+    if (s.routes.some((x) => x.id === r.id) || !portOpen(s, r.portB)) continue
+    s.routes.push({ ...r, demandCargo: rollDemand(s.rng), demandPassenger: rollDemand(s.rng) })
+  }
+}
 
 /** Add a harbour log entry. Exported for the crew actions; not for the UI. */
 export function log(s: GameState, at: number, kind: LogKind, text: string) {
@@ -654,7 +670,6 @@ function settleInPlace(s: GameState, now: number) {
         if (h.instantReturnOnLoss) {
           s.voyages = s.voyages.filter((x) => x !== v)
           recordCaptains(s, boat, ctx, ev.at)
-      if (!v.lost) recordHands(s, boat)
           dockBoat(boat, ev.at)
         } else {
           boat.state = 'returning'
@@ -694,6 +709,14 @@ function settleInPlace(s: GameState, now: number) {
         }
       }
       recordCaptains(s, boat, ctx, ev.at)
+      if (!v.lost) {
+        recordHands(s, boat)
+        const opened = chartTrip(s, getRoute(s, v.routeId).portB, ctx.weather)
+        if (opened) {
+          ensureRoutes(s)
+          log(s, ev.at, 'info', `${boat.nickname} finished charting ${opened}: new waters to sail`)
+        }
+      }
 
       let leaving = v.tripIndex < v.tripsTotal && !h.departureBlock?.(ev.at)
       if (leaving && quoteVoyage(s, boat.id, v.routeId, ev.at, 'true').blocked) {

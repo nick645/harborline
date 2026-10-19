@@ -6,7 +6,6 @@ export type Rarity = 'common' | 'rare' | 'legendary' | 'mythic'
 /** Parts have one extra, lowest rarity: standard fittings. */
 export type PartRarity = 'standard' | Exclude<Rarity, 'common'>
 export type SizeTier = 1 | 2 | 3 | 4 | 5 | 6
-export type PortTier = 1 | 2 | 3
 export type PartType = 'hull' | 'engine' | 'specialty'
 export type Weather = 'calm' | 'choppy' | 'rough' | 'storm'
 
@@ -18,8 +17,18 @@ export interface Port {
   name: string
   x: number
   y: number
-  tier: PortTier
-  unlocked: boolean
+  region: import('./data/ports').RegionId
+  /** Bigger ports have more captains and hands looking for work. */
+  size: 'village' | 'town' | 'city'
+}
+
+/** Who's looking for work at a port other than home, refreshed every 6 hours. */
+export interface PortPool {
+  slot: number
+  recruits: Captain[]
+  hands: Deckhand[]
+  /** The rare tavern captain, when they turn up here. */
+  captain: Captain | null
 }
 
 /** Static route definition (content). Distance is derived from port positions. */
@@ -170,6 +179,8 @@ export interface Captain {
   handlesCrew?: boolean
   /** A rare find from the tavern, well above what the quay offers. */
   rare?: boolean
+  /** The region they come from, which shows in how they dress. Absent means the home bay. */
+  region?: import('./data/ports').RegionId
 }
 
 export interface Deckhand {
@@ -183,6 +194,7 @@ export interface Deckhand {
   /** The boat they crew on; null while still at the tavern. */
   boatId: string | null
   voyages: number
+  region?: import('./data/ports').RegionId
 }
 
 export interface Tavern {
@@ -238,6 +250,10 @@ export interface GameState {
   recruitPool: RecruitPool
   /** Absent in older saves until first settled. */
   tavern?: Tavern
+  /** Quays and taverns of the other unlocked ports. */
+  portPools?: Record<string, PortPool>
+  /** Chart points earned toward each region not yet open. */
+  charts?: Record<string, number>
   nextHandSeq?: number
   /** Newest first; capped at LOG_LIMIT entries. */
   log: LogEntry[]
