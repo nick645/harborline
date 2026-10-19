@@ -141,12 +141,10 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
       case 'logbook':
         ly -= 12 * a; ry -= 12 * a; py += -12 * a; rot = -0.15 * a
         break
-      case 'rope': {
-        const cx = Math.cos(t * 5) * 3 * a
-        const cy = Math.sin(t * 5) * 3 * a
-        lx += cx; ly += cy; rx += cx; ry += cy; px = cx; py += cy; rot = t * 2 * a
+      case 'rope':
+        // Lift the coil a little to look it over; no spinning.
+        ly -= 8 * a; ry -= 8 * a; py += -8 * a
         break
-      }
       case 'lantern':
         rx += 6 * a; ry -= 42 * a; px = 6 * a; py += -42 * a
         break
