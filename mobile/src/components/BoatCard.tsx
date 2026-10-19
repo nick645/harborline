@@ -14,9 +14,9 @@ import { fonts, useTheme } from '../theme'
 import { BoatArt } from '../art/BoatArt'
 import { boatWidth } from '../art/boatGeometry'
 import { LIGHT } from '../art/light'
-import { Body, Button, Card, Muted, Row, Tag, Title } from './ui'
+import { Body, Button, Card, Muted, Row, Strip, Tag } from './ui'
 
-type Props = {
+export type Props = {
   game: GameState
   boat: Boat
   now: number
@@ -49,62 +49,108 @@ function BoatThumb({ cls, condition }: { cls: ReturnType<typeof getBoatClass>; c
 
 const signed = (x: number) => `${x >= 0 ? '+' : '−'}${Math.round(Math.abs(x) * 100)}%`
 
-export function BoatCard(props: Props) {
+/** One boat in the Fleet tab's row: her picture, name, where she is and her hull. */
+export function BoatChip({ game, boat, now, onOpen }: { game: GameState; boat: Boat; now: number; onOpen: () => void }) {
+  const t = useTheme()
+  const cls = getBoatClass(boat.classId)
+  const cond = boat.condition
+  const condColor = cond <= 20 ? t.bad : cond < LOW_CONDITION_THRESHOLD ? t.warn : t.good
+  const v = getVoyage(game, boat.id)
+  const dest = v ? getPort(game.routes.find((r) => r.id === v.routeId)!.portB).name : null
+  const status =
+    boat.state === 'sunk'
+      ? 'Sunk'
+      : boat.state === 'idle'
+        ? boat.captainId
+          ? 'Docked · ready'
+          : 'Docked · no captain'
+        : `${boat.state === 'sailing' ? 'To' : 'From'} ${dest} · ${duration((boat.etaMs ?? now) - now)}`
+  const attention = boat.state === 'sunk' || (boat.state === 'idle' && !isAutomated(game, boat))
+  return (
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${boat.nickname}, ${status}`}
+      style={({ pressed }) => [styles.chip, { backgroundColor: t.surface, borderColor: boat.state === 'sunk' ? t.bad : attention ? t.accent : t.border, opacity: pressed ? 0.8 : 1 }]}
+    >
+      <BoatThumb cls={cls} condition={boat.condition} />
+      <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 17 }}>
+        {boat.nickname}
+      </Text>
+      <Text numberOfLines={1} style={{ color: boat.state === 'sunk' ? t.bad : t.muted, fontFamily: fonts.body, fontSize: 12 }}>
+        {status}
+      </Text>
+      <View style={[styles.condTrack, { backgroundColor: t.surface2, width: '100%' }]}>
+        <View style={{ width: `${cond}%`, height: '100%', backgroundColor: condColor }} />
+      </View>
+    </Pressable>
+  )
+}
+
+/** Where she can go now (or her trip, or her wreck). */
+export function SendPanel(props: Props) {
   const { game, boat } = props
+  if (boat.state === 'sunk') return <Sunk {...props} />
+  if (boat.state === 'idle' && isAutomated(game, boat)) return <Muted>Docked · her manager sends her out again when the water is calm enough.</Muted>
+  if (boat.state === 'idle') return <Docked {...props} />
+  return <AtSea {...props} />
+}
+
+/** Who's aboard: her captain, her hands, and her manager. */
+export function CrewPanel(props: Props) {
+  return <CrewLine {...props} />
+}
+
+/** Her hull and what she is: condition, ability, repair and sale. */
+export function HullPanel({ game, boat, canSell, onRepair, onSell }: Props) {
   const t = useTheme()
   const cls = getBoatClass(boat.classId)
   const ability = abilityOf(boat)
   const cond = boat.condition
   const condColor = cond <= 20 ? t.bad : cond < LOW_CONDITION_THRESHOLD ? t.warn : t.good
+  const fix = repairQuote(game, boat.id)
   const rarityColor = cls.rarity === 'common' ? null : t[cls.rarity]
-
   return (
-    <Card accent={boat.state === 'idle' ? t.accent : boat.state === 'sunk' ? t.bad : undefined}>
-      <Pressable
-        onPress={props.onOpen}
-        disabled={!props.onOpen}
-        accessibilityRole="button"
-        accessibilityLabel={`Watch ${boat.nickname}`}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
-      >
-        <BoatThumb cls={cls} condition={boat.condition} />
-        <View style={{ flex: 1 }}>
-          <Row>
-            <Title size={21}>{boat.nickname}</Title>
-            {rarityColor && <Tag label={cls.rarity.toUpperCase()} color={rarityColor} />}
-          </Row>
-          <Muted>
-            {cls.name} · {cls.track === 'cargo' ? 'Cargo' : 'Passenger'} · T{cls.sizeTier} · cap {cls.capacity}
-          </Muted>
-          {props.onOpen && <Muted style={{ color: t.accent }}>Watch her ›</Muted>}
+    <View style={{ gap: 8 }}>
+      <Row>
+        <Muted>
+          {cls.name} · {cls.track === 'cargo' ? 'Cargo' : 'Passenger'} · tier {cls.sizeTier} · {cls.track === 'cargo' ? 'cargo' : 'seats'} {cls.capacity} · fuel for {cls.fuelTankTrips}
+        </Muted>
+        {rarityColor && <Tag label={cls.rarity.toUpperCase()} color={rarityColor} />}
+      </Row>
+      <Row style={{ flexWrap: 'nowrap' }}>
+        <Muted>Hull</Muted>
+        <View style={[styles.condTrack, { backgroundColor: t.surface2, flex: 1, width: undefined }]}>
+          <View style={{ width: `${cond}%`, height: '100%', backgroundColor: condColor }} />
         </View>
-        <View style={{ alignItems: 'flex-end', gap: 2 }}>
-          <View style={[styles.condTrack, { backgroundColor: t.surface2 }]}>
-            <View style={{ width: `${cond}%`, height: '100%', backgroundColor: condColor }} />
-          </View>
-          <Text style={{ color: condColor, fontSize: 12, fontFamily: fonts.bold }}>{cond}</Text>
-        </View>
-      </Pressable>
-
+        <Text style={{ color: condColor, fontSize: 13, fontFamily: fonts.bold }}>{cond}</Text>
+      </Row>
       {ability && (
         <Muted>
           <Text style={{ fontFamily: fonts.bold, color: t.text }}>{ability.name}:</Text> {ability.description}
           {ability.inactiveReason ? ` (${ability.inactiveReason})` : ''}
         </Muted>
       )}
-
-      <CrewLine {...props} />
-
-      {boat.state === 'sunk' ? (
-        <Sunk {...props} />
-      ) : boat.state === 'idle' && isAutomated(game, boat) ? (
-        <Muted>Docked · leaves again when the water is calm enough</Muted>
-      ) : boat.state === 'idle' ? (
-        <Docked {...props} />
-      ) : (
-        <AtSea {...props} />
+      {boat.state === 'idle' && (
+        <Row>
+          <Button small label={fix > 0 ? `Repair ${coins(fix)}c` : 'Hull is sound'} disabled={fix === 0 || game.player.coins < 2} onPress={onRepair} />
+          {canBeSold(cls) && (
+            <Button
+              small
+              kind="danger"
+              label={`Sell ${coins(sellPrice(cls))}c`}
+              disabled={!canSell}
+              onPress={() =>
+                Alert.alert(`Sell ${boat.nickname}?`, `For ${coins(sellPrice(cls))} coins.`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Sell', style: 'destructive', onPress: onSell },
+                ])
+              }
+            />
+          )}
+        </Row>
       )}
-    </Card>
+    </View>
   )
 }
 
@@ -227,12 +273,8 @@ function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props)
   const cls = getBoatClass(boat.classId)
   const tank = cls.fuelTankTrips
   const [trips, setTrips] = useState(tank)
-  // The bay's routes always show; farther waters fold away (but the last route run stays in view).
-  const [far, setFar] = useState(false)
-  const bay = game.routes.filter((r) => getPortDef(r.portB).region === 'bay' || r.id === boat.currentRoute)
-  const farther = game.routes.filter((r) => !bay.includes(r))
-  const shown = far ? [...bay, ...farther] : bay
-  const fix = repairQuote(game, boat.id)
+  // The bay first, then farther waters; the last route run leads.
+  const routes = [...game.routes].sort((x, y) => (x.id === boat.currentRoute ? -1 : y.id === boat.currentRoute ? 1 : 0))
   return (
     <View style={{ gap: 8 }}>
       <Row style={{ justifyContent: 'space-between' }}>
@@ -243,11 +285,11 @@ function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props)
           <Button small kind="secondary" label="+" disabled={trips >= tank} onPress={() => setTrips(trips + 1)} />
         </Row>
       </Row>
-      <View style={styles.routes}>
-        {shown.map((r) => {
+      <Strip>
+        {routes.map((r) => {
           const q = quoteVoyage(game, boat.id, r.id, now)
           return (
-            <View key={r.id} style={styles.routeCell}>
+            <View key={r.id} style={{ width: 168 }}>
               <Card
                 style={[
                   styles.routeCard,
@@ -271,27 +313,7 @@ function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props)
             </View>
           )
         })}
-      </View>
-      {farther.length > 0 && (
-        <Button small kind="secondary" label={far ? 'Just the bay' : `Farther ports (${farther.length})`} onPress={() => setFar(!far)} />
-      )}
-      <Row>
-        <Button small label={fix > 0 ? `Repair ${coins(fix)}c` : 'Repair'} disabled={fix === 0 || game.player.coins < 2} onPress={onRepair} />
-        {canBeSold(cls) && (
-          <Button
-            small
-            kind="danger"
-            label={`Sell ${coins(sellPrice(cls))}c`}
-            disabled={!canSell}
-            onPress={() =>
-              Alert.alert(`Sell ${boat.nickname}?`, `For ${coins(sellPrice(cls))} coins.`, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Sell', style: 'destructive', onPress: onSell },
-              ])
-            }
-          />
-        )}
-      </Row>
+      </Strip>
     </View>
   )
 }
@@ -322,7 +344,6 @@ function Sunk({ game, boat, now, onSalvage }: Props) {
 
 const styles = StyleSheet.create({
   condTrack: { width: 60, height: 8, borderRadius: 4, overflow: 'hidden' },
-  routes: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 },
-  routeCell: { width: '50%', padding: 4 },
+  chip: { width: 132, borderWidth: 1, borderRadius: 14, padding: 8, gap: 3, alignItems: 'flex-start' },
   routeCard: { padding: 8, gap: 4 },
 })

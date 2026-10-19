@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, BackHandler, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, BackHandler, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
@@ -20,7 +20,7 @@ import { alertsWanted, alertText, previewAlert, setAlertsWanted } from './src/no
 import { fonts, useTheme } from './src/theme'
 import { lightAt } from './src/art/light'
 import { HarborMap } from './src/components/HarborMap'
-import { BoatCard } from './src/components/BoatCard'
+import { BoatChip, type Props as BoatProps } from './src/components/BoatCard'
 import { CaptainsScreen, type CaptainsView } from './src/components/CaptainsScreen'
 import { ShipyardScreen } from './src/components/ShipyardScreen'
 import { BoatGallery } from './src/components/BoatGallery'
@@ -30,7 +30,7 @@ import { CaptainScreen } from './src/screens/CaptainScreen'
 import { PortsScreen } from './src/screens/PortsScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { placeDecor, styleHome } from '../src/game/home'
-import { Body, Button, Card, Muted, Row, Title } from './src/components/ui'
+import { Body, Button, Card, Measure, Muted, Row, Strip, Title } from './src/components/ui'
 
 type Tab = 'fleet' | 'captains' | 'ports' | 'shipyard' | 'home'
 const TABS: { id: Tab; label: string }[] = [
@@ -106,25 +106,23 @@ function Harbor() {
   const season = seasonAt(now)
   const finds = report?.parts.filter((id) => getPart(id).rarity !== 'standard') ?? []
 
-  const boatCard = (b: Boat, onOpen?: () => void) => (
-    <BoatCard
-      key={b.id}
-      game={game}
-      boat={b}
-      now={now}
-      canSell={boats.length > 1}
-      onOpen={onOpen}
-      onOpenCaptain={(id) => open({ kind: 'captain', id })}
-      onAssign={(routeId, trips) => act((g, at) => assignRoute(g, b.id, routeId, at, trips))}
-      onRecall={() => act((g) => recallBoat(g, b.id))}
-      onRepair={() => act((g) => repairBoat(g, b.id))}
-      onSell={() => act((g, at) => sellBoat(g, b.id, at))}
-      onSalvage={() => act((g, at) => salvageBoat(g, b.id, at))}
-      onCaptain={(captainId) => act((g) => assignCaptain(g, captainId, b.id))}
-      onManage={(managerId) => act((g) => setManaged(g, b.id, managerId))}
-      onFindHands={() => goToPort(homeOf(game!), 'tavern')}
-    />
-  )
+  const boatProps = (b: Boat): BoatProps => ({
+    game,
+    boat: b,
+    now,
+    canSell: boats.length > 1,
+    onOpenCaptain: (id) => open({ kind: 'captain', id }),
+    onAssign: (routeId, trips) => act((g, at) => assignRoute(g, b.id, routeId, at, trips)),
+    onRecall: () => act((g) => recallBoat(g, b.id)),
+    onRepair: () => act((g) => repairBoat(g, b.id)),
+    onSell: () => {
+      if (act((g, at) => sellBoat(g, b.id, at))) back()
+    },
+    onSalvage: () => act((g, at) => salvageBoat(g, b.id, at)),
+    onCaptain: (captainId) => act((g) => assignCaptain(g, captainId, b.id)),
+    onManage: (managerId) => act((g) => setManaged(g, b.id, managerId)),
+    onFindHands: () => goToPort(homeOf(game), 'tavern'),
+  })
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: t.bg }]} edges={['top', 'left', 'right']}>
@@ -153,7 +151,7 @@ function Harbor() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.content}>
         {report && (
           <Pressable onPress={clearReport}>
             <Card accent={report.sunk.length + report.lost.length + report.captainsLost.length ? t.bad : t.accent}>
@@ -194,13 +192,17 @@ function Harbor() {
         )}
 
         {detail ? (
-          <DetailScreen detail={detail} game={game} now={now} open={open} act={act} boatCard={boatCard} />
+          <DetailScreen detail={detail} game={game} now={now} open={open} act={act} boatProps={boatProps} />
         ) : (
           <>
             {tab === 'fleet' && (
               <>
-                <HarborMap game={game} now={now} onOpenPort={(id) => goToPort(id)} />
-                {boats.map((b) => boatCard(b, () => open({ kind: 'boat', id: b.id })))}
+                <Measure>{(w, h) => <HarborMap game={game} now={now} onOpenPort={(id) => goToPort(id)} box={{ w, h }} />}</Measure>
+                <Strip>
+                  {boats.map((b) => (
+                    <BoatChip key={b.id} game={game} boat={b} now={now} onOpen={() => open({ kind: 'boat', id: b.id })} />
+                  ))}
+                </Strip>
               </>
             )}
 
@@ -324,7 +326,7 @@ function Harbor() {
             )}
           </>
         )}
-      </ScrollView>
+      </View>
 
       {!detail && (
         <SafeAreaView edges={['bottom']} style={[styles.tabBar, { backgroundColor: t.surface, borderTopColor: t.border }]}>
@@ -372,19 +374,19 @@ function DetailScreen({
   now,
   open,
   act,
-  boatCard,
+  boatProps,
 }: {
   detail: NonNullable<Detail>
   game: GameState
   now: number
   open: (d: Detail) => void
   act: (fn: (g: GameState, t: number) => GameState) => boolean
-  boatCard: (b: Boat) => React.ReactNode
+  boatProps: (b: Boat) => BoatProps
 }) {
   if (detail.kind === 'boat') {
     const boat = game.player.ownedBoats.find((b) => b.id === detail.id)
     if (!boat) return <Muted>That boat is no longer in your fleet.</Muted>
-    return <BoatScreen game={game} boat={boat} now={now} onOpenCaptain={(id) => open({ kind: 'captain', id })} controls={boatCard(boat)} />
+    return <BoatScreen {...boatProps(boat)} />
   }
   return (
     <CaptainScreen
@@ -406,7 +408,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 16, paddingVertical: 8, minHeight: 56 },
   back: { paddingVertical: 10, paddingRight: 16 },
-  content: { padding: 12, gap: 12, paddingBottom: 32 },
+  content: { flex: 1, padding: 12, gap: 10, paddingBottom: 10 },
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   tabBar: { flexDirection: 'row', borderTopWidth: 1 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 12 },

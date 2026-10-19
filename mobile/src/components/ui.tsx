@@ -1,7 +1,7 @@
 // Small shared building blocks in the Lantern style.
 
-import type { ReactNode } from 'react'
-import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
+import { useState, type ReactNode } from 'react'
+import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
 import { bodyFont, fonts, useTheme } from '../theme'
 
 /** Text in Barlow; a fontWeight in `style` picks the matching family. */
@@ -115,4 +115,79 @@ const styles = StyleSheet.create({
   tag: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1, alignSelf: 'flex-start' },
   tagText: { fontSize: 11, fontFamily: fonts.bold, letterSpacing: 0.5 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  segments: { flexDirection: 'row', borderRadius: 10, borderWidth: 1, padding: 3, gap: 3 },
+  segment: { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 8 },
+  tile: { flexGrow: 1, flexBasis: '45%', borderWidth: 1, borderRadius: 14, padding: 12, gap: 2, minHeight: 64, justifyContent: 'center' },
 })
+
+/**
+ * A box that takes the space left on the page and hands its child the largest width that keeps
+ * the given aspect (width / height) inside it. Scenes use it so a page never has to scroll.
+ */
+export function Fit({ aspect, children, max = 720 }: { aspect: number; children: (width: number) => ReactNode; max?: number }) {
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null)
+  const width = box ? Math.max(0, Math.min(box.w, box.h * aspect, max)) : 0
+  return (
+    <View style={{ flex: 1, minHeight: 80, alignItems: 'center', justifyContent: 'center' }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+      {width > 0 && children(Math.floor(width))}
+    </View>
+  )
+}
+
+/** Sub-tabs within a page. */
+export function Segments<T extends string>({ items, value, onChange }: { items: { id: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+  const t = useTheme()
+  return (
+    <View style={[styles.segments, { backgroundColor: t.surface2, borderColor: t.border }]}>
+      {items.map((it) => {
+        const on = it.id === value
+        return (
+          <Pressable
+            key={it.id}
+            onPress={() => onChange(it.id)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            style={[styles.segment, on && { backgroundColor: t.accent }]}
+          >
+            <Text style={{ color: on ? t.accentText : t.text, fontFamily: fonts.semibold, fontSize: 13 }}>{it.label}</Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/** A row you swipe sideways, for lists that would otherwise make a page scroll. */
+export function Strip({ children, gap = 8 }: { children: ReactNode; gap?: number }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap, paddingRight: 8 }} style={{ flexGrow: 0 }}>
+      {children}
+    </ScrollView>
+  )
+}
+
+/** A big tappable tile for page menus. */
+export function Tile({ label, sub, onPress, accent, disabled }: { label: string; sub?: string; onPress: () => void; accent?: string; disabled?: boolean }) {
+  const t = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.tile, { backgroundColor: t.surface, borderColor: accent ?? t.border, opacity: disabled ? 0.45 : pressed ? 0.8 : 1 }]}
+    >
+      <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 15 }}>{label}</Text>
+      {sub ? <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>{sub}</Text> : null}
+    </Pressable>
+  )
+}
+
+/** A box that takes the space left on the page and tells its child how big that is. */
+export function Measure({ children }: { children: (w: number, h: number) => ReactNode }) {
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null)
+  return (
+    <View style={{ flex: 1, minHeight: 80, alignItems: 'center', justifyContent: 'center' }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+      {box && box.w > 0 && children(Math.floor(box.w), Math.floor(box.h))}
+    </View>
+  )
+}

@@ -2,7 +2,6 @@
 // under fog at the edge, the next region with how far its chart has come. The view widens as
 // regions open. Every open port can be tapped; routes run from home, coloured by their weather.
 
-import { useWindowDimensions } from 'react-native'
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg'
 import type { GameState, Port, Weather } from '../../../src/game/types'
 import { getBoatClass, getPort } from '../../../src/game/economy'
@@ -36,11 +35,9 @@ function landBlob(ports: Port[]): string {
     .join(' ')
 }
 
-export function HarborMap({ game, now, onOpenPort }: { game: GameState; now: number; onOpenPort: (portId: string) => void }) {
+export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now: number; onOpenPort: (portId: string) => void; box: { w: number; h: number } }) {
   const t = useTheme()
   const light = lightAt(now)
-  const { width } = useWindowDimensions()
-  const w = Math.min(width - 24, 720)
   const open = openPorts(game)
   const next = chartingNext(game)
   const fogPorts = next ? PORTS.filter((p) => p.region === next.id) : []
@@ -74,7 +71,7 @@ export function HarborMap({ game, now, onOpenPort }: { game: GameState; now: num
   }
 
   return (
-    <Svg width={w} height={(w * view.h) / view.w} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}>
+    <Svg width={Math.min(box.w, (box.h * view.w) / view.h)} height={Math.min(box.h, (box.w * view.h) / view.w)} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}>
       <Rect x={view.x} y={view.y} width={view.w} height={view.h} rx={28 * k} fill={light.sea} />
       {[0.25, 0.55, 0.82].map((f) => (
         <Path
