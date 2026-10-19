@@ -35,12 +35,15 @@ export function QuayScene({
   recruits,
   selectedId,
   onSelect,
+  onEnterTavern,
 }: {
   width: number
   light: Light
   recruits: Recruit[]
   selectedId: string | null
   onSelect: (id: string) => void
+  /** Tap the Gull & Lantern to go inside. */
+  onEnterTavern?: () => void
 }) {
   const clock = useSceneClock()
   const s = width / W
@@ -143,6 +146,11 @@ export function QuayScene({
             <Rect x={36} y={86} width={36} height={64} color={lit('#3a2420')} />
             <Path path="M36 86 Q 54 72 72 86" color={lit('#4a2e22')} style="stroke" strokeWidth={4} />
             <Rect x={58} y={116} width={4} height={4} color="#d9a441" />
+            {onEnterTavern && (
+              <Rect x={36} y={86} width={36} height={64} opacity={flicker}>
+                <RadialGradient c={vec(54, 140)} r={44} colors={[`${light.lamp}66`, `${light.lamp}00`]} />
+              </Rect>
+            )}
             {night && (
               <Rect x={36} y={86} width={36} height={64}>
                 <RadialGradient c={vec(54, 150)} r={60} colors={[`${light.lamp}55`, `${light.lamp}00`]} />
@@ -243,6 +251,14 @@ export function QuayScene({
           ))}
         </Group>
       </Canvas>
+      {onEnterTavern && (
+        <Pressable
+          onPress={onEnterTavern}
+          accessibilityRole="button"
+          accessibilityLabel="Go into the Gull & Lantern"
+          style={{ position: 'absolute', left: 250 * s, top: 4 * s, width: 108 * s, height: 180 * s }}
+        />
+      )}
       {recruits.map((r, i) => (
         <Pressable
           key={r.id}

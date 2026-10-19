@@ -146,6 +146,7 @@ function Tavern(props: Props) {
 
 function Quay(props: Props) {
   const { game, now } = props
+  const t = useTheme()
   const { width } = useWindowDimensions()
   const recruits = recruitViews(game)
   const [selectedId, setSelected] = useState<string | null>(null)
@@ -153,8 +154,13 @@ function Quay(props: Props) {
   return (
     <View style={{ gap: 10 }}>
       <Watches game={game} now={now} />
+      <Pressable onPress={() => props.onView('tavern')} accessibilityRole="button">
+        <Muted>
+          Tap the Gull & Lantern to go inside: deckhands drink there{tavernViews(game).captain ? <Text style={{ color: t.legendary }}>, and someone unusual is by the fire ✦</Text> : ''}.
+        </Muted>
+      </Pressable>
       {recruits.length > 0 ? (
-        <QuayScene width={Math.min(width - 24, 720)} light={lightAt(now)} recruits={recruits} selectedId={sel?.id ?? null} onSelect={setSelected} />
+        <QuayScene width={Math.min(width - 24, 720)} light={lightAt(now)} recruits={recruits} selectedId={sel?.id ?? null} onSelect={setSelected} onEnterTavern={() => props.onView('tavern')} />
       ) : (
         <Muted>Nobody else is looking for work today.</Muted>
       )}
