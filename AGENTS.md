@@ -99,8 +99,11 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   6 h (absolute time, runs while away); the wreck stays salvageable; bonded captains are spared;
   managed boats get no exception. Phone warns 1 h before; the sunk boat shows an underwater scene.
 - Deckhands (user-approved 2026-10-16): tier t needs t − 1; one-off fee of 5% of tier price per
-  hand, no wages; short-handed = +20% trip time per missing hand, never blocked; managers sign
-  them on; not characters. Sim: first tier 2 unchanged at ~4.85 h, tier 3 13.5 → 13.8 h.
+  hand, no wages; short-handed = +20% trip time per missing hand, never blocked; managers hire
+  them. Since 2026-10-18 they're characters hired at the tavern, each with one hidden trait
+  (`data/hands.ts`; rumour 70% right, a drink for 1 watch or 5 voyages reveals it; numbers are
+  Claude's picks). The tavern also has a rare captain 1 slot in 10, +2 anchors over the quay,
+  with a distinct look (`lookFor(id, rare)`). Sim: first tier 2 unchanged at ~4.85 h, tier 3 13.5 → 13.8 h.
   Full crew: −15% hull damage in rough/storm, tier 2+ only (all-in storm chasers: sinkings
   14 → 12, coins +8%; pacing unchanged).
 

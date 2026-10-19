@@ -74,7 +74,7 @@ export interface Boat {
   dockedAt: number | null
   /** When she went down, while sunk. Older saves start the clock when first loaded. */
   sunkAt?: number
-  /** Deckhands signed on. Absent in older saves, which reads as none. */
+  /** Older saves only: a count of hands aboard, turned into real deckhands on load. */
   hands?: number
   /** Managed boats only: don't try to leave before this time (weather or pay wasn't right). */
   autoWaitUntil?: number
@@ -168,6 +168,28 @@ export interface Captain {
   hiredBy?: string | null
   /** Managers only: whether they hire and fire crew for the boats they run (default on). */
   handlesCrew?: boolean
+  /** A rare find from the tavern, well above what the quay offers. */
+  rare?: boolean
+}
+
+export interface Deckhand {
+  id: string
+  name: string
+  /** Hidden: their real trait. UI reads it only once `known`. */
+  trait: import('./data/hands').HandTraitId
+  /** What the tavern says about them; right most of the time. */
+  heard: import('./data/hands').HandTraitId
+  known: boolean
+  /** The boat they crew on; null while still at the tavern. */
+  boatId: string | null
+  voyages: number
+}
+
+export interface Tavern {
+  slot: number
+  hands: Deckhand[]
+  /** Now and then, a captain well above the quay's best. */
+  captain: Captain | null
 }
 
 export interface RecruitPool {
@@ -183,6 +205,8 @@ export interface Player {
   ownedBoats: Boat[]
   partInventory: string[]
   roster: Captain[]
+  /** Hands aboard your boats. Absent in older saves. */
+  deckhands?: Deckhand[]
   portUpgrades: Record<string, number>
   /** Highest boat tier ever owned: unlocks manager roles and grows the fleet cap. */
   maxTierReached: number
@@ -212,6 +236,9 @@ export interface GameState {
   nextBoatSeq: number
   nextCaptainSeq: number
   recruitPool: RecruitPool
+  /** Absent in older saves until first settled. */
+  tavern?: Tavern
+  nextHandSeq?: number
   /** Newest first; capped at LOG_LIMIT entries. */
   log: LogEntry[]
 }

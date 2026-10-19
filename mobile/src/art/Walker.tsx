@@ -3,7 +3,7 @@
 // the mug, a look at the logbook...). Feet land on `footY`. With Reduce Motion the clock holds
 // still, so they stand at `x0` doing nothing.
 
-import { Group, Oval } from '@shopify/react-native-skia'
+import { Group, Oval, Path, RoundedRect } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Look } from './looks'
 import { Figure, FIGURE_FULL_H } from './Figure'
@@ -58,6 +58,47 @@ export function Walker({ look, clock, x0, x1, footY, scale, speed = 16, pauseMs 
       <Group transform={move}>
         <Figure look={look} x={x0} y={footY - FIGURE_FULL_H * scale} scale={scale} clock={clock} offset={offset} rimLight={rimLight} wind={wind} legs motion={{ stride, act }} />
       </Group>
+    </Group>
+  )
+}
+
+/**
+ * Two people talking: speech bubbles with bobbing dots that take turns above each head.
+ * `a` and `b` are where the bubbles sit (just above each head).
+ */
+export function Chatter({ clock, a, b, offset = 0, color = '#fff3dc' }: { clock: SharedValue<number>; a: { x: number; y: number }; b: { x: number; y: number }; offset?: number; color?: string }) {
+  const TURN = 2600
+  // Each speaks for part of their turn, then a short silence.
+  const showA = useDerivedValue(() => {
+    const t = ((clock.value + offset) % (2 * TURN) + 2 * TURN) % (2 * TURN)
+    return (t < TURN * 0.8 ? 1 : 0) as number
+  })
+  const showB = useDerivedValue(() => {
+    const t = ((clock.value + offset) % (2 * TURN) + 2 * TURN) % (2 * TURN)
+    return (t > TURN && t < TURN * 1.8 ? 1 : 0) as number
+  })
+  const dots = useDerivedValue(() => {
+    let d = ''
+    for (let i = 0; i < 3; i++) {
+      const lift = Math.max(0, Math.sin((clock.value + offset) / 160 - i * 0.9)) * 1.6
+      const r = 1.3
+      d += `M${-5 + i * 5 - r} ${-lift} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z `
+    }
+    return d
+  })
+  const bubble = (p: { x: number; y: number }, show: SharedValue<number>, tailLeft: boolean) => (
+    <Group opacity={show} transform={[{ translateX: p.x }, { translateY: p.y }]}>
+      <RoundedRect x={-11} y={-16} width={22} height={13} r={6} color={color} />
+      <Path path={tailLeft ? 'M-3 -3.5 L -7 2 L 2 -3.5 Z' : 'M3 -3.5 L 7 2 L -2 -3.5 Z'} color={color} />
+      <Group transform={[{ translateY: -9.5 }]}>
+        <Path path={dots} color="#4a3346" />
+      </Group>
+    </Group>
+  )
+  return (
+    <Group>
+      {bubble(a, showA, false)}
+      {bubble(b, showB, true)}
     </Group>
   )
 }

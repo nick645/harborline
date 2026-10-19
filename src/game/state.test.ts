@@ -17,7 +17,6 @@ import {
   sellBoat,
   settle,
   settleAway,
-  signOnHands,
   adriftDeadline,
   GameError,
 } from './state'
@@ -27,6 +26,7 @@ import { getBoatClass, handFee, handsNeeded, repairCostPerPoint, routeDistance, 
 import { missingAbilityIds } from './abilities'
 import { naturalWeather, seasonAt, stormAlerts } from './weather'
 import { upcomingAlerts } from './alerts'
+import { buyDrink, handView, hireHand } from './crew'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
 import { PARTS } from './data/parts'
@@ -494,7 +494,7 @@ describe('save', () => {
 })
 
 describe('deckhands', () => {
-  it('bigger boats need hands; short-handed trips run longer; signing on is a one-off fee', () => {
+  it('bigger boats need hands from the tavern; short-handed trips run longer', () => {
     let s = newGame(9, T0)
     const id = give(s, 'coastal-trawler') // tier 3: needs 2 hands
     const cls = getBoatClass('coastal-trawler')
@@ -503,26 +503,70 @@ describe('deckhands', () => {
     const route = ROUTES[1].id
     const short = quoteVoyage(s, id, route, T0, 'true')
     expect(short.handsMissing).toBe(2)
+    expect(s.tavern!.hands.length).toBeGreaterThanOrEqual(2)
 
     s.player.coins = 100_000
     const before = s.player.coins
-    s = signOnHands(s, id, T0)
+    // Green hands only, so traits don't muddy the timing.
+    for (const h of s.tavern!.hands) h.trait = 'green'
+    s = hireHand(s, s.tavern!.hands[0].id, id, T0)
+    s = hireHand(s, s.tavern!.hands[0].id, id, T0)
     expect(s.player.coins).toBe(before - 2 * handFee(cls))
-    expect(s.player.ownedBoats.find((b) => b.id === id)!.hands).toBe(2)
+    expect(() => hireHand(s, s.tavern!.hands[0].id, id, T0)).toThrow(GameError)
     const full = quoteVoyage(s, id, route, T0, 'true')
     expect(full.handsMissing).toBe(0)
-    // Two missing hands at +20% each.
     expect(short.durationMs / full.durationMs).toBeCloseTo(1.4, 2)
-    expect(() => signOnHands(s, id, T0)).toThrow(GameError)
+
     // A full crew takes less damage in storms; short-handed boats don't get it.
     const stormAt = timeWith(s, route, 'storm')
     const crewed = quoteVoyage(s, id, route, stormAt, 'true').worstDamage
     const bare = structuredClone(s)
-    bare.player.ownedBoats.find((b) => b.id === id)!.hands = 1
+    bare.player.deckhands = bare.player.deckhands!.slice(1)
     expect(crewed).toBeLessThan(quoteVoyage(bare, id, route, stormAt, 'true').worstDamage)
-    // Old saves have no hands field: read as none.
-    delete s.player.ownedBoats.find((b) => b.id === id)!.hands
-    expect(quoteVoyage(s, id, route, T0, 'true').handsMissing).toBe(2)
+  })
+
+  it("a hand's trait counts in the true quote, and in the player's only once known", () => {
+    let s = newGame(9, T0)
+    const id = give(s, 'harbor-skiff')
+    s.player.coins = 100_000
+    s.tavern!.hands[0].trait = 'quick'
+    s = hireHand(s, s.tavern!.hands[0].id, id, T0)
+    const route = ROUTES[1].id
+    expect(quoteVoyage(s, id, route, T0, 'true').durationMs).toBeLessThan(quoteVoyage(s, id, route, T0).durationMs)
+    s.player.deckhands![0].known = true
+    expect(quoteVoyage(s, id, route, T0, 'true').durationMs).toBe(quoteVoyage(s, id, route, T0).durationMs)
+  })
+
+  it('a drink reveals a hand; old saves get real hands for their count', () => {
+    let s = newGame(9, T0)
+    const h = s.tavern!.hands[0]
+    const watches = s.recruitPool.watchesLeft
+    s = buyDrink(s, h.id)
+    expect(s.tavern!.hands[0].known).toBe(true)
+    expect(s.recruitPool.watchesLeft).toBe(watches - 1)
+    expect(handView(s.tavern!.hands[0]).known).not.toBeNull()
+
+    const old = newGame(9, T0)
+    const oid = give(old, 'coastal-trawler')
+    old.player.ownedBoats.find((b) => b.id === oid)!.hands = 2
+    delete old.player.deckhands
+    const loaded = settle(old, T0 + 1000)
+    expect(loaded.player.deckhands!.filter((x) => x.boatId === oid)).toHaveLength(2)
+    expect(loaded.player.ownedBoats.find((b) => b.id === oid)!.hands).toBeUndefined()
+  })
+
+  it('the tavern sometimes has a captain two anchors above the quay', () => {
+    let rare = 0
+    for (let seed = 1; seed <= 300; seed++) {
+      const c = newGame(seed, T0).tavern!.captain
+      if (c) {
+        rare++
+        expect(c.rare).toBe(true)
+        expect(c.reputation).toBe(4) // quay offers 1–2 at tier 1
+      }
+    }
+    expect(rare).toBeGreaterThan(10)
+    expect(rare).toBeLessThan(60)
   })
 })
 

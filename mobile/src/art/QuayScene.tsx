@@ -10,7 +10,7 @@ import { getBoatClass } from '../../../src/game/economy'
 import type { Light } from './light'
 import { lookFor } from './looks'
 import { FIGURE_FULL_H } from './Figure'
-import { Walker } from './Walker'
+import { Chatter, Walker } from './Walker'
 import { BoatArt } from './BoatArt'
 import { useSceneClock } from './clock'
 import { mix, shade } from './paint'
@@ -78,6 +78,7 @@ export function QuayScene({
   }
   // Spread the recruits evenly along the quay, keeping the last one inside the frame.
   const span = W - 36 - 56 * FIGURE_SCALE - 2 * PACE
+  const pairs = Math.floor(recruits.length / 2)
   const xs = recruits.map((_, i) => (recruits.length > 1 ? 18 + PACE + (i * span) / (recruits.length - 1) : (W - 56 * FIGURE_SCALE) / 2))
   const wall = lit('#7a5038')
   const night = light.stars > 0
@@ -215,10 +216,31 @@ export function QuayScene({
                     <Oval x={xs[i] - PACE - 6} y={FOOT_Y - 10} width={56 * FIGURE_SCALE + 2 * PACE + 12} height={16} color={light.lamp} opacity={0.4} />
                   </>
                 )}
-                <Walker look={lookFor(r.id)} clock={clock} x0={xs[i] - PACE} x1={xs[i] + PACE} footY={FOOT_Y} scale={FIGURE_SCALE} speed={8} pauseMs={4200 + i * 900} offset={i * 1700} rimLight={chosen ? light.lamp : undefined} />
+                <Walker
+                  look={lookFor(r.id)}
+                  clock={clock}
+                  // Pairs drift toward each other to talk; an odd one out paces on their own.
+                  x0={i < pairs * 2 ? xs[i] : xs[i] - PACE}
+                  x1={i < pairs * 2 ? xs[i] + (i % 2 === 0 ? PACE : -PACE) : xs[i] + PACE}
+                  footY={FOOT_Y}
+                  scale={FIGURE_SCALE}
+                  speed={8}
+                  pauseMs={4200 + i * 900}
+                  offset={i * 1700}
+                  rimLight={chosen ? light.lamp : undefined}
+                />
               </Group>
             )
           })}
+          {Array.from({ length: pairs }, (_, k) => (
+            <Chatter
+              key={k}
+              clock={clock}
+              a={{ x: xs[2 * k] + (56 * FIGURE_SCALE) / 2 + 6, y: FIG_TOP - 2 }}
+              b={{ x: xs[2 * k + 1] + (56 * FIGURE_SCALE) / 2 - 6, y: FIG_TOP - 2 }}
+              offset={k * 1700}
+            />
+          ))}
         </Group>
       </Canvas>
       {recruits.map((r, i) => (

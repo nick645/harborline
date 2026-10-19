@@ -420,6 +420,8 @@ export interface CaptainView {
   hiredBy: string | null
   /** Managers: whether they hire and fire crew. */
   handlesCrew: boolean
+  /** A rare tavern find. */
+  rare: boolean
 }
 
 export function captainView(c: Captain): CaptainView {
@@ -447,5 +449,6 @@ export function captainView(c: Captain): CaptainView {
     sailsTiers: captainTiers(c.reputation),
     hiredBy: c.hiredBy ?? null,
     handlesCrew: c.handlesCrew !== false,
+    rare: !!c.rare,
   }
 }

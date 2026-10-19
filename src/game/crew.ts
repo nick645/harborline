@@ -1,12 +1,14 @@
 // Player actions for captains, managers and port upgrades, plus the views the UI reads.
 // Like state.ts, every action takes a state and returns a new one.
 
-import type { Boat, Captain, CaptainRole, GameState, Track } from './types'
+import type { Boat, Captain, CaptainRole, Deckhand, GameState, Track } from './types'
 import { captainTiers, SCOUT_ACCURACY, SCOUT_ACTIONS, SCOUT_BAND_WIDTH, PROMOTION_VOYAGES, type ScoutAction } from './data/captains'
 import { MANAGER_ROLES, type ManagerRoleDef } from './data/managers'
 import { UPGRADES, type UpgradeId } from './data/upgrades'
 import { addRumour, captainMods, captainView, combineMods, makeBand, poolRefreshesAt, severance, verdictFor, willSail, type CaptainView } from './captains'
-import { getBoatClass } from './economy'
+import { getBoatClass, handFee, handsNeeded } from './economy'
+import { getHandTrait, handCount, handsOn } from './hands'
+import { DRINK_WATCHES } from './data/hands'
 import { hooksOf } from './abilities'
 import { captainsAboard, GameError, getBoat, getCaptain, log, managerOf, topTier } from './state'
 import { nextUpgradeCost, scoutLevel, upgradeLevel } from './upgrades'
@@ -15,6 +17,43 @@ import { nextUpgradeCost, scoutLevel, upgradeLevel } from './upgrades'
 
 export function recruitViews(state: GameState): CaptainView[] {
   return state.recruitPool.recruits.map(captainView)
+}
+
+/** A deckhand as the player sees them: their real trait only once it's known. */
+export interface HandView {
+  id: string
+  name: string
+  /** What the tavern says about them. */
+  rumour: string
+  known: { name: string; description: string } | null
+  boatId: string | null
+  voyages: number
+}
+
+export function handView(h: Deckhand): HandView {
+  const t = getHandTrait(h.trait)
+  return {
+    id: h.id,
+    name: h.name,
+    rumour: getHandTrait(h.heard).rumour,
+    known: h.known ? { name: t.name, description: t.description } : null,
+    boatId: h.boatId,
+    voyages: h.voyages,
+  }
+}
+
+/** Who's at the tavern: hands looking for a berth, and now and then a rare captain. */
+export function tavernViews(state: GameState): { hands: HandView[]; captain: CaptainView | null } {
+  return { hands: (state.tavern?.hands ?? []).map(handView), captain: state.tavern?.captain ? captainView(state.tavern.captain) : null }
+}
+
+export function handViewsOn(state: GameState, boatId: string): HandView[] {
+  return handsOn(state, boatId).map(handView)
+}
+
+/** Boats that still need hands, for the tavern's hire buttons. */
+export function boatsNeedingHands(state: GameState): Boat[] {
+  return state.player.ownedBoats.filter((b) => b.state !== 'sunk' && handCount(state, b.id) < handsNeeded(getBoatClass(b.classId)))
 }
 
 export function rosterViews(state: GameState): CaptainView[] {
@@ -119,12 +158,17 @@ export function knownCrewEffect(state: GameState, boatId: string, t: number) {
 
 // ---------- scouting and hiring ----------
 
-/** Spend watches learning about a recruit on the quay. */
+/** A captain looking for work: on the quay, or the rare one at the tavern. */
+function findRecruit(s: GameState, captainId: string): Captain | undefined {
+  return s.recruitPool.recruits.find((r) => r.id === captainId) ?? (s.tavern?.captain?.id === captainId ? s.tavern.captain : undefined)
+}
+
+/** Spend watches learning about a recruit on the quay (or the tavern's rare captain). */
 export function scoutRecruit(state: GameState, captainId: string, action: ScoutAction): GameState {
   const cost = SCOUT_ACTIONS[action].watches
   if (state.recruitPool.watchesLeft < cost) throw new GameError('Not enough watches left today')
   const s = structuredClone(state)
-  const c = s.recruitPool.recruits.find((r) => r.id === captainId)
+  const c = findRecruit(s, captainId)
   if (!c) throw new GameError('That captain has left the quay')
   const level = scoutLevel(s)
   if (action === 'logbook') {
@@ -145,15 +189,45 @@ export function scoutRecruit(state: GameState, captainId: string, action: ScoutA
 }
 
 export function hireCaptain(state: GameState, captainId: string, now: number): GameState {
-  const c = state.recruitPool.recruits.find((r) => r.id === captainId)
+  const c = findRecruit(state, captainId)
   if (!c) throw new GameError('That captain has left the quay')
   if (state.player.coins < c.fee) throw new GameError('Not enough coins')
   const s = structuredClone(state)
-  const hired = s.recruitPool.recruits.find((r) => r.id === captainId)!
+  const hired = findRecruit(s, captainId)!
   s.recruitPool.recruits = s.recruitPool.recruits.filter((r) => r.id !== captainId)
+  if (s.tavern?.captain?.id === captainId) s.tavern.captain = null
   s.player.coins -= hired.fee
   s.player.roster.push(hired)
   log(s, now, 'captain', `Hired ${hired.name}`)
+  return s
+}
+
+/** Stand a hand a drink: one watch, and you learn what they're really like. */
+export function buyDrink(state: GameState, handId: string): GameState {
+  if (state.recruitPool.watchesLeft < DRINK_WATCHES) throw new GameError('Not enough watches left today')
+  const s = structuredClone(state)
+  const h = s.tavern?.hands.find((x) => x.id === handId)
+  if (!h) throw new GameError("They've left the tavern")
+  if (h.known) throw new GameError('You already know them well')
+  h.known = true
+  s.recruitPool.watchesLeft -= DRINK_WATCHES
+  return s
+}
+
+/** Hire a hand from the tavern onto a boat that needs one. A one-off fee; no wages. */
+export function hireHand(state: GameState, handId: string, boatId: string, now: number): GameState {
+  const boat = getBoat(state, boatId)
+  const cls = getBoatClass(boat.classId)
+  if (!state.tavern?.hands.some((x) => x.id === handId)) throw new GameError("They've left the tavern")
+  if (boat.state === 'sunk') throw new GameError('Raise her first')
+  if (handCount(state, boatId) >= handsNeeded(cls)) throw new GameError(`${boat.nickname} has all the hands she needs`)
+  if (state.player.coins < handFee(cls)) throw new GameError('Not enough coins')
+  const s = structuredClone(state)
+  const h = s.tavern!.hands.find((x) => x.id === handId)!
+  s.tavern!.hands = s.tavern!.hands.filter((x) => x.id !== handId)
+  s.player.coins -= handFee(cls)
+  ;(s.player.deckhands ??= []).push({ ...h, boatId })
+  log(s, now, 'info', `${h.name} signed on with ${boat.nickname}`)
   return s
 }
 

@@ -6,6 +6,7 @@ import type { Boat, GameState, Weather } from '../../../src/game/types'
 import { getBoatClass, getPort } from '../../../src/game/economy'
 import { captainViewById } from '../../../src/game/crew'
 import { getVoyage } from '../../../src/game/state'
+import { handCount } from '../../../src/game/hands'
 import { routeWeather } from '../../../src/game/weather'
 import { WEATHER } from '../../../src/game/data/weather'
 import { coins, duration, percent } from '../../../src/format'
@@ -45,16 +46,16 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
     <View style={{ gap: 12 }}>
       <View>
         {mode === 'sunk' && !preview ? (
-          <SunkScene width={sceneWidth} light={lightAt(now)} cls={cls} captain={captain ? lookFor(captain.id) : null} />
+          <SunkScene width={sceneWidth} light={lightAt(now)} cls={cls} captain={captain ? lookFor(captain.id, captain.rare) : null} />
         ) : mode === 'docked' && !preview ? (
           <DockScene
             width={sceneWidth}
             light={lightAt(now)}
             cls={cls}
-            captain={captain ? lookFor(captain.id) : null}
+            captain={captain ? lookFor(captain.id, captain.rare) : null}
             captainName={captain?.name}
             condition={boat.condition}
-            hands={boat.hands ?? 0}
+            hands={handCount(game, boat.id)}
             onOpenCaptain={captain ? () => onOpenCaptain(captain.id) : undefined}
           />
         ) : (
@@ -64,9 +65,9 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
           weather={preview ?? (mode === 'docked' ? 'calm' : weather)}
           mode={preview && mode === 'docked' ? 'sailing' : mode}
           cls={cls}
-          captain={captain ? lookFor(captain.id) : null}
+          captain={captain ? lookFor(captain.id, captain.rare) : null}
           condition={boat.condition}
-          hands={boat.hands ?? 0}
+          hands={handCount(game, boat.id)}
         />
         )}
         <View style={[styles.pill, { backgroundColor: 'rgba(29,20,32,0.75)' }]}>

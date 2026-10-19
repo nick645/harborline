@@ -4,11 +4,11 @@
 
 import { hash } from './paint'
 
-export type HatKind = 'cap' | 'souwester' | 'beanie' | 'brim' | 'bun' | 'bare'
+export type HatKind = 'cap' | 'souwester' | 'beanie' | 'brim' | 'bun' | 'bare' | 'tricorn'
 export type HairStyle = 'cropped' | 'swept' | 'long' | 'curls' | 'braid'
 export type FacialHair = 'none' | 'stubble' | 'moustache' | 'beard' | 'mutton'
-export type Coat = 'peacoat' | 'oilskin' | 'knit' | 'stripes' | 'raincoat'
-export type Prop = 'none' | 'spyglass' | 'mug' | 'logbook' | 'rope' | 'lantern'
+export type Coat = 'peacoat' | 'oilskin' | 'knit' | 'stripes' | 'raincoat' | 'greatcoat'
+export type Prop = 'none' | 'spyglass' | 'mug' | 'logbook' | 'rope' | 'lantern' | 'crate'
 export type Build = 'slim' | 'stocky'
 export type Extra = 'none' | 'pipe' | 'earring' | 'scar'
 
@@ -34,6 +34,8 @@ export interface Look {
   prop: Prop
   trousers: string
   boots: string
+  /** A rare tavern find: a look nobody else has. */
+  rare?: boolean
 }
 
 /** Hat and hair shapes in figure space: a 56 × 100 standing figure, head centred at (28, 40). */
@@ -44,6 +46,7 @@ export const HAT_PATHS: Record<HatKind, string> = {
   brim: 'M6 32 C 14 28, 42 28, 50 32 C 42 35, 14 35, 6 32 Z M18 30 C 18 20, 38 20, 38 30 Z',
   bun: 'M16 34 C 14 22, 22 20, 28 20 C 34 20, 42 22, 40 34 C 36 28, 20 28, 16 34 Z M23 17 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0 Z',
   bare: 'M16 34 C 14 22, 22 22, 28 22 C 34 22, 42 22, 40 34 C 36 29, 20 29, 16 34 Z',
+  tricorn: 'M4 30 C 10 24, 18 30, 28 18 C 38 30, 46 24, 52 30 C 44 36, 12 36, 4 30 Z',
 }
 
 const HATS: HatKind[] = ['cap', 'souwester', 'beanie', 'brim', 'bun', 'bare']
@@ -54,7 +57,25 @@ const SKIN = ['#f0c9a0', '#e0b48a', '#c98a5b', '#b5764c', '#8a5a3a', '#6b4430']
 const HAIR = ['#3a2630', '#5a3a2a', '#8a5a3a', '#c9a27a', '#2e1c19', '#a8452e']
 const GREY = '#b9aea6'
 
-export function lookFor(id: string): Look {
+/** A captain's look. Rare tavern finds keep their face but dress like no one else on the coast. */
+export function lookFor(id: string, rare = false): Look {
+  const look = baseLook(id)
+  if (!rare) return look
+  return {
+    ...look,
+    hat: 'tricorn',
+    hatColor: '#1d1218',
+    coat: '#7a1f2a',
+    coatStyle: 'greatcoat',
+    scarf: '#e6a53a',
+    trousers: '#1d1218',
+    boots: '#1d1218',
+    prop: 'spyglass',
+    rare: true,
+  }
+}
+
+function baseLook(id: string): Look {
   const h = hash(id)
   // A second hash for the newer features, so existing captains keep their hat, coat and skin.
   const h2 = hash(`${id}~face`)

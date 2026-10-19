@@ -4,7 +4,7 @@ import type { Boat, GameState } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../../../src/game/economy'
 import { adriftDeadline, getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
 import { abilityOf } from '../../../src/game/abilities'
-import { availableCaptains, captainViewById, knownCrewEffect, managersFor } from '../../../src/game/crew'
+import { availableCaptains, captainViewById, handViewsOn, knownCrewEffect, managersFor } from '../../../src/game/crew'
 import { LOW_CONDITION_THRESHOLD, SALVAGE_CONDITION } from '../../../src/game/data/economy'
 import { WEATHER } from '../../../src/game/data/weather'
 import { coins, duration, percent } from '../../../src/format'
@@ -28,7 +28,8 @@ type Props = {
   onCaptain: (captainId: string) => void
   /** Hand her to a manager, or (null) take her back. */
   onManage: (managerId: string | null) => void
-  onSignOn: () => void
+  /** Go to the tavern to hire hands. */
+  onFindHands: () => void
   /** Open the live view of this boat; absent when already on it. */
   onOpen?: () => void
   onOpenCaptain: (captainId: string) => void
@@ -106,7 +107,7 @@ export function BoatCard(props: Props) {
   )
 }
 
-function CrewLine({ game, boat, now, onCaptain, onManage, onSignOn, onOpenCaptain }: Props) {
+function CrewLine({ game, boat, now, onCaptain, onManage, onFindHands, onOpenCaptain }: Props) {
   const t = useTheme()
   const captain = captainViewById(game, boat.captainId)
   const effect = knownCrewEffect(game, boat.id, now)
@@ -135,7 +136,7 @@ function CrewLine({ game, boat, now, onCaptain, onManage, onSignOn, onOpenCaptai
           No captain aboard: she can’t sail.{spare.length === 0 ? ' Hire one in Captains.' : ''}
         </Text>
       )}
-      <Hands game={game} boat={boat} onSignOn={onSignOn} />
+      <Hands game={game} boat={boat} onFindHands={onFindHands} />
       {manager && (
         <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
           <Muted style={{ flex: 1 }}>
@@ -163,23 +164,23 @@ function CrewLine({ game, boat, now, onCaptain, onManage, onSignOn, onOpenCaptai
   )
 }
 
-/** Deckhands: how many she has, and a button to sign on the rest. */
-function Hands({ game, boat, onSignOn }: { game: GameState; boat: Boat; onSignOn: () => void }) {
+/** Deckhands: who's aboard (with what you know of them), and the way to the tavern for the rest. */
+function Hands({ game, boat, onFindHands }: { game: GameState; boat: Boat; onFindHands: () => void }) {
   const t = useTheme()
   const cls = getBoatClass(boat.classId)
   const need = handsNeeded(cls)
   if (need === 0 || boat.state === 'sunk') return null
-  const have = boat.hands ?? 0
-  const missing = need - have
-  const cost = missing * handFee(cls)
+  const aboard = handViewsOn(game, boat.id)
+  const missing = need - aboard.length
   return (
-    <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-      <Muted style={{ flex: 1, color: missing ? t.bad : t.muted }}>
-        Deckhands {have}/{need}
+    <View style={{ gap: 4 }}>
+      <Muted style={{ color: missing ? t.bad : t.muted }}>
+        Deckhands {aboard.length}/{need}
+        {aboard.length ? `: ${aboard.map((h) => `${h.name.split(' ')[0]}${h.known ? ` (${h.known.name.toLowerCase()})` : ''}`).join(', ')}` : ''}
         {missing ? ` · short-handed, trips take ${Math.round(missing * 20)}% longer` : ''}
       </Muted>
-      {missing > 0 && <Button small kind="secondary" label={`Sign on ${missing} · ${coins(cost)}c`} disabled={game.player.coins < cost} onPress={onSignOn} />}
-    </Row>
+      {missing > 0 && <Button small kind="secondary" label={`Find ${missing} at the tavern · ${coins(handFee(cls))}c each`} onPress={onFindHands} />}
+    </View>
   )
 }
 

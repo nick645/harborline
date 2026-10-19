@@ -32,6 +32,7 @@ const HATS: Record<Look['hat'], string> = {
   brim: 'M-6.4 -27.6 C -3 -29, 3 -29, 6.4 -27.6 C 3 -26.6, -3 -26.6, -6.4 -27.6 Z M-3 -28 C -3 -31.4, 3 -31.4, 3 -28 Z',
   bun: 'M-3.6 -26 C -3.8 -29.6, 3.8 -29.6, 3.6 -26 Z M-1.4 -30.6 a1.6 1.6 0 1 0 3.2 0 a1.6 1.6 0 1 0 -3.2 0 Z',
   bare: 'M-3.6 -25.6 C -3.8 -29.4, 3.8 -29.4, 3.6 -25.6 Z',
+  tricorn: 'M-6.6 -27.4 C -4 -30, -2 -28, 0 -32 C 2 -28, 4 -30, 6.6 -27.4 C 3 -25.8, -3 -25.8, -6.6 -27.4 Z',
 }
 
 export function DeckFigure({ look, pose, x, y, size, aft = false, clock, offset = 0, lit, lineTo }: Props) {

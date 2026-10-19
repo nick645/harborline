@@ -44,7 +44,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
 
   return (
     <View style={{ gap: 12 }}>
-      <CaptainScene width={Math.min(width - 24, 720)} light={lightAt(now)} look={lookFor(c.id)} place={atSea ? 'helm' : 'port'} />
+      <CaptainScene width={Math.min(width - 24, 720)} light={lightAt(now)} look={lookFor(c.id, c.rare)} place={atSea ? 'helm' : 'port'} />
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>

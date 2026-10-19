@@ -3,10 +3,14 @@ import { Pressable, Text, useWindowDimensions, View } from 'react-native'
 import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
-import { boatOfCaptain, managerRole, quayInfo, recruitViews, rosterViews } from '../../../src/game/crew'
+import { boatOfCaptain, boatsNeedingHands, managerRole, quayInfo, recruitViews, rosterViews, tavernViews } from '../../../src/game/crew'
+import { getBoatClass, handFee } from '../../../src/game/economy'
+import { DRINK_WATCHES } from '../../../src/game/data/hands'
 import { SCOUT_ACTIONS, type ScoutAction } from '../../../src/game/data/captains'
 import { coins, duration } from '../../../src/format'
 import { QuayScene } from '../art/QuayScene'
+import { TavernScene } from '../art/TavernScene'
+import { WorkScene } from '../art/WorkScene'
 import { Figure } from '../art/Figure'
 import { useSceneClock } from '../art/clock'
 import { lightAt } from '../art/light'
@@ -22,98 +26,183 @@ type Props = {
   onScout: (id: string, action: ScoutAction) => boolean
   onHire: (id: string) => void
   onOpenCaptain: (id: string) => void
+  onBuyDrink: (handId: string) => boolean
+  onHireHand: (handId: string, boatId: string) => void
+  /** Which part of the harbour is showing; kept by the app so a boat card can send you to the tavern. */
+  view: CaptainsView
+  onView: (v: CaptainsView) => void
 }
+
+export type CaptainsView = 'quay' | 'tavern' | 'roster'
 
 const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'True to form' } as const
 
 export function CaptainsScreen(props: Props) {
-  const [tab, setTab] = useState<'quay' | 'roster'>('quay')
+  const { view: tab, onView: setTab } = props
+  const tavern = tavernViews(props.game)
   return (
     <View style={{ gap: 10 }}>
       <Row>
         <Button small kind={tab === 'quay' ? 'primary' : 'secondary'} label={`The quay (${props.game.recruitPool.recruits.length})`} onPress={() => setTab('quay')} />
+        <Button small kind={tab === 'tavern' ? 'primary' : 'secondary'} label={`The tavern${tavern.captain ? ' ✦' : ''}`} onPress={() => setTab('tavern')} />
         <Button small kind={tab === 'roster' ? 'primary' : 'secondary'} label={`Your captains (${props.game.player.roster.length})`} onPress={() => setTab('roster')} />
       </Row>
-      {tab === 'quay' ? <Quay {...props} /> : <Roster {...props} />}
+      {tab === 'quay' ? <Quay {...props} /> : tab === 'tavern' ? <Tavern {...props} /> : <Roster {...props} />}
     </View>
   )
 }
 
-function Quay({ game, now, onScout, onHire }: Props) {
+/** How many watches are left today, and when new faces arrive. */
+function Watches({ game, now }: { game: GameState; now: number }) {
+  const t = useTheme()
+  const info = quayInfo(game, now)
+  return (
+    <Row style={{ justifyContent: 'space-between' }}>
+      <Muted>New faces in {duration(info.refreshesAt - now)}</Muted>
+      <Row style={{ gap: 3 }}>
+        {Array.from({ length: Math.max(info.watchesLeft, 0) }, (_, i) => (
+          <Text key={i} style={{ color: t.accent, fontSize: 14 }}>●</Text>
+        ))}
+        <Muted>
+          {info.watchesLeft} watch{info.watchesLeft === 1 ? '' : 'es'} left
+        </Muted>
+      </Row>
+    </Row>
+  )
+}
+
+function Tavern(props: Props) {
+  const { game, now, onBuyDrink, onHireHand } = props
   const t = useTheme()
   const { width } = useWindowDimensions()
-  const info = quayInfo(game, now)
-  const recruits = recruitViews(game)
+  const { hands, captain } = tavernViews(game)
+  const watchesLeft = quayInfo(game, now).watchesLeft
   const [selectedId, setSelected] = useState<string | null>(null)
-  const [moment, setMoment] = useState<{ id: string; action: ScoutAction } | null>(null)
-  const sel = recruits.find((r) => r.id === selectedId) ?? recruits[0] ?? null
-
-  const scout = (action: ScoutAction) => {
-    if (sel && onScout(sel.id, action)) setMoment({ id: sel.id, action })
-  }
+  const [toast, setToast] = useState<string | null>(null)
+  const selHand = hands.find((h) => h.id === selectedId) ?? (captain && selectedId === captain.id ? null : hands[0] ?? null)
+  const selCaptain = captain && (selectedId === captain.id || (!selHand && !hands.length)) ? captain : null
+  const boats = boatsNeedingHands(game)
 
   return (
     <View style={{ gap: 10 }}>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <Muted>New faces in {duration(info.refreshesAt - now)}</Muted>
-        <Row style={{ gap: 3 }}>
-          {Array.from({ length: Math.max(info.watchesLeft, 0) + 0 }, (_, i) => (
-            <Text key={i} style={{ color: t.accent, fontSize: 14 }}>●</Text>
-          ))}
-          <Muted>
-            {info.watchesLeft} watch{info.watchesLeft === 1 ? '' : 'es'} left
-          </Muted>
-        </Row>
-      </Row>
+      <Watches game={game} now={now} />
+      <TavernScene
+        width={Math.min(width - 24, 720)}
+        light={lightAt(now)}
+        hands={hands}
+        captain={captain}
+        selectedId={selCaptain?.id ?? selHand?.id ?? null}
+        onSelect={(id) => {
+          setSelected(id)
+          setToast(null)
+        }}
+      />
+      {captain && !selCaptain && (
+        <Pressable onPress={() => setSelected(captain.id)} accessibilityRole="button">
+          <Muted style={{ color: t.legendary }}>✦ Someone unusual is sitting by the fire. Tap them.</Muted>
+        </Pressable>
+      )}
+      {selCaptain ? (
+        <RecruitCard {...props} sel={selCaptain} rare />
+      ) : selHand ? (
+        <Card>
+          <Title size={22}>{selHand.name}</Title>
+          {selHand.known ? (
+            <Text style={{ color: t.text, fontFamily: fonts.body, fontSize: 15 }}>
+              <Text style={{ fontFamily: fonts.bold }}>{selHand.known.name}.</Text> {selHand.known.description}
+            </Text>
+          ) : (
+            <Text style={{ fontFamily: fonts.titleItalic, fontSize: 18, color: '#e2d2c8' }}>“{selHand.rumour}”</Text>
+          )}
+          {toast && <Muted>{toast}</Muted>}
+          {!selHand.known && (
+            <Button
+              small
+              kind="secondary"
+              label={`Buy them a drink · ${DRINK_WATCHES} watch`}
+              disabled={watchesLeft < DRINK_WATCHES}
+              onPress={() => {
+                if (onBuyDrink(selHand.id)) setToast(`You stand ${selHand.name.split(' ')[0]} a drink by the fire and hear the real story.`)
+              }}
+            />
+          )}
+          {boats.length === 0 ? (
+            <Muted>None of your boats needs hands right now. Boats of tier 2 and up do.</Muted>
+          ) : (
+            <Row>
+              {boats.map((b) => {
+                const fee = handFee(getBoatClass(b.classId))
+                return <Button key={b.id} small label={`Hire for ${b.nickname} · ${coins(fee)}c`} disabled={game.player.coins < fee} onPress={() => onHireHand(selHand.id, b.id)} />
+              })}
+            </Row>
+          )}
+        </Card>
+      ) : (
+        <Muted>The tavern is quiet. New faces come in every six hours.</Muted>
+      )}
+    </View>
+  )
+}
 
+function Quay(props: Props) {
+  const { game, now } = props
+  const { width } = useWindowDimensions()
+  const recruits = recruitViews(game)
+  const [selectedId, setSelected] = useState<string | null>(null)
+  const sel = recruits.find((r) => r.id === selectedId) ?? recruits[0] ?? null
+  return (
+    <View style={{ gap: 10 }}>
+      <Watches game={game} now={now} />
       {recruits.length > 0 ? (
-        <QuayScene
-          width={Math.min(width - 24, 720)}
-          light={lightAt(now)}
-          recruits={recruits}
-          selectedId={sel?.id ?? null}
-          onSelect={(id) => {
-            setSelected(id)
-            setMoment(null)
-          }}
-        />
+        <QuayScene width={Math.min(width - 24, 720)} light={lightAt(now)} recruits={recruits} selectedId={sel?.id ?? null} onSelect={setSelected} />
       ) : (
         <Muted>Nobody else is looking for work today.</Muted>
       )}
-
-      {sel && (
-        <Card>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <Title size={24}>{sel.name}</Title>
-            <Anchors n={sel.reputation} />
-          </Row>
-          <Muted>
-            From {sel.homePort} · takes tier {sel.sailsTiers[0]}–{sel.sailsTiers[1]} boats · asks {coins(sel.fee)}c
-          </Muted>
-          {sel.traits.map((tr) => (
-            <Text key={tr.id} style={{ fontFamily: fonts.titleItalic, fontSize: 18, color: tr.status === 'disproven' ? t.muted : '#e2d2c8', textDecorationLine: tr.status === 'disproven' ? 'line-through' : 'none' }}>
-              “{tr.rumour}”
-            </Text>
-          ))}
-          {!(sel.skillBand[0] <= 1 && sel.skillBand[1] >= 100) && <SkillRange band={sel.skillBand} />}
-          {sel.verdict && <Tag label={VERDICT[sel.verdict]} color={sel.verdict === 'sleeper' ? t.good : sel.verdict === 'all-talk' ? t.bad : t.muted} dark />}
-          {moment?.id === sel.id && <Moment c={sel} action={moment.action} />}
-          <Row>
-            {(Object.keys(SCOUT_ACTIONS) as ScoutAction[]).map((a) => (
-              <Button
-                key={a}
-                small
-                kind="secondary"
-                label={`${SCOUT_ACTIONS[a].name} · ${SCOUT_ACTIONS[a].watches}`}
-                disabled={(a === 'run' && sel.verdict !== null) || info.watchesLeft < SCOUT_ACTIONS[a].watches}
-                onPress={() => scout(a)}
-              />
-            ))}
-          </Row>
-          <Button label={`Hire for ${coins(sel.fee)}c`} disabled={game.player.coins < sel.fee} onPress={() => onHire(sel.id)} />
-        </Card>
-      )}
+      {sel && <RecruitCard key={sel.id} {...props} sel={sel} />}
     </View>
+  )
+}
+
+/** A captain looking for work: what's known, scouting, and hiring. */
+function RecruitCard({ game, now, onScout, onHire, sel, rare = false }: Props & { sel: CaptainView; rare?: boolean }) {
+  const t = useTheme()
+  const info = quayInfo(game, now)
+  const [moment, setMoment] = useState<ScoutAction | null>(null)
+  const scout = (action: ScoutAction) => {
+    if (onScout(sel.id, action)) setMoment(action)
+  }
+  return (
+    <Card accent={rare ? t.legendary : undefined}>
+      {rare && <Tag label="A RARE FIND" color={t.legendary} dark />}
+      <Row style={{ justifyContent: 'space-between' }}>
+        <Title size={24}>{sel.name}</Title>
+        <Anchors n={sel.reputation} />
+      </Row>
+      <Muted>
+        From {sel.homePort} · takes tier {sel.sailsTiers[0]}–{sel.sailsTiers[1]} boats · asks {coins(sel.fee)}c
+      </Muted>
+      {sel.traits.map((tr) => (
+        <Text key={tr.id} style={{ fontFamily: fonts.titleItalic, fontSize: 18, color: tr.status === 'disproven' ? t.muted : '#e2d2c8', textDecorationLine: tr.status === 'disproven' ? 'line-through' : 'none' }}>
+          “{tr.rumour}”
+        </Text>
+      ))}
+      {!(sel.skillBand[0] <= 1 && sel.skillBand[1] >= 100) && <SkillRange band={sel.skillBand} />}
+      {sel.verdict && <Tag label={VERDICT[sel.verdict]} color={sel.verdict === 'sleeper' ? t.good : sel.verdict === 'all-talk' ? t.bad : t.muted} dark />}
+      {moment && <Moment c={sel} action={moment} />}
+      <Row>
+        {(Object.keys(SCOUT_ACTIONS) as ScoutAction[]).map((a) => (
+          <Button
+            key={a}
+            small
+            kind="secondary"
+            label={`${SCOUT_ACTIONS[a].name} · ${SCOUT_ACTIONS[a].watches}`}
+            disabled={(a === 'run' && sel.verdict !== null) || info.watchesLeft < SCOUT_ACTIONS[a].watches}
+            onPress={() => scout(a)}
+          />
+        ))}
+      </Row>
+      <Button label={`Hire for ${coins(sel.fee)}c`} disabled={game.player.coins < sel.fee} onPress={() => onHire(sel.id)} />
+    </Card>
   )
 }
 
@@ -135,12 +224,21 @@ function Moment({ c, action }: { c: CaptainView; action: ScoutAction }) {
   )
 }
 
-function Roster({ game, onOpenCaptain }: Props) {
+function Roster({ game, now, onOpenCaptain }: Props) {
   const t = useTheme()
   const roster = rosterViews(game)
+  const { width } = useWindowDimensions()
   if (roster.length === 0) return <Muted>No captains yet. Find one on the quay.</Muted>
+  const moored = game.player.ownedBoats.find((b) => b.state === 'idle') ?? game.player.ownedBoats[0]
   return (
     <View style={{ gap: 10 }}>
+      <WorkScene
+        width={Math.min(width - 24, 720)}
+        light={lightAt(now)}
+        cls={moored ? getBoatClass(moored.classId) : null}
+        captains={roster}
+        onOpen={onOpenCaptain}
+      />
       {roster.map((c) => {
         const boat = boatOfCaptain(game, c.id)
         const role = managerRole(c.role)
@@ -149,7 +247,7 @@ function Roster({ game, onOpenCaptain }: Props) {
           <Pressable key={c.id} onPress={() => onOpenCaptain(c.id)} accessibilityRole="button" accessibilityLabel={`Open Captain ${c.name}`}>
             <Card>
               <Row style={{ flexWrap: 'nowrap' }}>
-                <Portrait id={c.id} />
+                <Portrait id={c.id} rare={c.rare} />
                 <View style={{ flex: 1, gap: 3 }}>
                   <Row style={{ justifyContent: 'space-between' }}>
                     <Title size={20}>{c.name}</Title>
@@ -172,13 +270,13 @@ function Roster({ game, onOpenCaptain }: Props) {
 }
 
 /** A small head-and-shoulders portrait under lamplight. */
-function Portrait({ id }: { id: string }) {
+function Portrait({ id, rare }: { id: string; rare: boolean }) {
   const clock = useSceneClock()
   return (
     <Canvas style={{ width: 56, height: 64 }}>
       <Group clip={rrect(rect(0, 0, 56, 64), 10, 10)}>
         <Rect x={0} y={0} width={56} height={64} color="#433145" />
-        <Figure look={lookFor(id)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
+        <Figure look={lookFor(id, rare)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
       </Group>
     </Canvas>
   )

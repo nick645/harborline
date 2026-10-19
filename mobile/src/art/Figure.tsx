@@ -63,6 +63,7 @@ const HANDS: Record<Prop, [[number, number], [number, number]]> = {
   logbook: [[20, 88], [36, 88]],
   rope: [[21, 87], [35, 87]],
   lantern: [[22, 90], [37, 84]],
+  crate: [[15, 80], [41, 80]],
 }
 
 const BACK_HAIR: Partial<Record<HairStyle, string>> = {
@@ -209,7 +210,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   }
   const ember = useDerivedValue(() => 0.6 + 0.4 * Math.sin((clock.value + offset) / 260))
 
-  const hatTrim = HAT_TRIM[look.hat]
+  const hatTrim = HAT_TRIM[look.hat] ?? (look.hat === 'tricorn' ? { band: 'M4 30 C 12 35.6, 44 35.6, 52 30 L 52 31.6 C 44 37.2, 12 37.2, 4 31.6 Z' } : undefined)
   const eye = (cx: number) => (
     <Group key={cx}>
       <Oval x={cx - 2.3} y={38.1} width={4.6} height={3.1} color="#f3e7d8" opacity={0.9} />
@@ -267,6 +268,22 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             <Path path="M28 103 V 118" color={shade(base, 0.35)} style="stroke" strokeWidth={0.9} />
           </>
         )}
+        {look.coatStyle === 'greatcoat' && (
+          <>
+            {/* Gold-edged lapels down the front, gold buttons, and a hem of braid */}
+            <Path path="M21.5 61 L 28 82 L 24.4 86 L 16.6 66.5 Z" color={shade(look.coat, 0.3)} />
+            <Path path="M34.5 61 L 28 82 L 31.6 86 L 39.4 66.5 Z" color={tint(look.coat, 0.06)} />
+            <Path path="M21.5 61 L 28 82 L 34.5 61" color="#e6a53a" style="stroke" strokeWidth={1.2} />
+            <Path path="M28 82 V 120" color="#e6a53a" style="stroke" strokeWidth={1} />
+            {[88, 95, 102, 109].map((by) => (
+              <Circle key={by} cx={24.6} cy={by} r={1.3} color="#f2c75a" />
+            ))}
+            {[88, 95, 102, 109].map((by) => (
+              <Circle key={-by} cx={31.4} cy={by} r={1.3} color="#f2c75a" />
+            ))}
+            <Rect x={-2} y={114} width={60} height={2.4} color="#e6a53a" />
+          </>
+        )}
         {look.coatStyle === 'peacoat' && (
           <>
             <Path path="M28 79 V 100" color={shade(look.coat, 0.4)} style="stroke" strokeWidth={0.8} />
@@ -318,6 +335,13 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
       {/* Arms and whatever they're holding */}
       <Path path={sleeveL} color={shade(base, 0.12)} style="stroke" strokeWidth={sleeveW} strokeCap="round" />
       <Path path={sleeveR} color={shade(base, 0.04)} style="stroke" strokeWidth={sleeveW} strokeCap="round" />
+      {look.coatStyle === 'greatcoat' &&
+        [shoulderL, shoulderR].map(([ex, ey], i) => (
+          <Group key={i}>
+            <RoundedRect x={ex - 5} y={ey - 4} width={10} height={4} r={2} color="#e6a53a" />
+            <Path path={`M${ex - 4} ${ey} v 3 M${ex - 1.5} ${ey} v 3.4 M${ex + 1} ${ey} v 3.4 M${ex + 3.5} ${ey} v 3`} color="#f2c75a" style="stroke" strokeWidth={0.8} />
+          </Group>
+        ))}
       <Group transform={propT} origin={propOrigin}>
         <PropArt prop={look.prop} hands={[hl, hr]} clock={clock} offset={offset} />
       </Group>
@@ -396,6 +420,12 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
               {hatTrim.band && <Path path={hatTrim.band} color={shade(look.hatColor, 0.3)} />}
               {hatTrim.shine && <Path path={hatTrim.shine} color="#fff3dc" opacity={0.28} style="stroke" strokeWidth={1.1} strokeCap="round" />}
               {hatTrim.badge && <Circle cx={28} cy={25.2} r={1.7} color="#f2b45a" />}
+              {look.hat === 'tricorn' && (
+                <>
+                  <Path path="M4 30 C 12 35.6, 44 35.6, 52 30" color="#e6a53a" style="stroke" strokeWidth={1.2} />
+                  <Path path="M28 22 l 1.4 3 l 3.2 0.3 l -2.4 2.1 l 0.7 3.1 l -2.9 -1.7 l -2.9 1.7 l 0.7 -3.1 l -2.4 -2.1 l 3.2 -0.3 Z" color="#f2c75a" />
+                </>
+              )}
             </>
           )
         )}
@@ -446,6 +476,14 @@ function PropArt({ prop, hands, clock, offset }: { prop: Prop; hands: [[number, 
             <Circle key={r} cx={28} cy={86} r={r} color="#c9a26a" style="stroke" strokeWidth={2.2} />
           ))}
           <Path path="M33 92 q 4 4 2 8" color="#c9a26a" style="stroke" strokeWidth={2.2} strokeCap="round" />
+        </Group>
+      )
+    case 'crate':
+      return (
+        <Group>
+          <Rect x={14} y={72} width={28} height={20} color="#8a5a3a" />
+          <Path path="M14 72 l 28 20 M14 82 h 28" color="#4a2e1e" style="stroke" strokeWidth={1.1} />
+          <Rect x={14} y={72} width={28} height={20} color="#4a2e1e" style="stroke" strokeWidth={1.2} />
         </Group>
       )
     case 'lantern':

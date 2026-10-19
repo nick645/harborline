@@ -26,12 +26,12 @@ import {
   scrapStandardParts,
   settleAway,
   shopClasses,
-  signOnHands,
 } from '../src/game/state'
 import { getBoatClass, handFee, handsNeeded, repairCostPerPoint } from '../src/game/economy'
 import { getPart, hasParts } from '../src/game/parts'
 import { fleetCap } from '../src/game/upgrades'
-import { assignCaptain, hireCaptain } from '../src/game/crew'
+import { assignCaptain, hireCaptain, hireHand } from '../src/game/crew'
+import { handCount } from '../src/game/hands'
 import { willSail } from '../src/game/captains'
 import { ROUTES } from '../src/game/data/routes'
 import { LOW_CONDITION_THRESHOLD, STARTING_COINS, WEAR_MULTIPLIERS } from '../src/game/data/economy'
@@ -147,11 +147,12 @@ function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPo
   for (const boat of s.player.ownedBoats) {
     if (boat.state === 'sunk' && s.player.coins >= salvageQuote(s, boat.id)) s = salvageBoat(s, boat.id, t)
   }
-  // Sign on deckhands as soon as the coins are there; until then she sails short-handed.
+  // Hire deckhands from the tavern as soon as the coins are there; until then she sails short-handed.
   for (const boat of s.player.ownedBoats) {
     const cls = getBoatClass(boat.classId)
-    const missing = handsNeeded(cls) - (boat.hands ?? 0)
-    if (boat.state !== 'sunk' && missing > 0 && s.player.coins >= missing * handFee(cls)) s = signOnHands(s, boat.id, t)
+    while (boat.state !== 'sunk' && handCount(s, boat.id) < handsNeeded(cls) && s.player.coins >= handFee(cls) && s.tavern?.hands.length) {
+      s = hireHand(s, s.tavern.hands[0].id, boat.id, t)
+    }
   }
   // Every boat needs a captain: reuse one ashore, else hire the cheapest who'll take her.
   for (const boat of s.player.ownedBoats) {

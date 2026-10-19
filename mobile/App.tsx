@@ -5,20 +5,22 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
-import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat, signOnHands } from '../src/game/state'
-import { assignCaptain, buyUpgrade, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
+import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat } from '../src/game/state'
+import { assignCaptain, buyDrink, buyUpgrade, hireHand, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName } from '../src/game/parts'
 import { seasonAt, seasonEndsAt } from '../src/game/weather'
 import { fleetCap } from '../src/game/upgrades'
 import { coins, duration } from '../src/format'
-import { PROMOTION_VOYAGES } from '../src/game/data/captains'
+import { PROMOTION_VOYAGES, QUAY_REPUTATION } from '../src/game/data/captains'
+import { TAVERN_RARE_BOOST } from '../src/game/data/hands'
+import { generateCaptain } from '../src/game/captains'
 import { useGame } from './src/useGame'
 import { alertsWanted, alertText, previewAlert, setAlertsWanted } from './src/notify'
 import { fonts, useTheme } from './src/theme'
 import { lightAt } from './src/art/light'
 import { HarborMap } from './src/components/HarborMap'
 import { BoatCard } from './src/components/BoatCard'
-import { CaptainsScreen } from './src/components/CaptainsScreen'
+import { CaptainsScreen, type CaptainsView } from './src/components/CaptainsScreen'
 import { ShipyardScreen } from './src/components/ShipyardScreen'
 import { BoatGallery } from './src/components/BoatGallery'
 import { PortScreen } from './src/components/PortScreen'
@@ -66,6 +68,7 @@ function Harbor() {
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
   const [gallery, setGallery] = useState(false)
+  const [captainsView, setCaptainsView] = useState<CaptainsView>('quay')
   const detail = stack[stack.length - 1] ?? null
   const open = (d: Detail) => setStack((s) => [...s, d])
   const back = () => setStack((s) => s.slice(0, -1))
@@ -108,7 +111,11 @@ function Harbor() {
       onSalvage={() => act((g, at) => salvageBoat(g, b.id, at))}
       onCaptain={(captainId) => act((g) => assignCaptain(g, captainId, b.id))}
       onManage={(managerId) => act((g) => setManaged(g, b.id, managerId))}
-      onSignOn={() => act((g, at) => signOnHands(g, b.id, at))}
+      onFindHands={() => {
+        setStack([])
+        setTab('captains')
+        setCaptainsView('tavern')
+      }}
     />
   )
 
@@ -197,6 +204,10 @@ function Harbor() {
                 onScout={(id, a) => act((g) => scoutRecruit(g, id, a))}
                 onHire={(id) => act((g, at) => hireCaptain(g, id, at))}
                 onOpenCaptain={(id) => open({ kind: 'captain', id })}
+                onBuyDrink={(id) => act((g) => buyDrink(g, id))}
+                onHireHand={(id, boatId) => act((g, at) => hireHand(g, id, boatId, at))}
+                view={captainsView}
+                onView={setCaptainsView}
               />
             )}
 
@@ -255,6 +266,22 @@ function Harbor() {
                         }
                       />
                       <Button small kind="secondary" label="Preview storm alert" onPress={() => void previewAlert(game, Date.now())} />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Rare captain at the tavern"
+                        onPress={() =>
+                          act((g) => {
+                            // Dev: a guaranteed rare captain, two anchors above the quay.
+                            const s = structuredClone(g)
+                            const rep = Math.min(5, QUAY_REPUTATION[s.player.maxTierReached][1] + TAVERN_RARE_BOOST)
+                            const c = generateCaptain(s.rng, `c${s.nextCaptainSeq++}`, [rep, rep])
+                            c.rare = true
+                            if (s.tavern) s.tavern.captain = c
+                            return s
+                          })
+                        }
+                      />
                       <Button small kind="secondary" label={gallery ? 'Hide boats' : 'Boat gallery'} onPress={() => setGallery(!gallery)} />
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />
                     </Row>
