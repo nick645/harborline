@@ -5,7 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
-import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat } from '../src/game/state'
+import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, sellBoat, settle } from '../src/game/state'
 import { assignCaptain, buyDrink, buyUpgrade, hireHand, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName } from '../src/game/parts'
 import { seasonAt, seasonEndsAt } from '../src/game/weather'
@@ -14,6 +14,7 @@ import { coins, duration } from '../src/format'
 import { PROMOTION_VOYAGES, QUAY_REPUTATION } from '../src/game/data/captains'
 import { TAVERN_RARE_BOOST } from '../src/game/data/hands'
 import { generateCaptain } from '../src/game/captains'
+import { chartingNext } from '../src/game/regions'
 import { useGame } from './src/useGame'
 import { alertsWanted, alertText, previewAlert, setAlertsWanted } from './src/notify'
 import { fonts, useTheme } from './src/theme'
@@ -26,6 +27,7 @@ import { BoatGallery } from './src/components/BoatGallery'
 import { PortScreen } from './src/components/PortScreen'
 import { BoatScreen } from './src/screens/BoatScreen'
 import { CaptainScreen } from './src/screens/CaptainScreen'
+import { VisitScreen } from './src/screens/VisitScreen'
 import { Body, Button, Card, Muted, Row, Title } from './src/components/ui'
 
 type Tab = 'fleet' | 'captains' | 'shipyard' | 'port' | 'log'
@@ -38,7 +40,7 @@ const TABS: { id: Tab; label: string }[] = [
 ]
 
 /** A screen opened on top of the tabs. */
-type Detail = { kind: 'boat'; id: string } | { kind: 'captain'; id: string } | null
+type Detail = { kind: 'boat'; id: string } | { kind: 'captain'; id: string } | { kind: 'port'; id: string } | null
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -192,7 +194,7 @@ function Harbor() {
           <>
             {tab === 'fleet' && (
               <>
-                <HarborMap game={game} now={now} />
+                <HarborMap game={game} now={now} onOpenPort={(id) => open({ kind: 'port', id })} />
                 {boats.map((b) => boatCard(b, () => open({ kind: 'boat', id: b.id })))}
               </>
             )}
@@ -266,6 +268,19 @@ function Harbor() {
                         }
                       />
                       <Button small kind="secondary" label="Preview storm alert" onPress={() => void previewAlert(game, Date.now())} />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Chart the next region"
+                        onPress={() =>
+                          act((g, at) => {
+                            // Dev: fill the next region's chart; the next settle adds its routes and people.
+                            const n = chartingNext(g)
+                            if (!n) return g
+                            return settle({ ...g, charts: { ...(g.charts ?? {}), [n.id]: n.needed } }, at)
+                          })
+                        }
+                      />
                       <Button
                         small
                         kind="secondary"
@@ -349,6 +364,21 @@ function DetailScreen({
   act: (fn: (g: GameState, t: number) => GameState) => boolean
   boatCard: (b: Boat) => React.ReactNode
 }) {
+  if (detail.kind === 'port') {
+    return (
+      <VisitScreen
+        game={game}
+        portId={detail.id}
+        now={now}
+        onSend={(boatId, routeId, trips) => act((g, at) => assignRoute(g, boatId, routeId, at, trips))}
+        onScout={(id, a) => act((g) => scoutRecruit(g, id, a))}
+        onHire={(id) => act((g, at) => hireCaptain(g, id, at))}
+        onBuyDrink={(id) => act((g) => buyDrink(g, id))}
+        onHireHand={(id, boatId) => act((g, at) => hireHand(g, id, boatId, at))}
+        onOpenCaptain={(id) => open({ kind: 'captain', id })}
+      />
+    )
+  }
   if (detail.kind === 'boat') {
     const boat = game.player.ownedBoats.find((b) => b.id === detail.id)
     if (!boat) return <Muted>That boat is no longer in your fleet.</Muted>

@@ -46,13 +46,13 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
     <View style={{ gap: 12 }}>
       <View>
         {mode === 'sunk' && !preview ? (
-          <SunkScene width={sceneWidth} light={lightAt(now)} cls={cls} captain={captain ? lookFor(captain.id, captain.rare) : null} />
+          <SunkScene width={sceneWidth} light={lightAt(now)} cls={cls} captain={captain ? lookFor(captain.id, captain.rare, captain.region) : null} />
         ) : mode === 'docked' && !preview ? (
           <DockScene
             width={sceneWidth}
             light={lightAt(now)}
             cls={cls}
-            captain={captain ? lookFor(captain.id, captain.rare) : null}
+            captain={captain ? lookFor(captain.id, captain.rare, captain.region) : null}
             captainName={captain?.name}
             condition={boat.condition}
             hands={handCount(game, boat.id)}
@@ -66,7 +66,7 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
           weather={preview ?? (mode === 'docked' ? 'calm' : weather)}
           mode={preview && mode === 'docked' ? 'sailing' : mode}
           cls={cls}
-          captain={captain ? lookFor(captain.id, captain.rare) : null}
+          captain={captain ? lookFor(captain.id, captain.rare, captain.region) : null}
           condition={boat.condition}
           hands={handCount(game, boat.id)}
         />

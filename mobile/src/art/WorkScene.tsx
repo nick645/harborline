@@ -33,7 +33,7 @@ const JOBS: [Prop, number, number][] = [
   ['crate', 320, 180],
 ]
 
-type Person = { id: string; name: string; rare: boolean }
+type Person = { id: string; name: string; rare: boolean; region: import('../../../src/game/data/ports').RegionId }
 
 export function WorkScene({ width, light, cls, captains, onOpen }: { width: number; light: Light; cls: BoatClass | null; captains: Person[]; onOpen: (id: string) => void }) {
   const clock = useSceneClock()
@@ -93,7 +93,7 @@ export function WorkScene({ width, light, cls, captains, onOpen }: { width: numb
 
           {shown.map((c, i) => {
             const [prop, from, to] = JOBS[i]
-            const look: Look = { ...lookFor(c.id, c.rare), prop }
+            const look: Look = { ...lookFor(c.id, c.rare, c.region), prop }
             return (
               <Walker
                 key={c.id}

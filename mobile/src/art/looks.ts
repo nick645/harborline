@@ -3,6 +3,8 @@
 // hints at hidden skill or traits.
 
 import { hash } from './paint'
+import type { RegionId } from '../../../src/game/data/ports'
+import { REGION_STYLE } from './regionStyle'
 
 export type HatKind = 'cap' | 'souwester' | 'beanie' | 'brim' | 'bun' | 'bare' | 'tricorn'
 export type HairStyle = 'cropped' | 'swept' | 'long' | 'curls' | 'braid'
@@ -58,8 +60,8 @@ const HAIR = ['#3a2630', '#5a3a2a', '#8a5a3a', '#c9a27a', '#2e1c19', '#a8452e']
 const GREY = '#b9aea6'
 
 /** A captain's look. Rare tavern finds keep their face but dress like no one else on the coast. */
-export function lookFor(id: string, rare = false): Look {
-  const look = baseLook(id)
+export function lookFor(id: string, rare = false, region: RegionId = 'bay'): Look {
+  const look = regional(baseLook(id), id, region)
   if (!rare) return look
   return {
     ...look,
@@ -72,6 +74,24 @@ export function lookFor(id: string, rare = false): Look {
     boots: '#1d1218',
     prop: 'spyglass',
     rare: true,
+  }
+}
+
+/** People from beyond the bay dress the way their region does; their face stays their own. */
+function regional(look: Look, id: string, region: RegionId): Look {
+  const st = REGION_STYLE[region]
+  if (!st.coats) return look
+  const h = hash(`${id}~${region}`)
+  const pick = <T,>(xs: readonly T[], shift: number) => xs[(h >>> shift) % xs.length]
+  const hat = look.hat === 'bun' && st.hats!.includes('bun') ? 'bun' : pick(st.hats!, 0)
+  return {
+    ...look,
+    hat,
+    hatColor: hat === 'bun' || hat === 'bare' ? look.hair : pick(st.coats, 6),
+    coat: pick(st.coats, 3),
+    coatStyle: pick(st.coatStyles!, 9),
+    scarf: pick(st.scarves!, 13),
+    hairStyle: hat === 'bun' ? 'braid' : look.hairStyle === 'braid' && look.hat === 'bun' ? 'long' : look.hairStyle,
   }
 }
 

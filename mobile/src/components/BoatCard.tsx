@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Boat, GameState } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../../../src/game/economy'
+import { getPortDef } from '../../../src/game/regions'
 import { adriftDeadline, getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
 import { abilityOf } from '../../../src/game/abilities'
 import { availableCaptains, captainViewById, handViewsOn, knownCrewEffect, managersFor } from '../../../src/game/crew'
@@ -226,6 +227,11 @@ function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props)
   const cls = getBoatClass(boat.classId)
   const tank = cls.fuelTankTrips
   const [trips, setTrips] = useState(tank)
+  // The bay's routes always show; farther waters fold away (but the last route run stays in view).
+  const [far, setFar] = useState(false)
+  const bay = game.routes.filter((r) => getPortDef(r.portB).region === 'bay' || r.id === boat.currentRoute)
+  const farther = game.routes.filter((r) => !bay.includes(r))
+  const shown = far ? [...bay, ...farther] : bay
   const fix = repairQuote(game, boat.id)
   return (
     <View style={{ gap: 8 }}>
@@ -238,7 +244,7 @@ function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props)
         </Row>
       </Row>
       <View style={styles.routes}>
-        {game.routes.map((r) => {
+        {shown.map((r) => {
           const q = quoteVoyage(game, boat.id, r.id, now)
           return (
             <View key={r.id} style={styles.routeCell}>
@@ -266,6 +272,9 @@ function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props)
           )
         })}
       </View>
+      {farther.length > 0 && (
+        <Button small kind="secondary" label={far ? 'Just the bay' : `Farther ports (${farther.length})`} onPress={() => setFar(!far)} />
+      )}
       <Row>
         <Button small label={fix > 0 ? `Repair ${coins(fix)}c` : 'Repair'} disabled={fix === 0 || game.player.coins < 2} onPress={onRepair} />
         {canBeSold(cls) && (

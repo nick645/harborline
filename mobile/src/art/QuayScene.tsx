@@ -9,6 +9,7 @@ import { useDerivedValue } from 'react-native-reanimated'
 import { getBoatClass } from '../../../src/game/economy'
 import type { Light } from './light'
 import { lookFor } from './looks'
+import type { RegionId } from '../../../src/game/data/ports'
 import { FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
 import { BoatArt } from './BoatArt'
@@ -36,6 +37,7 @@ export function QuayScene({
   selectedId,
   onSelect,
   onEnterTavern,
+  region = 'bay',
 }: {
   width: number
   light: Light
@@ -44,6 +46,8 @@ export function QuayScene({
   onSelect: (id: string) => void
   /** Tap the Gull & Lantern to go inside. */
   onEnterTavern?: () => void
+  /** Where these people are from, which shows in how they dress. */
+  region?: RegionId
 }) {
   const clock = useSceneClock()
   const s = width / W
@@ -225,7 +229,7 @@ export function QuayScene({
                   </>
                 )}
                 <Walker
-                  look={lookFor(r.id)}
+                  look={lookFor(r.id, false, region)}
                   clock={clock}
                   // Pairs drift toward each other to talk; an odd one out paces on their own.
                   x0={i < pairs * 2 ? xs[i] : xs[i] - PACE}

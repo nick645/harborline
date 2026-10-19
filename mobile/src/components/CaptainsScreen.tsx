@@ -3,7 +3,11 @@ import { Pressable, Text, useWindowDimensions, View } from 'react-native'
 import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
-import { boatOfCaptain, boatsNeedingHands, managerRole, quayInfo, recruitViews, rosterViews, tavernViews } from '../../../src/game/crew'
+import { boatOfCaptain, boatsNeedingHands, managerRole, portPeople, quayInfo, rosterViews } from '../../../src/game/crew'
+import { HOME_PORT_ID, type RegionId } from '../../../src/game/data/ports'
+import { getPortDef } from '../../../src/game/regions'
+
+const portRegion = (portId?: string): RegionId => (portId ? getPortDef(portId).region : 'bay')
 import { getBoatClass, handFee } from '../../../src/game/economy'
 import { DRINK_WATCHES } from '../../../src/game/data/hands'
 import { SCOUT_ACTIONS, type ScoutAction } from '../../../src/game/data/captains'
@@ -31,6 +35,8 @@ type Props = {
   /** Which part of the harbour is showing; kept by the app so a boat card can send you to the tavern. */
   view: CaptainsView
   onView: (v: CaptainsView) => void
+  /** Whose quay and tavern: home by default. A port screen shows only its quay and tavern. */
+  portId?: string
 }
 
 export type CaptainsView = 'quay' | 'tavern' | 'roster'
@@ -39,13 +45,14 @@ const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'T
 
 export function CaptainsScreen(props: Props) {
   const { view: tab, onView: setTab } = props
-  const tavern = tavernViews(props.game)
+  const people = portPeople(props.game, props.portId ?? HOME_PORT_ID)
+  const atPort = props.portId !== undefined && props.portId !== HOME_PORT_ID
   return (
     <View style={{ gap: 10 }}>
       <Row>
-        <Button small kind={tab === 'quay' ? 'primary' : 'secondary'} label={`The quay (${props.game.recruitPool.recruits.length})`} onPress={() => setTab('quay')} />
-        <Button small kind={tab === 'tavern' ? 'primary' : 'secondary'} label={`The tavern${tavern.captain ? ' ✦' : ''}`} onPress={() => setTab('tavern')} />
-        <Button small kind={tab === 'roster' ? 'primary' : 'secondary'} label={`Your captains (${props.game.player.roster.length})`} onPress={() => setTab('roster')} />
+        <Button small kind={tab === 'quay' ? 'primary' : 'secondary'} label={`The quay (${people.recruits.length})`} onPress={() => setTab('quay')} />
+        <Button small kind={tab === 'tavern' ? 'primary' : 'secondary'} label={`The tavern${people.captain ? ' ✦' : ''}`} onPress={() => setTab('tavern')} />
+        {!atPort && <Button small kind={tab === 'roster' ? 'primary' : 'secondary'} label={`Your captains (${props.game.player.roster.length})`} onPress={() => setTab('roster')} />}
       </Row>
       {tab === 'quay' ? <Quay {...props} /> : tab === 'tavern' ? <Tavern {...props} /> : <Roster {...props} />}
     </View>
@@ -75,7 +82,8 @@ function Tavern(props: Props) {
   const { game, now, onBuyDrink, onHireHand } = props
   const t = useTheme()
   const { width } = useWindowDimensions()
-  const { hands, captain } = tavernViews(game)
+  const { hands, captain } = portPeople(game, props.portId ?? HOME_PORT_ID)
+  const region = portRegion(props.portId)
   const watchesLeft = quayInfo(game, now).watchesLeft
   const [selectedId, setSelected] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -90,6 +98,7 @@ function Tavern(props: Props) {
         width={Math.min(width - 24, 720)}
         light={lightAt(now)}
         hands={hands}
+        region={region}
         captain={captain}
         selectedId={selCaptain?.id ?? selHand?.id ?? null}
         onSelect={(id) => {
@@ -148,7 +157,9 @@ function Quay(props: Props) {
   const { game, now } = props
   const t = useTheme()
   const { width } = useWindowDimensions()
-  const recruits = recruitViews(game)
+  const people = portPeople(game, props.portId ?? HOME_PORT_ID)
+  const recruits = people.recruits
+  const region = portRegion(props.portId)
   const [selectedId, setSelected] = useState<string | null>(null)
   const sel = recruits.find((r) => r.id === selectedId) ?? recruits[0] ?? null
   return (
@@ -156,11 +167,11 @@ function Quay(props: Props) {
       <Watches game={game} now={now} />
       <Pressable onPress={() => props.onView('tavern')} accessibilityRole="button">
         <Muted>
-          Tap the Gull & Lantern to go inside: deckhands drink there{tavernViews(game).captain ? <Text style={{ color: t.legendary }}>, and someone unusual is by the fire ✦</Text> : ''}.
+          Tap the tavern to go inside: deckhands drink there{people.captain ? <Text style={{ color: t.legendary }}>, and someone unusual is by the fire ✦</Text> : ''}.
         </Muted>
       </Pressable>
       {recruits.length > 0 ? (
-        <QuayScene width={Math.min(width - 24, 720)} light={lightAt(now)} recruits={recruits} selectedId={sel?.id ?? null} onSelect={setSelected} onEnterTavern={() => props.onView('tavern')} />
+        <QuayScene width={Math.min(width - 24, 720)} light={lightAt(now)} recruits={recruits} region={region} selectedId={sel?.id ?? null} onSelect={setSelected} onEnterTavern={() => props.onView('tavern')} />
       ) : (
         <Muted>Nobody else is looking for work today.</Muted>
       )}
@@ -253,7 +264,7 @@ function Roster({ game, now, onOpenCaptain }: Props) {
           <Pressable key={c.id} onPress={() => onOpenCaptain(c.id)} accessibilityRole="button" accessibilityLabel={`Open Captain ${c.name}`}>
             <Card>
               <Row style={{ flexWrap: 'nowrap' }}>
-                <Portrait id={c.id} rare={c.rare} />
+                <Portrait id={c.id} rare={c.rare} region={c.region} />
                 <View style={{ flex: 1, gap: 3 }}>
                   <Row style={{ justifyContent: 'space-between' }}>
                     <Title size={20}>{c.name}</Title>
@@ -276,13 +287,13 @@ function Roster({ game, now, onOpenCaptain }: Props) {
 }
 
 /** A small head-and-shoulders portrait under lamplight. */
-function Portrait({ id, rare }: { id: string; rare: boolean }) {
+function Portrait({ id, rare, region }: { id: string; rare: boolean; region: RegionId }) {
   const clock = useSceneClock()
   return (
     <Canvas style={{ width: 56, height: 64 }}>
       <Group clip={rrect(rect(0, 0, 56, 64), 10, 10)}>
         <Rect x={0} y={0} width={56} height={64} color="#433145" />
-        <Figure look={lookFor(id, rare)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
+        <Figure look={lookFor(id, rare, region)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
       </Group>
     </Canvas>
   )

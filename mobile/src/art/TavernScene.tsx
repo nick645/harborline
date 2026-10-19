@@ -10,6 +10,7 @@ import { Pressable, View } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Light } from './light'
 import { lookFor, type Look } from './looks'
+import type { RegionId } from '../../../src/game/data/ports'
 import { Figure, FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
 import { useSceneClock } from './clock'
@@ -68,6 +69,7 @@ export function TavernScene({
   captain,
   selectedId,
   onSelect,
+  region = 'bay',
 }: {
   width: number
   light: Light
@@ -75,6 +77,8 @@ export function TavernScene({
   captain: Person | null
   selectedId: string | null
   onSelect: (id: string) => void
+  /** Where the hands are from; regulars and barkeep dress like the bay. */
+  region?: RegionId
 }) {
   const clock = useSceneClock()
   const s = width / W
@@ -103,7 +107,8 @@ export function TavernScene({
     return { x, hand, id: hand?.id ?? `regular-${i}` }
   })
   const extraHands = hands.slice(HAND_SEATS.length)
-  const mug = (id: string): Look => ({ ...lookFor(id), prop: 'mug' })
+  const handIds = new Set(hands.map((h) => h.id))
+  const mug = (id: string): Look => ({ ...lookFor(id, false, handIds.has(id) || id.startsWith('regular') ? region : 'bay'), prop: 'mug' })
   const seatHead = TABLE_Y - 49 - 4
   const walkTop = FRONT_FOOT - FIGURE_FULL_H * WALK_SCALE
   // Where the selected person is, for the soft light over them.
