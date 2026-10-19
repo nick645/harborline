@@ -28,9 +28,9 @@ type Props = {
   portId: string
   now: number
   onSend: (boatId: string, routeId: string, trips: number) => void
-  onScout: (id: string, action: ScoutAction) => boolean
+  onScout: (id: string, action: ScoutAction) => Promise<boolean>
   onHire: (id: string) => void
-  onBuyDrink: (handId: string) => boolean
+  onBuyDrink: (handId: string) => Promise<boolean>
   onHireHand: (handId: string, boatId: string) => void
   onOpenCaptain: (id: string) => void
   onMoveHome: (portId: string) => void

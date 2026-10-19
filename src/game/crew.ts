@@ -194,6 +194,16 @@ function allTavernHands(s: GameState): Deckhand[][] {
   return [s.tavern?.hands ?? [], ...Object.values(s.portPools ?? {}).map((p) => p.hands)]
 }
 
+/** What the player can see of a captain looking for work anywhere, or a hand in any tavern. */
+export function recruitViewById(state: GameState, captainId: string): CaptainView | null {
+  const c = findRecruit(state, captainId)
+  return c ? captainView(c) : null
+}
+export function tavernHandView(state: GameState, handId: string): HandView | null {
+  const h = findTavernHand(state, handId)
+  return h ? handView(h) : null
+}
+
 function findTavernHand(s: GameState, handId: string): Deckhand | undefined {
   return allTavernHands(s).flat().find((h) => h.id === handId)
 }
@@ -248,12 +258,36 @@ export function buyDrink(state: GameState, handId: string): GameState {
   return s
 }
 
+/**
+ * Move a hand from one boat to another, or swap them for one of hers when she's full. Both
+ * boats must be docked at home: nobody changes ships at sea.
+ */
+export function moveHand(state: GameState, handId: string, toBoatId: string, now: number, swapWithId?: string): GameState {
+  const hand = (state.player.deckhands ?? []).find((h) => h.id === handId)
+  if (!hand?.boatId) throw new GameError('They are not aboard one of your boats')
+  if (hand.boatId === toBoatId) return state
+  const from = getBoat(state, hand.boatId)
+  const to = getBoat(state, toBoatId)
+  for (const b of [from, to]) if (b.state !== 'idle') throw new GameError(`${b.nickname} isn't docked: crew change ships only at home`)
+  const other = swapWithId ? (state.player.deckhands ?? []).find((h) => h.id === swapWithId && h.boatId === toBoatId) : undefined
+  if (swapWithId && !other) throw new GameError(`They aren't aboard ${to.nickname}`)
+  if (!other && handCount(state, toBoatId) >= handsNeeded(getBoatClass(to.classId))) throw new GameError(`${to.nickname} has all the hands she needs`)
+  const s = structuredClone(state)
+  for (const h of s.player.deckhands!) {
+    if (h.id === handId) h.boatId = toBoatId
+    else if (other && h.id === other.id) h.boatId = from.id
+  }
+  log(s, now, 'info', other ? `${hand.name} and ${other.name} swapped ships` : `${hand.name} moved from ${from.nickname} to ${to.nickname}`)
+  return s
+}
+
 /** Hire a hand from the tavern onto a boat that needs one. A one-off fee; no wages. */
 export function hireHand(state: GameState, handId: string, boatId: string, now: number): GameState {
   const boat = getBoat(state, boatId)
   const cls = getBoatClass(boat.classId)
   if (!findTavernHand(state, handId)) throw new GameError("They've left the tavern")
   if (boat.state === 'sunk') throw new GameError('Raise her first')
+  if (boat.state !== 'idle') throw new GameError(`Hands sign on at the dock: wait for ${boat.nickname} to come home`)
   if (handCount(state, boatId) >= handsNeeded(cls)) throw new GameError(`${boat.nickname} has all the hands she needs`)
   if (state.player.coins < handFee(cls)) throw new GameError('Not enough coins')
   const s = structuredClone(state)

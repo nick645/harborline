@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Boat, GameState } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../../../src/game/economy'
 import { adriftDeadline, getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
@@ -28,6 +28,8 @@ export type Props = {
   onCaptain: (captainId: string) => void
   /** Hand her to a manager, or (null) take her back. */
   onManage: (managerId: string | null) => void
+  /** Move one of her hands to another docked boat, or swap them for one of that boat's. */
+  onMoveHand: (handId: string, toBoatId: string, swapWithId?: string) => void
   /** Go to the tavern to hire hands. */
   onFindHands: () => void
   /** Open the live view of this boat; absent when already on it. */
@@ -139,12 +141,7 @@ export function HullPanel({ game, boat, canSell, onRepair, onSell }: Props) {
               kind="danger"
               label={`Sell ${coins(sellPrice(cls))}c`}
               disabled={!canSell}
-              onPress={() =>
-                Alert.alert(`Sell ${boat.nickname}?`, `For ${coins(sellPrice(cls))} coins.`, [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Sell', style: 'destructive', onPress: onSell },
-                ])
-              }
+              onPress={onSell}
             />
           )}
         </Row>
@@ -153,7 +150,7 @@ export function HullPanel({ game, boat, canSell, onRepair, onSell }: Props) {
   )
 }
 
-function CrewLine({ game, boat, now, onCaptain, onManage, onFindHands, onOpenCaptain }: Props) {
+function CrewLine({ game, boat, now, onCaptain, onManage, onFindHands, onMoveHand, onOpenCaptain }: Props) {
   const t = useTheme()
   const captain = captainViewById(game, boat.captainId)
   const effect = knownCrewEffect(game, boat.id, now)
@@ -182,7 +179,7 @@ function CrewLine({ game, boat, now, onCaptain, onManage, onFindHands, onOpenCap
           No captain aboard: she can’t sail.{spare.length === 0 ? ' Hire one in Captains.' : ''}
         </Text>
       )}
-      <Hands game={game} boat={boat} onFindHands={onFindHands} />
+      <Hands game={game} boat={boat} onFindHands={onFindHands} onMoveHand={onMoveHand} />
       {manager && (
         <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
           <Muted style={{ flex: 1 }}>
@@ -210,22 +207,68 @@ function CrewLine({ game, boat, now, onCaptain, onManage, onFindHands, onOpenCap
   )
 }
 
-/** Deckhands: who's aboard (with what you know of them), and the way to the tavern for the rest. */
-function Hands({ game, boat, onFindHands }: { game: GameState; boat: Boat; onFindHands: () => void }) {
+/**
+ * Deckhands: who's aboard (with what you know of them), the way to the tavern for the rest, and
+ * moving a hand to another boat. Hands change ships only with both boats docked at home.
+ */
+function Hands({ game, boat, onFindHands, onMoveHand }: Pick<Props, 'game' | 'boat' | 'onFindHands' | 'onMoveHand'>) {
   const t = useTheme()
+  const [sel, setSel] = useState<string | null>(null)
   const cls = getBoatClass(boat.classId)
   const need = handsNeeded(cls)
   if (need === 0 || boat.state === 'sunk') return null
   const aboard = handViewsOn(game, boat.id)
   const missing = need - aboard.length
+  const picked = aboard.find((h) => h.id === sel)
+  const docked = boat.state === 'idle'
+  const others = game.player.ownedBoats.filter((b) => b.id !== boat.id && b.state === 'idle' && handsNeeded(getBoatClass(b.classId)) > 0)
   return (
     <View style={{ gap: 4 }}>
       <Muted style={{ color: missing ? t.bad : t.muted }}>
         Deckhands {aboard.length}/{need}
-        {aboard.length ? `: ${aboard.map((h) => `${h.name.split(' ')[0]}${h.known ? ` (${h.known.name.toLowerCase()})` : ''}`).join(', ')}` : ''}
         {missing ? ` · short-handed, trips take ${Math.round(missing * 20)}% longer` : ''}
       </Muted>
-      {missing > 0 && <Button small kind="secondary" label={`Find ${missing} at the tavern · ${coins(handFee(cls))}c each`} onPress={onFindHands} />}
+      {aboard.length > 0 && (
+        <Strip gap={6}>
+          {aboard.map((h) => (
+            <Pressable
+              key={h.id}
+              onPress={() => setSel(sel === h.id ? null : h.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: sel === h.id }}
+              style={[styles.handChip, { borderColor: sel === h.id ? t.accent : t.border, backgroundColor: sel === h.id ? t.surface2 : 'transparent' }]}
+            >
+              <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 12 }}>
+                {h.name.split(' ')[0]}
+                {h.known ? <Text style={{ color: t.muted, fontFamily: fonts.body }}> · {h.known.name.toLowerCase()}</Text> : null}
+              </Text>
+            </Pressable>
+          ))}
+        </Strip>
+      )}
+      {picked &&
+        (!docked ? (
+          <Muted>Crew change ships only at home: {picked.name.split(' ')[0]} stays aboard until she docks.</Muted>
+        ) : others.length === 0 ? (
+          <Muted>No other boat docked at home takes hands.</Muted>
+        ) : (
+          <Strip gap={6}>
+            {others.flatMap((b) => {
+              const theirs = handViewsOn(game, b.id)
+              if (theirs.length < handsNeeded(getBoatClass(b.classId)))
+                return [<Button key={b.id} small kind="secondary" label={`Move to ${b.nickname}`} onPress={() => onMoveHand(picked.id, b.id)} />]
+              return theirs.map((o) => (
+                <Button key={`${b.id}/${o.id}`} small kind="secondary" label={`Swap with ${o.name.split(' ')[0]} (${b.nickname})`} onPress={() => onMoveHand(picked.id, b.id, o.id)} />
+              ))
+            })}
+          </Strip>
+        ))}
+      {missing > 0 &&
+        (docked ? (
+          <Button small kind="secondary" label={`Find ${missing} at the tavern · ${coins(handFee(cls))}c each`} onPress={onFindHands} />
+        ) : (
+          <Muted>Sign on more hands when she's back at home.</Muted>
+        ))}
     </View>
   )
 }
@@ -343,6 +386,7 @@ function Sunk({ game, boat, now, onSalvage }: Props) {
 
 const styles = StyleSheet.create({
   condTrack: { width: 60, height: 8, borderRadius: 4, overflow: 'hidden' },
+  handChip: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
   chip: { width: 132, borderWidth: 1, borderRadius: 14, padding: 8, gap: 3, alignItems: 'flex-start' },
   routeCard: { padding: 8, gap: 4 },
 })

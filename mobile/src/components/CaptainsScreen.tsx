@@ -33,10 +33,10 @@ type Props = {
   game: GameState
   now: number
   /** Returns true if the scouting went ahead. */
-  onScout: (id: string, action: ScoutAction) => boolean
+  onScout: (id: string, action: ScoutAction) => Promise<boolean>
   onHire: (id: string) => void
   onOpenCaptain: (id: string) => void
-  onBuyDrink: (handId: string) => boolean
+  onBuyDrink: (handId: string) => Promise<boolean>
   onHireHand: (handId: string, boatId: string) => void
   /** Which part of the harbour is showing; kept by the app so a boat card can send you to the tavern. */
   view: CaptainsView
@@ -145,20 +145,33 @@ function Tavern(props: Props) {
               kind="secondary"
               label={`Buy them a drink · ${DRINK_WATCHES} watch`}
               disabled={watchesLeft < DRINK_WATCHES}
-              onPress={() => {
-                if (onBuyDrink(selHand.id)) setToast(`You stand ${selHand.name.split(' ')[0]} a drink by the fire and hear the real story.`)
+              onPress={async () => {
+                if (await onBuyDrink(selHand.id)) setToast(`You stand ${selHand.name.split(' ')[0]} a drink by the fire and hear the real story.`)
               }}
             />
           )}
           {boats.length === 0 ? (
             <Muted>None of your boats needs hands right now. Boats of tier 2 and up do.</Muted>
           ) : (
-            <Strip>
-              {boats.map((b) => {
-                const fee = handFee(getBoatClass(b.classId))
-                return <Button key={b.id} small label={`Hire for ${b.nickname} · ${coins(fee)}c`} disabled={game.player.coins < fee} onPress={() => onHireHand(selHand.id, b.id)} />
-              })}
-            </Strip>
+            <>
+              <Strip>
+                {boats
+                  .filter((b) => b.state === 'idle')
+                  .map((b) => {
+                    const fee = handFee(getBoatClass(b.classId))
+                    return <Button key={b.id} small label={`Hire for ${b.nickname} · ${coins(fee)}c`} disabled={game.player.coins < fee} onPress={() => onHireHand(selHand.id, b.id)} />
+                  })}
+              </Strip>
+              {boats.some((b) => b.state !== 'idle') && (
+                <Muted>
+                  {boats
+                    .filter((b) => b.state !== 'idle')
+                    .map((b) => b.nickname)
+                    .join(', ')}{' '}
+                  can take hands once docked at home.
+                </Muted>
+              )}
+            </>
           )}
         </Card>
       ) : (
@@ -203,8 +216,8 @@ function RecruitCard({ game, now, onScout, onHire, sel, portId, rare = false }: 
   const t = useTheme()
   const info = quayInfo(game, now)
   const [moment, setMoment] = useState<ScoutAction | null>(null)
-  const scout = (action: ScoutAction) => {
-    if (onScout(sel.id, action)) setMoment(action)
+  const scout = async (action: ScoutAction) => {
+    if (await onScout(sel.id, action)) setMoment(action)
   }
   const short: Record<ScoutAction, string> = { ask: 'Ask around', logbook: 'Logbook', run: 'Take out' }
   return (

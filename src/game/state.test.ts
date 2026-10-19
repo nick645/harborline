@@ -29,7 +29,7 @@ import { naturalWeather, seasonAt, stormAlerts } from './weather'
 import { upcomingAlerts } from './alerts'
 import { chartingNext, homeOf, regionOpen } from './regions'
 import { decorUnlocked, placeDecor, styleHome } from './home'
-import { buyDrink, handView, hireHand } from './crew'
+import { assignCaptain, buyDrink, handView, hireHand, moveHand } from './crew'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
 import { PARTS } from './data/parts'
@@ -540,6 +540,36 @@ describe('deckhands', () => {
     expect(quoteVoyage(s, id, route, T0, 'true').durationMs).toBeLessThan(quoteVoyage(s, id, route, T0).durationMs)
     s.player.deckhands![0].known = true
     expect(quoteVoyage(s, id, route, T0, 'true').durationMs).toBe(quoteVoyage(s, id, route, T0).durationMs)
+  })
+
+  it('crew change ships only with both boats docked at home', () => {
+    let s = newGame(9, T0)
+    const a = give(s, 'coastal-trawler')
+    const b = give(s, 'coastal-trawler')
+    s.player.coins = 100_000
+    s = hireHand(s, s.tavern!.hands[0].id, a, T0)
+    s = hireHand(s, s.tavern!.hands[0].id, a, T0)
+    s = hireHand(s, s.tavern!.hands[0].id, b, T0)
+    const [h1, h2] = s.player.deckhands!.filter((h) => h.boatId === a)
+    const h3 = s.player.deckhands!.find((h) => h.boatId === b)!
+
+    // Room aboard: a plain move. Full: only a swap.
+    const moved = moveHand(s, h1.id, b, T0)
+    expect(moved.player.deckhands!.find((h) => h.id === h1.id)!.boatId).toBe(b)
+    expect(() => moveHand(moved, h2.id, b, T0)).toThrow(/all the hands/)
+    const swapped = moveHand(moved, h2.id, b, T0, h3.id)
+    expect(swapped.player.deckhands!.find((h) => h.id === h2.id)!.boatId).toBe(b)
+    expect(swapped.player.deckhands!.find((h) => h.id === h3.id)!.boatId).toBe(a)
+
+    // One boat out at sea: nobody moves, and no one signs on mid-voyage either.
+    const out = structuredClone(s)
+    out.player.ownedBoats.find((x) => x.id === b)!.state = 'sailing'
+    expect(() => moveHand(out, h1.id, b, T0)).toThrow(/docked/)
+    expect(() => hireHand(out, out.tavern!.hands[0].id, b, T0)).toThrow(/dock/)
+    const sailingCaptain = out.player.roster[0].id
+    out.player.ownedBoats.find((x) => x.id === b)!.captainId = null
+    out.player.ownedBoats.find((x) => x.captainId === sailingCaptain)!.state = 'sailing'
+    expect(() => assignCaptain(out, sailingCaptain, a)).toThrow(GameError)
   })
 
   it('hands gain voyages on every completed trip, and show their trait in time', () => {

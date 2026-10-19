@@ -1,7 +1,7 @@
 // One captain: where they are right now, what's known of them, and their logbook.
 
 import { useState } from 'react'
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 import type { GameState } from '../../../src/game/types'
 import { boatOfCaptain, boatsManagedBy, captainViewById, managerRole, promotionOptions } from '../../../src/game/crew'
 import { coins } from '../../../src/format'
@@ -143,12 +143,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
             kind="danger"
             label={`Let go · ${coins(c.severance)}c`}
             disabled={game.player.coins < c.severance || atSea}
-            onPress={() =>
-              Alert.alert(`Let ${c.name} go?`, `Severance is ${coins(c.severance)} coins.`, [
-                { text: 'Keep', style: 'cancel' },
-                { text: 'Let go', style: 'destructive', onPress: () => onFire(c.id) },
-              ])
-            }
+            onPress={() => onFire(c.id)}
           />
         )}
       </Row>
