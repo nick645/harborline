@@ -48,10 +48,10 @@ const TORSO = {
 }
 /** Full-length figures wear their coat down to the hip, so there's a body between head and legs. */
 const TORSO_LONG = {
-  slim: 'M13 68 C 13 63, 17 60, 22 60 L 34 60 C 39 60, 43 63, 43 68 L 41 100 L 42 117 C 34 119, 22 119, 14 117 L 15 100 Z',
-  stocky: 'M10 69 C 10 63, 15 60, 21 60 L 35 60 C 41 60, 46 63, 46 69 L 45 100 L 46 117 C 36 119.5, 20 119.5, 10 117 L 11 100 Z',
+  slim: 'M13 68 C 13 63, 17 60, 22 60 L 34 60 C 39 60, 43 63, 43 68 L 41 96 L 42 110 C 34 112, 22 112, 14 110 L 15 96 Z',
+  stocky: 'M10 69 C 10 63, 15 60, 21 60 L 35 60 C 41 60, 46 63, 46 69 L 45 96 L 46 110 C 36 112.5, 20 112.5, 10 110 L 11 96 Z',
 }
-const TORSO_SHADOW_LONG = 'M13 68 C 13 63, 17 60, 22 60 L 24 60 C 20 64, 19 80, 20 118 C 18 118, 16 117.6, 14 117 L 15 100 Z'
+const TORSO_SHADOW_LONG = 'M13 68 C 13 63, 17 60, 22 60 L 24 60 C 20 64, 19 80, 20 111 C 18 111, 16 110.6, 14 110 L 15 96 Z'
 const TORSO_SHADOW = 'M3 100 C 4 76, 11 64, 21 61 L 24 61 C 17 66, 14 80, 15 100 Z'
 const CREAM = '#efe6d6'
 
@@ -226,9 +226,9 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             [28 + hipX, legR, 1],
           ] as const).map(([lx, lt, side]) => (
             <Group key={side} transform={lt}>
-              <RoundedRect x={lx - 4.4} y={110} width={8.8} height={24} r={3} color={shade(look.trousers, side < 0 ? 0.15 : 0)} />
-              <Path path={`M${lx - 5} 132 h 10 q ${side * 5} 0 ${side * 5} 5 v 4 h -15 Z`} color={look.boots} />
-              <Rect x={lx - 5} y={131} width={10} height={3} color={shade(look.boots, 0.2)} />
+              <RoundedRect x={lx - 4.4} y={104} width={8.8} height={34} r={3} color={shade(look.trousers, side < 0 ? 0.15 : 0)} />
+              <Path path={`M${lx - 5} 136 h 10 q ${side * 5} 0 ${side * 5} 5 v 4 h -15 Z`} color={look.boots} />
+              <Rect x={lx - 5} y={135} width={10} height={3} color={shade(look.boots, 0.2)} />
             </Group>
           ))}
         </Group>
@@ -261,9 +261,9 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
         {legs && (
           <>
             {/* Waist: a belt, so the coat reads as a body over the legs */}
-            <Rect x={0} y={99} width={56} height={4} color={shade(base, 0.5)} />
-            <RoundedRect x={25} y={98.5} width={6} height={5} r={1} color="#c9a24a" />
-            <Path path="M28 103 V 118" color={shade(base, 0.35)} style="stroke" strokeWidth={0.9} />
+            <Rect x={0} y={93} width={56} height={4} color={shade(base, 0.5)} />
+            <RoundedRect x={25} y={92.5} width={6} height={5} r={1} color="#c9a24a" />
+            <Path path="M28 97 V 111" color={shade(base, 0.35)} style="stroke" strokeWidth={0.9} />
           </>
         )}
         {look.coatStyle === 'greatcoat' && (
@@ -272,14 +272,14 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             <Path path="M21.5 61 L 28 82 L 24.4 86 L 16.6 66.5 Z" color={shade(look.coat, 0.3)} />
             <Path path="M34.5 61 L 28 82 L 31.6 86 L 39.4 66.5 Z" color={tint(look.coat, 0.06)} />
             <Path path="M21.5 61 L 28 82 L 34.5 61" color="#e6a53a" style="stroke" strokeWidth={1.2} />
-            <Path path="M28 82 V 120" color="#e6a53a" style="stroke" strokeWidth={1} />
+            <Path path="M28 82 V 110" color="#e6a53a" style="stroke" strokeWidth={1} />
             {[88, 95, 102, 109].map((by) => (
               <Circle key={by} cx={24.6} cy={by} r={1.3} color="#f2c75a" />
             ))}
             {[88, 95, 102, 109].map((by) => (
               <Circle key={-by} cx={31.4} cy={by} r={1.3} color="#f2c75a" />
             ))}
-            <Rect x={-2} y={114} width={60} height={2.4} color="#e6a53a" />
+            <Rect x={-2} y={107} width={60} height={2.4} color="#e6a53a" />
           </>
         )}
         {look.coatStyle === 'peacoat' && (
@@ -298,7 +298,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             <Path path="M40 66 C 46 70, 49 80, 50 92" color="#ffffff" opacity={0.16} style="stroke" strokeWidth={2.4} strokeCap="round" />
           </>
         )}
-        {look.coatStyle === 'raincoat' && legs && <RoundedRect x={16} y={104} width={9} height={7} r={1.5} color={shade(look.coat, 0.12)} />}
+        {look.coatStyle === 'raincoat' && legs && <RoundedRect x={16} y={99} width={9} height={7} r={1.5} color={shade(look.coat, 0.12)} />}
         {look.coatStyle === 'knit' && (
           <>
             {fine && [70, 77, 84, 91].map((ry) => <Path key={ry} path={`M${8 + (ry - 70) * 0.18} ${ry} H ${48 - (ry - 70) * 0.18}`} color={shade(look.coat, 0.3)} opacity={0.5} style="stroke" strokeWidth={0.7} />)}

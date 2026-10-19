@@ -56,7 +56,7 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
             </Group>
             <Rect x={0} y={226} width={W} height={H - 226} color="#3a2420" />
             <Path path="M0 244 h 358 M0 262 h 358" color="#2e1c19" style="stroke" strokeWidth={1.4} />
-            <Walker look={look} clock={clock} x0={24} x1={112} footY={270} scale={1.3} rimLight={light.lamp} wind />
+            <Walker look={look} clock={clock} x0={30} x1={110} footY={262} scale={1.1} rimLight={light.lamp} wind />
             <Group transform={[{ translateX: 252 }, { translateY: 236 }]}>
               <Circle cx={0} cy={0} r={44} color="#8a5a3a" style="stroke" strokeWidth={8} />
               <Circle cx={0} cy={0} r={10} color="#8a5a3a" />
@@ -98,7 +98,7 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
             <Rect x={322} y={214} width={8} height={56} color="#4a2a1e" />
             <Rect x={150} y={206} width={190} height={10} color="#8a5a3a" />
             <Rect x={150} y={206} width={190} height={2} color="#c98a5b" opacity={0.7} />
-            <Walker look={look} clock={clock} x0={10} x1={98} footY={274} scale={1.3} rimLight={light.lamp} offset={2600} />
+            <Walker look={look} clock={clock} x0={14} x1={96} footY={262} scale={1.1} rimLight={light.lamp} offset={2600} />
             {/* On the table: a candle and a ship in a bottle */}
             <Group transform={[{ translateX: 236 }, { translateY: 206 }]}>
               <Rect x={-4} y={-18} width={8} height={18} color="#f3e7d8" />
