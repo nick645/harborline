@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Boat, GameState } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../../../src/game/economy'
-import { getPortDef } from '../../../src/game/regions'
 import { adriftDeadline, getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
 import { abilityOf } from '../../../src/game/abilities'
 import { availableCaptains, captainViewById, handViewsOn, knownCrewEffect, managersFor } from '../../../src/game/crew'
@@ -268,7 +267,7 @@ function AtSea({ game, boat, now, onRecall }: Props) {
   )
 }
 
-function Docked({ game, boat, now, canSell, onAssign, onRepair, onSell }: Props) {
+function Docked({ game, boat, now, onAssign }: Props) {
   const t = useTheme()
   const cls = getBoatClass(boat.classId)
   const tank = cls.fuelTankTrips
