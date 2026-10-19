@@ -48,9 +48,10 @@ const TORSO = {
 }
 /** Full-length figures wear their coat down to the hip, so there's a body between head and legs. */
 const TORSO_LONG = {
-  slim: 'M3 100 C 4 76, 11 64, 21 61 L 35 61 C 45 64, 52 76, 53 100 L 51 117 C 40 119, 16 119, 5 117 Z',
-  stocky: 'M-1 100 C 0 73, 8 62, 20 60 L 36 60 C 48 62, 56 73, 57 100 L 55 117 C 42 119, 14 119, 1 117 Z',
+  slim: 'M13 68 C 13 63, 17 60, 22 60 L 34 60 C 39 60, 43 63, 43 68 L 41 100 L 42 117 C 34 119, 22 119, 14 117 L 15 100 Z',
+  stocky: 'M10 69 C 10 63, 15 60, 21 60 L 35 60 C 41 60, 46 63, 46 69 L 45 100 L 46 117 C 36 119.5, 20 119.5, 10 117 L 11 100 Z',
 }
+const TORSO_SHADOW_LONG = 'M13 68 C 13 63, 17 60, 22 60 L 24 60 C 20 64, 19 80, 20 118 C 18 118, 16 117.6, 14 117 L 15 100 Z'
 const TORSO_SHADOW = 'M3 100 C 4 76, 11 64, 21 61 L 24 61 C 17 66, 14 80, 15 100 Z'
 const CREAM = '#efe6d6'
 
@@ -105,9 +106,12 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const torsoClip = useMemo(() => Skia.Path.MakeFromSVGString(torso)!, [torso])
   const base = look.coatStyle === 'stripes' ? CREAM : look.coat
   const wide = look.build === 'stocky' ? 2.5 : 0
-  const [hl, hr] = HANDS[look.prop]
-  const shoulderL: [number, number] = [11 - wide, 70]
-  const shoulderR: [number, number] = [45 + wide, 70]
+  const [hl, hr]: [[number, number], [number, number]] =
+    legs && look.prop === 'none' ? [[15 - wide, 101], [41 + wide, 101]] : HANDS[look.prop]
+  const shoulderL: [number, number] = legs ? [15 - wide, 66] : [11 - wide, 70]
+  const shoulderR: [number, number] = legs ? [41 + wide, 66] : [45 + wide, 70]
+  const sleeveW = legs ? 5.6 : 7.5
+  const handR = legs ? 3.5 : 3
   const still = useSharedValue(0)
   const stride = motion?.stride ?? still
   const act = motion?.act ?? still
@@ -167,7 +171,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const propOrigin = vec((hl[0] + hr[0]) / 2, (hl[1] + hr[1]) / 2)
   const legL = useDerivedValue(() => [{ translateY: -Math.max(0, stride.value) * 5 }])
   const legR = useDerivedValue(() => [{ translateY: -Math.max(0, -stride.value) * 5 }])
-  const hipX = look.build === 'stocky' ? 9 : 8
+  const hipX = look.build === 'stocky' ? 7 : 6
   const blinkEvery = 3600 + (offset % 1300)
 
   const idle = useDerivedValue(() => [
@@ -223,9 +227,9 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             [28 + hipX, legR, 1],
           ] as const).map(([lx, lt, side]) => (
             <Group key={side} transform={lt}>
-              <RoundedRect x={lx - 5.2} y={110} width={10.4} height={24} r={3} color={shade(look.trousers, side < 0 ? 0.15 : 0)} />
-              <Path path={`M${lx - 6} 132 h 12 q ${side * 7} 0 ${side * 7} 6 v 4 h -19 Z`} color={look.boots} />
-              <Rect x={lx - 6} y={131} width={12} height={3} color={shade(look.boots, 0.2)} />
+              <RoundedRect x={lx - 4.4} y={110} width={8.8} height={24} r={3} color={shade(look.trousers, side < 0 ? 0.15 : 0)} />
+              <Path path={`M${lx - 5} 132 h 10 q ${side * 5} 0 ${side * 5} 5 v 4 h -15 Z`} color={look.boots} />
+              <Rect x={lx - 5} y={131} width={10} height={3} color={shade(look.boots, 0.2)} />
             </Group>
           ))}
         </Group>
@@ -235,8 +239,9 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
         <Path path={torso}>
           <LinearGradient start={vec(28, 61)} end={vec(28, 100)} colors={[tint(base, 0.1), shade(base, 0.2)]} />
         </Path>
+        <Group clip={torsoClip}>
         {look.coatStyle === 'stripes' && (
-          <Group clip={torsoClip}>
+          <Group>
             {[66, 72, 78, 84, 90, 96, 102, 108, 114].map((sy) => (
               <Rect key={sy} x={-4} y={sy} width={64} height={2.6} color={look.coat} />
             ))}
@@ -249,15 +254,15 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             {[70, 80, 90].map((by) => (
               <RoundedRect key={by} x={29.5} y={by - 1.2} width={5} height={2.4} r={1.2} color={tint(look.coat, 0.6)} />
             ))}
-            <RoundedRect x={10} y={88} width={11} height={8} r={1.5} color={shade(look.coat, 0.12)} />
+            {!legs && <RoundedRect x={10} y={88} width={11} height={8} r={1.5} color={shade(look.coat, 0.12)} />}
             <Path path="M38 64 C 44 68, 48 78, 49 90" color="#ffffff" opacity={0.2} style="stroke" strokeWidth={2.6} strokeCap="round" />
           </>
         )}
-        <Path path={TORSO_SHADOW} color={shade(look.coat, 0.45)} opacity={0.45} />
+        <Path path={legs ? TORSO_SHADOW_LONG : TORSO_SHADOW} color={shade(look.coat, 0.45)} opacity={0.45} />
         {legs && (
           <>
             {/* Waist: a belt, so the coat reads as a body over the legs */}
-            <Rect x={look.build === 'stocky' ? 0 : 4} y={99} width={look.build === 'stocky' ? 56 : 48} height={4} color={shade(base, 0.5)} />
+            <Rect x={0} y={99} width={56} height={4} color={shade(base, 0.5)} />
             <RoundedRect x={25} y={98.5} width={6} height={5} r={1} color="#c9a24a" />
             <Path path="M28 103 V 118" color={shade(base, 0.35)} style="stroke" strokeWidth={0.9} />
           </>
@@ -278,11 +283,13 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             <Path path="M40 66 C 46 70, 49 80, 50 92" color="#ffffff" opacity={0.16} style="stroke" strokeWidth={2.4} strokeCap="round" />
           </>
         )}
+        {look.coatStyle === 'raincoat' && legs && <RoundedRect x={16} y={104} width={9} height={7} r={1.5} color={shade(look.coat, 0.12)} />}
         {look.coatStyle === 'knit' && (
           <>
             {fine && [70, 77, 84, 91].map((ry) => <Path key={ry} path={`M${8 + (ry - 70) * 0.18} ${ry} H ${48 - (ry - 70) * 0.18}`} color={shade(look.coat, 0.3)} opacity={0.5} style="stroke" strokeWidth={0.7} />)}
           </>
         )}
+        </Group>
       </Group>
 
       {look.hairStyle === 'braid' &&
@@ -309,13 +316,13 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
       )}
 
       {/* Arms and whatever they're holding */}
-      <Path path={sleeveL} color={shade(base, 0.12)} style="stroke" strokeWidth={7.5} strokeCap="round" />
-      <Path path={sleeveR} color={shade(base, 0.04)} style="stroke" strokeWidth={7.5} strokeCap="round" />
+      <Path path={sleeveL} color={shade(base, 0.12)} style="stroke" strokeWidth={sleeveW} strokeCap="round" />
+      <Path path={sleeveR} color={shade(base, 0.04)} style="stroke" strokeWidth={sleeveW} strokeCap="round" />
       <Group transform={propT} origin={propOrigin}>
         <PropArt prop={look.prop} hands={[hl, hr]} clock={clock} offset={offset} />
       </Group>
-      <Circle cx={handLx} cy={handLy} r={3} color={skinShadow} />
-      <Circle cx={handRx} cy={handRy} r={3} color={look.skin} />
+      <Circle cx={handLx} cy={handLy} r={handR} color={skinShadow} />
+      <Circle cx={handRx} cy={handRy} r={handR} color={look.skin} />
 
       {/* Head */}
       <Group transform={tilt} origin={vec(28, 56)}>
