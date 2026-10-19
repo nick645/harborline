@@ -1,31 +1,65 @@
-// Inside the Gull & Lantern: a fire in the hearth, the barkeep polishing glasses behind the
-// bar, and deckhands looking for a berth, talking in pairs. Now and then someone else is
-// here: a captain far above the quay's usual, standing by the fire in a coat nobody else
-// wears. Tap anyone to step closer. Design space is 358 × 280.
+// Inside the Gull & Lantern: a long table down the middle of the room with hands and regulars
+// drinking, laughing and talking across it, more of them wandering about with a mug, the
+// barkeep working the bar at the back, and a fire in the hearth. Now and then someone else is
+// here: a captain far above the quay's usual, by the fire in a coat nobody else wears. Every
+// figure is drawn at the same scale, a little smaller toward the back of the room.
+// Tap anyone you could hire to step closer. Design space is 358 × 290.
 
 import { Canvas, Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
 import { Pressable, View } from 'react-native'
-import { useDerivedValue } from 'react-native-reanimated'
+import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Light } from './light'
-import { lookFor } from './looks'
+import { lookFor, type Look } from './looks'
 import { Figure, FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
 import { useSceneClock } from './clock'
 
 const W = 358
-const H = 280
-const FLOOR = 196
-const FOOT_Y = 268
-const SCALE = 0.6
-const FIG_W = 56 * SCALE
-const FIG_H = FIGURE_FULL_H * SCALE
-const PACE = 7
-/** Where each hand stands (figure's left edge), two pairs facing each other across the room. */
-const HAND_X = [136, 170, 254, 288]
-/** Beside the hearth, warmed by it, not standing in it. */
-const CAPTAIN_X = 90
+const H = 290
+const BACK = 190
+/** Table top, its front edge, and where its legs meet the floor. */
+const TABLE_Y = 222
+const TABLE_X0 = 64
+const TABLE_X1 = 304
+/** Seated figures (behind the table) and walkers (in front of it). */
+const SEAT_SCALE = 0.55
+const WALK_SCALE = 0.6
+const FRONT_FOOT = 284
+const SEAT_W = 56 * SEAT_SCALE
+const SEATS = [78, 118, 158, 198, 238, 272]
+/** Which seats the hands take (the rest are regulars). */
+const HAND_SEATS = [0, 2, 4, 5]
+const CAPTAIN_X = 14
 
 type Person = { id: string; name: string }
+
+/** Someone on the bench behind the table: they drink, laugh and lean in to talk. */
+function Seated({ look, x, clock, offset, rim }: { look: Look; x: number; clock: SharedValue<number>; offset: number; rim?: string }) {
+  const CYCLE = 7000
+  const phase = useDerivedValue(() => ((((clock.value + offset) % CYCLE) + CYCLE) % CYCLE) / CYCLE)
+  // A sip partway through each cycle.
+  const act = useDerivedValue(() => {
+    const p = phase.value
+    return p > 0.55 && p < 0.85 ? Math.sin(((p - 0.55) / 0.3) * Math.PI) : 0
+  })
+  // A laugh near the start: quick bounces and a little sway of the arms.
+  const laughing = useDerivedValue(() => (phase.value < 0.16 ? 1 : 0) as number)
+  const stride = useDerivedValue(() => laughing.value * Math.sin((clock.value + offset) / 70) * 0.6)
+  const bounce = useDerivedValue(() => [{ translateY: -Math.abs(Math.sin((clock.value + offset) / 70)) * 2.4 * laughing.value }])
+  const top = TABLE_Y - 49
+  const hx = x + SEAT_W / 2
+  return (
+    <Group>
+      <Group transform={bounce}>
+        <Figure look={look} x={x} y={top} scale={SEAT_SCALE} clock={clock} offset={offset} rimLight={rim} motion={{ stride, act }} />
+      </Group>
+      {/* Laugh lines either side of the head */}
+      <Group opacity={laughing}>
+        <Path path={`M${hx - 13} ${top + 14} l -5 -3 M${hx - 14} ${top + 20} l -6 0 M${hx + 13} ${top + 14} l 5 -3 M${hx + 14} ${top + 20} l 6 0`} color="#fff3dc" style="stroke" strokeWidth={1.4} strokeCap="round" />
+      </Group>
+    </Group>
+  )
+}
 
 export function TavernScene({
   width,
@@ -52,135 +86,172 @@ export function TavernScene({
     let d = ''
     for (let i = 0; i < 5; i++) {
       const p = ((clock.value / 2600 + i / 5) % 1 + 1) % 1
-      const x = CAPTAIN_X + 4 + ((i * 37) % 30)
-      const y = FOOT_Y - 20 - p * 90
+      const x = CAPTAIN_X + 6 + ((i * 37) % 30)
+      const y = FRONT_FOOT - 20 - p * 90
       const r = 0.9 + (1 - p) * 0.8
       d += `M${x - r} ${y} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z `
     }
     return d
   })
   const sparkleOpacity = useDerivedValue(() => 0.7 + 0.3 * Math.sin(clock.value / 200))
-  const headY = FOOT_Y - FIG_H - 2
-  const shown = hands.slice(0, HAND_X.length)
+
+  // Who sits where: hands in their seats, regulars filling the rest.
+  const seated = SEATS.map((x, i) => {
+    const handIdx = HAND_SEATS.indexOf(i)
+    const hand = handIdx >= 0 && handIdx < hands.length ? hands[handIdx] : null
+    return { x, hand, id: hand?.id ?? `regular-${i}` }
+  })
+  const extraHands = hands.slice(HAND_SEATS.length)
+  const mug = (id: string): Look => ({ ...lookFor(id), prop: 'mug' })
+  const seatHead = TABLE_Y - 49 - 4
+  const walkTop = FRONT_FOOT - FIGURE_FULL_H * WALK_SCALE
 
   return (
     <View style={{ width, height: H * s }}>
       <Canvas style={{ width, height: H * s }}>
         <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
-          {/* Walls, beams and a window on the night (or day) */}
-          <Rect x={0} y={0} width={W} height={FLOOR}>
-            <LinearGradient start={vec(0, 0)} end={vec(0, FLOOR)} colors={['#4a2e22', '#6e4430']} />
+          {/* Back wall, beams and a window */}
+          <Rect x={0} y={0} width={W} height={BACK}>
+            <LinearGradient start={vec(0, 0)} end={vec(0, BACK)} colors={['#4a2e22', '#6e4430']} />
           </Rect>
           {Array.from({ length: 9 }, (_, i) => (
-            <Path key={i} path={`M${i * 42 + 10} 0 V ${FLOOR}`} color="#3a2420" style="stroke" strokeWidth={1} opacity={0.5} />
+            <Path key={i} path={`M${i * 42 + 10} 0 V ${BACK}`} color="#3a2420" style="stroke" strokeWidth={1} opacity={0.5} />
           ))}
-          <Rect x={0} y={14} width={W} height={8} color="#2e1c19" />
-          <Rect x={0} y={150} width={W} height={4} color="#2e1c19" />
-          <Rect x={124} y={40} width={70} height={58} color={light.sky} />
-          <Circle cx={170} cy={58} r={9} color={light.sun} opacity={light.stars ? 1 : 0.8} />
-          <Rect x={124} y={80} width={70} height={18} color={light.sea} />
-          <Path path="M124 40 h 70 v 58 h -70 Z M159 40 v 58 M124 69 h 70" color="#2e1c19" style="stroke" strokeWidth={4} />
+          <Rect x={0} y={12} width={W} height={8} color="#2e1c19" />
+          <Rect x={110} y={34} width={64} height={50} color={light.sky} />
+          <Circle cx={152} cy={50} r={8} color={light.sun} />
+          <Rect x={110} y={70} width={64} height={14} color={light.sea} />
+          <Path path="M110 34 h 64 v 50 h -64 Z M142 34 v 50 M110 59 h 64" color="#2e1c19" style="stroke" strokeWidth={3.5} />
 
-          {/* The hearth */}
-          <Path path="M6 196 V 110 C 6 92, 18 84, 46 84 C 74 84, 86 92, 86 110 V 196 Z" color="#5b5452" />
-          <Path path="M6 110 h 80 M6 132 h 80 M6 154 h 80 M6 176 h 80 M26 88 v 22 M66 88 v 22 M46 110 v 22 M26 132 v 22 M66 132 v 22 M46 154 v 22" color="#3f3a3a" style="stroke" strokeWidth={1.2} />
-          <Path path="M20 196 V 140 C 20 126, 30 120, 46 120 C 62 120, 72 126, 72 140 V 196 Z" color="#1d1218" />
-          <Rect x={2} y={102} width={88} height={8} color="#6e4733" />
-          <Circle cx={46} cy={176} r={60} opacity={fireGlow}>
-            <RadialGradient c={vec(46, 176)} r={60} colors={['#ffb054aa', '#ffb05400']} />
+          {/* The hearth, back left */}
+          <Path path={`M4 ${BACK} V 104 C 4 88, 14 80, 40 80 C 66 80, 76 88, 76 104 V ${BACK} Z`} color="#5b5452" />
+          <Path path="M4 104 h 72 M4 126 h 72 M4 148 h 72 M4 170 h 72 M22 84 v 20 M58 84 v 20 M40 104 v 22 M22 126 v 22 M58 126 v 22 M40 148 v 22" color="#3f3a3a" style="stroke" strokeWidth={1.1} />
+          <Path path={`M16 ${BACK} V 140 C 16 126, 26 120, 40 120 C 54 120, 64 126, 64 140 V ${BACK} Z`} color="#1d1218" />
+          <Rect x={0} y={96} width={80} height={7} color="#6e4733" />
+          <Circle cx={40} cy={172} r={56} opacity={fireGlow}>
+            <RadialGradient c={vec(40, 172)} r={56} colors={['#ffb054aa', '#ffb05400']} />
           </Circle>
-          <Group transform={fire} origin={{ x: 46, y: 192 }}>
-            <Path path="M30 192 C 28 176, 38 172, 36 158 C 44 166, 46 174, 48 164 C 54 172, 60 178, 62 192 Z" color="#e9772f" />
-            <Path path="M36 192 C 36 182, 42 178, 42 170 C 48 178, 52 182, 56 192 Z" color="#ffd27a" />
+          <Group transform={fire} origin={{ x: 40, y: 186 }}>
+            <Path path="M26 186 C 24 172, 33 168, 31 156 C 38 163, 40 170, 42 161 C 47 168, 52 174, 54 186 Z" color="#e9772f" />
+            <Path path="M31 186 C 31 177, 36 174, 36 167 C 41 174, 45 177, 48 186 Z" color="#ffd27a" />
           </Group>
-          <Path path="M28 192 h 36" color="#4a2e22" style="stroke" strokeWidth={4} strokeCap="round" />
 
-          {/* The bar, shelves of bottles, and the barkeep behind it */}
-          {[44, 70].map((sy) => (
+          {/* Shelves of bottles and the barkeep, working the bar at the back */}
+          {[42, 66].map((sy) => (
             <Group key={sy}>
-              <Rect x={226} y={sy} width={124} height={4} color="#2e1c19" />
+              <Rect x={228} y={sy} width={126} height={4} color="#2e1c19" />
               {Array.from({ length: 9 }, (_, i) => (
-                <RoundedRect key={i} x={230 + i * 13} y={sy - 16 + (i % 3)} width={7} height={16 - (i % 3)} r={2} color={['#3f6b5a', '#8a3a3a', '#c9a24a', '#5a7f9a'][(i + sy) % 4]} />
+                <RoundedRect key={i} x={232 + i * 13} y={sy - 15 + (i % 3)} width={7} height={15 - (i % 3)} r={2} color={['#3f6b5a', '#8a3a3a', '#c9a24a', '#5a7f9a'][(i + sy) % 4]} />
               ))}
             </Group>
           ))}
-          <Figure look={lookFor('barkeep')} x={286} y={62} scale={0.95} clock={clock} offset={500} />
-          <Rect x={218} y={150} width={140} height={46} color="#5a3424" />
-          <Rect x={214} y={146} width={144} height={6} color="#8a5a3a" />
-          <Rect x={214} y={146} width={144} height={1.5} color="#c98a5b" opacity={0.7} />
+          <Walker look={mug('barkeep')} clock={clock} x0={244} x1={312} footY={BACK - 18} scale={0.5} speed={10} pauseMs={4200} offset={300} shadow={false} />
+          <Rect x={226} y={148} width={132} height={BACK - 148} color="#5a3424" />
+          <Rect x={222} y={144} width={136} height={5} color="#8a5a3a" />
           {[0, 1, 2].map((i) => (
-            <Rect key={i} x={226 + i * 44} y={160} width={36} height={30} color="#4a2a1e" style="stroke" strokeWidth={1.6} />
+            <Rect key={i} x={234 + i * 40} y={156} width={32} height={28} color="#4a2a1e" style="stroke" strokeWidth={1.4} />
           ))}
-          {[240, 300].map((x) => (
+          {[248, 290, 330].map((x) => (
             <Group key={x}>
-              <RoundedRect x={x} y={134} width={9} height={12} r={2} color="#c98a5b" />
-              <Rect x={x} y={134} width={9} height={3} color="#fff3dc" />
+              <RoundedRect x={x} y={134} width={8} height={10} r={2} color="#c98a5b" />
+              <Rect x={x} y={134} width={8} height={2.5} color="#fff3dc" />
             </Group>
           ))}
 
-          {/* Hanging lamps */}
-          {[110, 210].map((x) => (
+          {/* Lamps */}
+          {[90, 200].map((x) => (
             <Group key={x}>
-              <Path path={`M${x} 22 v 22`} color="#2e1c19" style="stroke" strokeWidth={1.4} />
-              <Rect x={x - 7} y={44} width={14} height={14} color="#2e1c19" />
-              <Rect x={x - 4.5} y={46.5} width={9} height={9} color={light.lamp} opacity={flicker} />
-              <Circle cx={x} cy={51} r={40} opacity={flicker}>
-                <RadialGradient c={vec(x, 51)} r={40} colors={[`${light.lamp}44`, `${light.lamp}00`]} />
+              <Path path={`M${x} 20 v 20`} color="#2e1c19" style="stroke" strokeWidth={1.3} />
+              <Rect x={x - 6} y={40} width={12} height={12} color="#2e1c19" />
+              <Rect x={x - 4} y={42} width={8} height={8} color={light.lamp} opacity={flicker} />
+              <Circle cx={x} cy={46} r={44} opacity={flicker}>
+                <RadialGradient c={vec(x, 46)} r={44} colors={[`${light.lamp}44`, `${light.lamp}00`]} />
               </Circle>
             </Group>
           ))}
 
-          {/* Floorboards and a table */}
-          <Rect x={0} y={FLOOR} width={W} height={H - FLOOR}>
-            <LinearGradient start={vec(0, FLOOR)} end={vec(0, H)} colors={['#6e4430', '#3a2420']} />
+          {/* Floor */}
+          <Rect x={0} y={BACK} width={W} height={H - BACK}>
+            <LinearGradient start={vec(0, BACK)} end={vec(0, H)} colors={['#6e4430', '#3a2420']} />
           </Rect>
-          <Path path="M0 214 h 358 M0 236 h 358 M0 260 h 358 M60 196 v 18 M180 214 v 22 M300 196 v 18 M120 236 v 24 M240 236 v 24" color="#2e1c19" style="stroke" strokeWidth={1.1} />
-          <Group transform={[{ translateX: 228 }, { translateY: 212 }]}>
-            <Oval x={-24} y={30} width={48} height={8} color="#000000" opacity={0.2} />
-            <Rect x={-3} y={4} width={6} height={30} color="#4a2a1e" />
-            <RoundedRect x={-22} y={0} width={44} height={6} r={2} color="#8a5a3a" />
-            <RoundedRect x={-14} y={-10} width={8} height={10} r={2} color="#c98a5b" />
-            <Rect x={4} y={-14} width={4} height={14} color="#f3e7d8" />
-            <Path path="M6 -14 C 4 -17, 6 -20, 6 -21 C 7 -20, 9 -17, 6 -14 Z" color="#ffd27a" opacity={flicker} />
-          </Group>
+          <Path path="M0 206 h 358 M0 230 h 358 M0 258 h 358 M60 190 v 16 M180 206 v 24 M300 190 v 16 M120 230 v 28 M240 230 v 28" color="#2e1c19" style="stroke" strokeWidth={1} />
+
+          {/* The long table, with everyone on the far bench */}
+          <Rect x={TABLE_X0 + 6} y={TABLE_Y - 18} width={TABLE_X1 - TABLE_X0 - 12} height={10} color="#4a2a1e" />
+          {seated.map((p, i) => (
+            <Seated key={p.id} look={mug(p.id)} x={p.x} clock={clock} offset={i * 1170 + (i % 2) * 2900} rim={p.hand && p.hand.id === selectedId ? light.lamp : undefined} />
+          ))}
+          <Oval x={TABLE_X0} y={TABLE_Y + 36} width={TABLE_X1 - TABLE_X0} height={10} color="#000000" opacity={0.25} />
+          {[TABLE_X0 + 14, TABLE_X1 - 22, (TABLE_X0 + TABLE_X1) / 2 - 4].map((x) => (
+            <Rect key={x} x={x} y={TABLE_Y + 10} width={8} height={30} color="#4a2a1e" />
+          ))}
+          <Rect x={TABLE_X0} y={TABLE_Y} width={TABLE_X1 - TABLE_X0} height={12} color="#8a5a3a" />
+          <Rect x={TABLE_X0} y={TABLE_Y} width={TABLE_X1 - TABLE_X0} height={2} color="#c98a5b" opacity={0.8} />
+          <Path path={`M${TABLE_X0 + 60} ${TABLE_Y + 2} v 10 M${TABLE_X0 + 130} ${TABLE_Y + 2} v 10 M${TABLE_X0 + 190} ${TABLE_Y + 2} v 10`} color="#5a3424" style="stroke" strokeWidth={1} />
+          {/* On the table: mugs, a plate, a candle */}
+          {[100, 146, 214, 262].map((x, i) => (
+            <Group key={x}>
+              <RoundedRect x={x} y={TABLE_Y - 9} width={7} height={9} r={1.5} color={i % 2 ? '#c98a5b' : '#b5764c'} />
+              <Rect x={x} y={TABLE_Y - 9} width={7} height={2} color="#fff3dc" />
+            </Group>
+          ))}
+          <Oval x={176} y={TABLE_Y - 3} width={20} height={5} color="#efe3d2" />
+          <Rect x={182} y={TABLE_Y - 6} width={8} height={4} color="#c98a5b" />
+          <Rect x={238} y={TABLE_Y - 13} width={3.5} height={13} color="#f3e7d8" />
+          <Path path={`M239.7 ${TABLE_Y - 13} C 238 ${TABLE_Y - 16}, 240 ${TABLE_Y - 19}, 239.7 ${TABLE_Y - 20} C 241 ${TABLE_Y - 19}, 242 ${TABLE_Y - 16}, 239.7 ${TABLE_Y - 13} Z`} color="#ffd27a" opacity={flicker} />
+          <Circle cx={240} cy={TABLE_Y - 16} r={16} opacity={flicker}>
+            <RadialGradient c={vec(240, TABLE_Y - 16)} r={16} colors={['#ffd27a55', '#ffd27a00']} />
+          </Circle>
+          {/* The near bench */}
+          <Rect x={TABLE_X0 + 10} y={TABLE_Y + 30} width={TABLE_X1 - TABLE_X0 - 20} height={6} color="#6e4733" />
+
+          {/* Talk across the table */}
+          <Chatter clock={clock} a={{ x: SEATS[0] + SEAT_W / 2 + 6, y: seatHead }} b={{ x: SEATS[1] + SEAT_W / 2 - 6, y: seatHead }} />
+          <Chatter clock={clock} a={{ x: SEATS[3] + SEAT_W / 2 + 6, y: seatHead }} b={{ x: SEATS[4] + SEAT_W / 2 - 6, y: seatHead }} offset={1900} />
 
           {/* The rare captain, by the fire, in a glow of their own */}
           {captain && (
             <Group>
-              <Oval x={CAPTAIN_X - 18} y={FOOT_Y - FIG_H - 18} width={FIG_W + 36} height={FIG_H + 30} opacity={aura}>
-                <RadialGradient c={vec(CAPTAIN_X + FIG_W / 2, FOOT_Y - FIG_H / 2)} r={FIG_H * 0.75} colors={['#f2c75a66', '#f2c75a00']} />
+              <Oval x={CAPTAIN_X - 16} y={FRONT_FOOT - 112} width={70} height={120} opacity={aura}>
+                <RadialGradient c={vec(CAPTAIN_X + 18, FRONT_FOOT - 50)} r={64} colors={['#f2c75a66', '#f2c75a00']} />
               </Oval>
-              <Walker look={lookFor(captain.id, true)} clock={clock} x0={CAPTAIN_X} x1={CAPTAIN_X + 10} footY={FOOT_Y} scale={SCALE * 1.1} speed={5} pauseMs={7000} offset={900} rimLight="#f2c75a" />
+              <Walker look={lookFor(captain.id, true)} clock={clock} x0={CAPTAIN_X} x1={CAPTAIN_X + 8} footY={FRONT_FOOT} scale={WALK_SCALE * 1.04} speed={4} pauseMs={7000} offset={900} rimLight="#f2c75a" />
               <Path path={sparkle} color="#f2c75a" opacity={sparkleOpacity} />
             </Group>
           )}
 
-          {/* Hands looking for a berth, talking in pairs */}
-          {shown.map((h, i) => {
-            const chosen = h.id === selectedId
-            const x = HAND_X[i]
-            const towards = i % 2 === 0 ? 1 : -1
-            return (
-              <Group key={h.id} opacity={selectedId && !chosen ? 0.85 : 1}>
-                {chosen && <Oval x={x - 6} y={FOOT_Y - 8} width={FIG_W + 12 + PACE} height={12} color={light.lamp} opacity={0.45} />}
-                <Walker look={lookFor(h.id)} clock={clock} x0={x} x1={x + towards * PACE} footY={FOOT_Y} scale={SCALE} speed={5} pauseMs={5200 + i * 700} offset={i * 1300} rimLight={chosen ? light.lamp : undefined} />
-              </Group>
-            )
-          })}
-          {shown.length >= 2 && <Chatter clock={clock} a={{ x: HAND_X[0] + FIG_W / 2, y: headY }} b={{ x: HAND_X[1] + FIG_W / 2, y: headY }} />}
-          {shown.length >= 4 && <Chatter clock={clock} a={{ x: HAND_X[2] + FIG_W / 2, y: headY }} b={{ x: HAND_X[3] + FIG_W / 2, y: headY }} offset={1700} />}
+          {/* Wandering about with a mug: a regular, and any hands without a seat */}
+          <Walker look={mug('regular-walker')} clock={clock} x0={300} x1={170} footY={FRONT_FOOT} scale={WALK_SCALE} speed={14} pauseMs={3800} offset={2200} />
+          {extraHands.map((h, i) => (
+            <Walker key={h.id} look={mug(h.id)} clock={clock} x0={70 + i * 40} x1={150 + i * 40} footY={FRONT_FOOT} scale={WALK_SCALE} speed={12} pauseMs={4400} offset={i * 1500} rimLight={h.id === selectedId ? light.lamp : undefined} />
+          ))}
         </Group>
       </Canvas>
-      {[...(captain ? [{ p: captain, x: CAPTAIN_X, w: FIG_W * 1.1 + 10 }] : []), ...shown.map((p, i) => ({ p, x: HAND_X[i] - PACE, w: FIG_W + 2 * PACE }))].map(({ p, x, w }) => (
-        <Pressable
-          key={p.id}
-          onPress={() => onSelect(p.id)}
-          accessibilityRole="button"
-          accessibilityLabel={p.name}
-          accessibilityState={{ selected: p.id === selectedId }}
-          style={{ position: 'absolute', left: x * s, top: (FOOT_Y - FIG_H * 1.1) * s, width: w * s, height: FIG_H * 1.1 * s }}
-        />
+
+      {/* Tap targets: hands at the table, any wandering hands, and the rare captain */}
+      {seated
+        .filter((p) => p.hand)
+        .map((p) => (
+          <Pressable
+            key={p.id}
+            onPress={() => onSelect(p.hand!.id)}
+            accessibilityRole="button"
+            accessibilityLabel={p.hand!.name}
+            accessibilityState={{ selected: p.hand!.id === selectedId }}
+            style={{ position: 'absolute', left: (p.x - 4) * s, top: (TABLE_Y - 54) * s, width: (SEAT_W + 8) * s, height: 58 * s }}
+          />
+        ))}
+      {extraHands.map((h, i) => (
+        <Pressable key={h.id} onPress={() => onSelect(h.id)} accessibilityRole="button" accessibilityLabel={h.name} style={{ position: 'absolute', left: (70 + i * 40) * s, top: walkTop * s, width: 110 * s, height: (FRONT_FOOT - walkTop) * s }} />
       ))}
+      {captain && (
+        <Pressable
+          onPress={() => onSelect(captain.id)}
+          accessibilityRole="button"
+          accessibilityLabel={captain.name}
+          style={{ position: 'absolute', left: (CAPTAIN_X - 4) * s, top: walkTop * s, width: 50 * s, height: (FRONT_FOOT - walkTop) * s }}
+        />
+      )}
     </View>
   )
 }
