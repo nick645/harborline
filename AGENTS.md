@@ -101,6 +101,10 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   any charted town or city (harbour office, price by region). Chart sizes, pay discount and home
   prices are Claude's picks. Sim (wide, 40 h): tier 2 at 4.6 h; Fogbanks 1.7 h, Sunward 7 h,
   Ironcliffs 24 h, Lantern Reach > 40 h.
+- Phone tabs (user-approved 2026-10-18): Fleet · Captains (your roster) · Ports (chips for every
+  charted port → town, quay, tavern, harbour office) · Shipyard · Home (customizable harbour:
+  name, colours, bunting, earned decorations in 3 spots, upgrades drawn in the scene, captains
+  ashore; then upgrades, workshop, log). Home customization is cosmetic (`src/game/home.ts`).
 - Lost at sea (user-approved 2026-10-16): a sunk boat's captain is lost if she isn't raised within
   6 h (absolute time, runs while away); the wreck stays salvageable; bonded captains are spared;
   managed boats get no exception. Phone warns 1 h before; the sunk boat shows an underwater scene.

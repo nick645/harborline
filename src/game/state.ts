@@ -49,6 +49,7 @@ import { routeWeather, weatherSlot } from './weather'
 import { handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
 import { chartTrip, getPortDef, homeOf, portOpen, refreshPortPools } from './regions'
 import { getRegion, HOME_PRICE } from './data/ports'
+import { markMilestone } from './home'
 import { countParts, dropChances, getPart, hasParts, partName, pickPart, takeParts } from './parts'
 import {
   captainMods,
@@ -419,6 +420,7 @@ export function salvageBoat(state: GameState, boatId: string, now: number): Game
   b.state = 'idle'
   b.condition = SALVAGE_CONDITION
   delete b.sunkAt
+  markMilestone(s, 'raised-wreck')
   b.dockedAt = now
   return s
 }
@@ -750,6 +752,7 @@ function settleInPlace(s: GameState, now: number) {
       recordCaptains(s, boat, ctx, ev.at)
       if (!v.lost) {
         recordHands(s, boat)
+        if (ctx.weather === 'storm') markMilestone(s, 'storm-trip')
         const opened = chartTrip(s, getRoute(s, v.routeId).portB, ctx.weather)
         if (opened) {
           ensureRoutes(s)

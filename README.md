@@ -101,6 +101,12 @@ scripts/sim.ts       balance harness
 - **Every open port can be visited**: its town (each region looks different), weather and demand, a quick send for docked boats, and its own quay and tavern, as big as the port (village 2 captains/2 hands, town 3/3, city 5/4). People dress like their region. Watches are shared.
 - **Moving home**: buy the harbour office in any charted town or city (25k in the bay up to 2M in Lantern Reach) and your fleet sails from there; upgrades come with you, and moving back to an office you own is free. Every boat must be in port first.
 
+## Your home harbour
+
+- The phone's tabs: **Fleet** (map and boats) · **Captains** (your captains) · **Ports** (every charted port: its town, quay, tavern and harbour office) · **Shipyard** · **Home** (your harbour, upgrades, workshop and log).
+- Home is yours to dress: name it, pick wall, roof and sign colours and the bunting, and place decorations on three spots on the quay. Decorations are earned: flower barrels from the start, an old anchor (own three boats), a storm flag (bring a boat home from a storm), a wreck figurehead (raise a sunk boat), a harbour bell (chart new waters), a lantern arch (own a tier 3 boat), a statue (build a legendary or mythic). All cosmetic.
+- Port upgrades show in the scene (slipway, mooring posts, fuel tanks, salvage crane, scout hut, radar mast), and your captains ashore wander the quay.
+
 ## Deckhands and the tavern
 
 - A boat of tier *t* needs *t − 1* deckhands (none on tier 1, five on a tier-6). They're found at the **Gull & Lantern** (Captains → The tavern): 4 new faces every 6 hours. Hiring one onto a boat is a one-off fee of 5% of the boat's tier price; there are no wages.

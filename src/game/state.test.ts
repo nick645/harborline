@@ -28,6 +28,7 @@ import { missingAbilityIds } from './abilities'
 import { naturalWeather, seasonAt, stormAlerts } from './weather'
 import { upcomingAlerts } from './alerts'
 import { chartingNext, homeOf, regionOpen } from './regions'
+import { decorUnlocked, placeDecor, styleHome } from './home'
 import { buyDrink, handView, hireHand } from './crew'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
@@ -690,5 +691,33 @@ describe('moving home', () => {
     const coins = s.player.coins
     s = moveHome(s, 'saltmarsh', T0 + 10 * 60 * 60 * 1000)
     expect(s.player.coins).toBe(coins)
+  })
+})
+
+describe('customizing home', () => {
+  it('names and colours the harbour; checks the choices', () => {
+    let s = newGame(4, T0)
+    s = styleHome(s, { name: '  Lamplight Wharf ', wall: '#2f5d62', bunting: 2 })
+    expect(s.player.homeStyle).toMatchObject({ name: 'Lamplight Wharf', wall: '#2f5d62', bunting: 2 })
+    expect(() => styleHome(s, { wall: '#ff00ff' })).toThrow(GameError)
+    expect(() => styleHome(s, { name: 'x'.repeat(40) })).toThrow(GameError)
+  })
+
+  it('places earned decorations, one of each, and keeps the rest locked', () => {
+    let s = newGame(4, T0)
+    expect(decorUnlocked(s, 'flowerboxes')).toBe(true)
+    expect(decorUnlocked(s, 'figurehead')).toBe(false)
+    expect(() => placeDecor(s, 0, 'figurehead')).toThrow(GameError)
+    s = placeDecor(s, 0, 'flowerboxes')
+    s = placeDecor(s, 2, 'flowerboxes')
+    expect(s.player.homeStyle!.decor).toEqual([null, null, 'flowerboxes'])
+    // Raising a wreck earns the figurehead.
+    const b = s.player.ownedBoats[0]
+    b.state = 'sunk'
+    b.condition = 0
+    b.sunkAt = T0
+    s.player.coins = 10_000
+    s = salvageBoat(s, b.id, T0 + 1000)
+    expect(decorUnlocked(s, 'figurehead')).toBe(true)
   })
 })

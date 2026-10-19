@@ -40,25 +40,28 @@ type Props = {
   portId?: string
 }
 
-export type CaptainsView = 'quay' | 'tavern' | 'roster'
+export type CaptainsView = 'quay' | 'tavern'
 
 const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'True to form' } as const
 
-export function CaptainsScreen(props: Props) {
+/** A port's quay and tavern: who's looking for work there. */
+export function HiringScreen(props: Props) {
   const { view: tab, onView: setTab } = props
-  const home = homeOf(props.game)
-  const people = portPeople(props.game, props.portId ?? home)
-  const atPort = props.portId !== undefined && props.portId !== home
+  const people = portPeople(props.game, props.portId ?? homeOf(props.game))
   return (
     <View style={{ gap: 10 }}>
       <Row>
         <Button small kind={tab === 'quay' ? 'primary' : 'secondary'} label={`The quay (${people.recruits.length})`} onPress={() => setTab('quay')} />
         <Button small kind={tab === 'tavern' ? 'primary' : 'secondary'} label={`The tavern${people.captain ? ' ✦' : ''}`} onPress={() => setTab('tavern')} />
-        {!atPort && <Button small kind={tab === 'roster' ? 'primary' : 'secondary'} label={`Your captains (${props.game.player.roster.length})`} onPress={() => setTab('roster')} />}
       </Row>
-      {tab === 'quay' ? <Quay {...props} /> : tab === 'tavern' ? <Tavern {...props} /> : <Roster {...props} />}
+      {tab === 'quay' ? <Quay {...props} /> : <Tavern {...props} />}
     </View>
   )
+}
+
+/** Your captains: at work on the home quay, and the roster. */
+export function CaptainsScreen({ game, now, onOpenCaptain }: { game: GameState; now: number; onOpenCaptain: (id: string) => void }) {
+  return <Roster game={game} now={now} onOpenCaptain={onOpenCaptain} />
 }
 
 /** How many watches are left today, and when new faces arrive. */
@@ -243,7 +246,7 @@ function Moment({ c, action, tavern }: { c: CaptainView; action: ScoutAction; ta
   )
 }
 
-function Roster({ game, now, onOpenCaptain }: Props) {
+function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; onOpenCaptain: (id: string) => void }) {
   const t = useTheme()
   const roster = rosterViews(game)
   const { width } = useWindowDimensions()

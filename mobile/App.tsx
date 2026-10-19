@@ -14,7 +14,7 @@ import { coins, duration } from '../src/format'
 import { PROMOTION_VOYAGES, QUAY_REPUTATION } from '../src/game/data/captains'
 import { TAVERN_RARE_BOOST } from '../src/game/data/hands'
 import { generateCaptain } from '../src/game/captains'
-import { chartingNext } from '../src/game/regions'
+import { chartingNext, homeOf } from '../src/game/regions'
 import { useGame } from './src/useGame'
 import { alertsWanted, alertText, previewAlert, setAlertsWanted } from './src/notify'
 import { fonts, useTheme } from './src/theme'
@@ -27,20 +27,22 @@ import { BoatGallery } from './src/components/BoatGallery'
 import { PortScreen } from './src/components/PortScreen'
 import { BoatScreen } from './src/screens/BoatScreen'
 import { CaptainScreen } from './src/screens/CaptainScreen'
-import { VisitScreen } from './src/screens/VisitScreen'
+import { PortsScreen } from './src/screens/PortsScreen'
+import { HomeScreen } from './src/screens/HomeScreen'
+import { placeDecor, styleHome } from '../src/game/home'
 import { Body, Button, Card, Muted, Row, Title } from './src/components/ui'
 
-type Tab = 'fleet' | 'captains' | 'shipyard' | 'port' | 'log'
+type Tab = 'fleet' | 'captains' | 'ports' | 'shipyard' | 'home'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'fleet', label: 'Fleet' },
   { id: 'captains', label: 'Captains' },
+  { id: 'ports', label: 'Ports' },
   { id: 'shipyard', label: 'Shipyard' },
-  { id: 'port', label: 'Port' },
-  { id: 'log', label: 'Log' },
+  { id: 'home', label: 'Home' },
 ]
 
 /** A screen opened on top of the tabs. */
-type Detail = { kind: 'boat'; id: string } | { kind: 'captain'; id: string } | { kind: 'port'; id: string } | null
+type Detail = { kind: 'boat'; id: string } | { kind: 'captain'; id: string } | null
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -70,7 +72,14 @@ function Harbor() {
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
   const [gallery, setGallery] = useState(false)
-  const [captainsView, setCaptainsView] = useState<CaptainsView>('quay')
+  const [portsSel, setPortsSel] = useState<string | null>(null)
+  const [portsView, setPortsView] = useState<CaptainsView>('quay')
+  const goToPort = (id: string, view: CaptainsView = 'quay') => {
+    setStack([])
+    setPortsSel(id)
+    setPortsView(view)
+    setTab('ports')
+  }
   const detail = stack[stack.length - 1] ?? null
   const open = (d: Detail) => setStack((s) => [...s, d])
   const back = () => setStack((s) => s.slice(0, -1))
@@ -113,11 +122,7 @@ function Harbor() {
       onSalvage={() => act((g, at) => salvageBoat(g, b.id, at))}
       onCaptain={(captainId) => act((g) => assignCaptain(g, captainId, b.id))}
       onManage={(managerId) => act((g) => setManaged(g, b.id, managerId))}
-      onFindHands={() => {
-        setStack([])
-        setTab('captains')
-        setCaptainsView('tavern')
-      }}
+      onFindHands={() => goToPort(homeOf(game!), 'tavern')}
     />
   )
 
@@ -194,39 +199,50 @@ function Harbor() {
           <>
             {tab === 'fleet' && (
               <>
-                <HarborMap game={game} now={now} onOpenPort={(id) => open({ kind: 'port', id })} />
+                <HarborMap game={game} now={now} onOpenPort={(id) => goToPort(id)} />
                 {boats.map((b) => boatCard(b, () => open({ kind: 'boat', id: b.id })))}
               </>
             )}
 
-            {tab === 'captains' && (
-              <CaptainsScreen
+            {tab === 'captains' && <CaptainsScreen game={game} now={now} onOpenCaptain={(id) => open({ kind: 'captain', id })} />}
+
+            {tab === 'ports' && (
+              <PortsScreen
                 game={game}
                 now={now}
+                selected={portsSel}
+                onSelect={(id) => {
+                  setPortsSel(id)
+                  setPortsView('quay')
+                }}
+                view={portsView}
+                onView={setPortsView}
+                onSend={(boatId, routeId, trips) => act((g, at) => assignRoute(g, boatId, routeId, at, trips))}
                 onScout={(id, a) => act((g) => scoutRecruit(g, id, a))}
                 onHire={(id) => act((g, at) => hireCaptain(g, id, at))}
-                onOpenCaptain={(id) => open({ kind: 'captain', id })}
                 onBuyDrink={(id) => act((g) => buyDrink(g, id))}
                 onHireHand={(id, boatId) => act((g, at) => hireHand(g, id, boatId, at))}
-                view={captainsView}
-                onView={setCaptainsView}
+                onOpenCaptain={(id) => open({ kind: 'captain', id })}
+                onMoveHome={(id) => act((g, at) => moveHome(g, id, at))}
               />
             )}
 
             {tab === 'shipyard' && <ShipyardScreen game={game} onBuy={(id) => act((g, at) => buyBoat(g, id, at))} />}
 
-            {tab === 'port' && (
-              <PortScreen
+            {tab === 'home' && (
+              <HomeScreen
+                game={game}
+                now={now}
+                onStyle={(patch) => act((g) => styleHome(g, patch))}
+                onPlace={(slot, id) => act((g) => placeDecor(g, slot, id))}
+                works={<PortScreen
                 game={game}
                 onBuild={(id) => act((g, at) => buyUpgrade(g, id, at))}
                 onCraft={(id) => act((g, at) => craftBoat(g, id, at))}
                 onScrap={() => act((g) => scrapStandardParts(g))}
                 onMelt={(rarity, slot, track) => act((g, at) => meltSpares(g, rarity, slot, track, at))}
-              />
-            )}
-
-            {tab === 'log' && (
-              <View style={{ gap: 6 }}>
+              />}
+                log={<View style={{ gap: 6 }}>
                 <StormAlertsToggle />
                 {game.log.length === 0 && <Muted>Nothing to report yet.</Muted>}
                 {game.log.map((e, i) => (
@@ -303,7 +319,8 @@ function Harbor() {
                   </Card>
                 )}
                 {__DEV__ && gallery && <BoatGallery />}
-              </View>
+              </View>}
+              />
             )}
           </>
         )}
@@ -364,22 +381,6 @@ function DetailScreen({
   act: (fn: (g: GameState, t: number) => GameState) => boolean
   boatCard: (b: Boat) => React.ReactNode
 }) {
-  if (detail.kind === 'port') {
-    return (
-      <VisitScreen
-        game={game}
-        portId={detail.id}
-        now={now}
-        onSend={(boatId, routeId, trips) => act((g, at) => assignRoute(g, boatId, routeId, at, trips))}
-        onScout={(id, a) => act((g) => scoutRecruit(g, id, a))}
-        onHire={(id) => act((g, at) => hireCaptain(g, id, at))}
-        onBuyDrink={(id) => act((g) => buyDrink(g, id))}
-        onHireHand={(id, boatId) => act((g, at) => hireHand(g, id, boatId, at))}
-        onOpenCaptain={(id) => open({ kind: 'captain', id })}
-        onMoveHome={(id) => act((g, at) => moveHome(g, id, at))}
-      />
-    )
-  }
   if (detail.kind === 'boat') {
     const boat = game.player.ownedBoats.find((b) => b.id === detail.id)
     if (!boat) return <Muted>That boat is no longer in your fleet.</Muted>

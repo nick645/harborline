@@ -15,7 +15,7 @@ import { coins, duration } from '../../../src/format'
 import { PortScene } from '../art/PortScene'
 import { lightAt } from '../art/light'
 import { useTheme } from '../theme'
-import { CaptainsScreen, type CaptainsView } from '../components/CaptainsScreen'
+import { HiringScreen, type CaptainsView } from '../components/CaptainsScreen'
 import { Body, Button, Card, Heading, Muted, Row, Tag, Title } from '../components/ui'
 
 type Props = {
@@ -29,17 +29,23 @@ type Props = {
   onHireHand: (handId: string, boatId: string) => void
   onOpenCaptain: (id: string) => void
   onMoveHome: (portId: string) => void
+  /** Quay or tavern; kept by the caller so other screens can send you straight to a tavern. */
+  view?: CaptainsView
+  onView?: (v: CaptainsView) => void
 }
 
 const SIZE = { village: 'Village', town: 'Town', city: 'City' } as const
 
-export function VisitScreen({ game, portId, now, onSend, onMoveHome, ...people }: Props) {
+export function VisitScreen(props: Props) {
+  const { game, portId, now, onSend, onMoveHome, view: _v, onView: _ov, ...people } = props
   const t = useTheme()
   const { width } = useWindowDimensions()
   const port = getPortDef(portId)
   const region = getRegion(port.region)
   const route = game.routes.find((r) => r.portB === portId)
-  const [view, setView] = useState<CaptainsView>('quay')
+  const [ownView, setOwnView] = useState<CaptainsView>('quay')
+  const view = props.view ?? ownView
+  const setView = props.onView ?? setOwnView
   const home = portId === homeOf(game)
   const owned = (game.player.homesOwned ?? [HOME_PORT_ID]).includes(portId)
   const price = owned ? 0 : HOME_PRICE[port.region]
@@ -109,7 +115,7 @@ export function VisitScreen({ game, portId, now, onSend, onMoveHome, ...people }
       )}
 
       <Heading>{home ? 'Hiring at home' : `Hiring in ${port.name}`}</Heading>
-      <CaptainsScreen game={game} now={now} portId={portId} view={view === 'roster' ? 'quay' : view} onView={setView} {...people} />
+      <HiringScreen game={game} now={now} portId={portId} view={view} onView={setView} {...people} />
     </View>
   )
 }

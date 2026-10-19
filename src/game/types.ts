@@ -222,6 +222,10 @@ export interface Player {
   portUpgrades: Record<string, number>
   /** Highest boat tier ever owned: unlocks manager roles and grows the fleet cap. */
   maxTierReached: number
+  /** How you've made your home harbour look. Cosmetic. */
+  homeStyle?: { name?: string; wall?: string; roof?: string; sign?: string; bunting?: number; decor?: (string | null)[] }
+  /** Things you've done that unlock decorations. */
+  milestones?: string[]
   /** Where the fleet sails from. Absent in older saves: Saltmarsh Quay. */
   home?: string
   /** Harbour offices bought; moving back to one is free. Saltmarsh is always yours. */
