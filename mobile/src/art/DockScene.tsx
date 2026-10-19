@@ -9,7 +9,7 @@ import { Pressable, View } from 'react-native'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { BoatClass } from '../../../src/game/types'
 import type { Light } from './light'
-import type { Look } from './looks'
+import { lookFor, type Look, type Prop } from './looks'
 import { BoatArt } from './BoatArt'
 import { FIGURE_FULL_H } from './Figure'
 import { Walker } from './Walker'
@@ -25,6 +25,18 @@ const CAPTAIN_SCALE = 1.15
 const CAPTAIN_X0 = 140
 const CAPTAIN_X1 = 250
 const FOOT_Y = SCENE_H - 10
+/** Deckhands work the quay behind the captain, a little smaller. */
+const HAND_SCALE = 0.6
+const HAND_FOOT = 292
+/** Their jobs, in turn: what they carry and where they walk. Crates go from the stack to the boat. */
+const HAND_JOBS: [Prop, number, number, number][] = [
+  // prop, from, to, speed
+  ['crate', 56, 200, 20],
+  ['rope', 24, 44, 6],
+  ['crate', 90, 250, 18],
+  ['logbook', 300, 320, 5],
+  ['lantern', 270, 210, 9],
+]
 
 type Props = {
   width: number
@@ -34,10 +46,12 @@ type Props = {
   captainName?: string
   condition: number
   hands: number
+  /** Ids of the hands aboard, so each one working the quay has their own look. */
+  handIds?: string[]
   onOpenCaptain?: () => void
 }
 
-export function DockScene({ width, light, cls, captain, captainName, condition, hands, onOpenCaptain }: Props) {
+export function DockScene({ width, light, cls, captain, captainName, condition, hands, handIds = [], onOpenCaptain }: Props) {
   const clock = useSceneClock()
   const s = width / SCENE_W
   const lit = (c: string) => mix(c, light.silhouette, light.dim * 0.8)
@@ -123,6 +137,25 @@ export function DockScene({ width, light, cls, captain, captainName, condition, 
               <RadialGradient c={vec(0, -127)} r={night ? 34 : 18} colors={[`${light.lamp}77`, `${light.lamp}00`]} />
             </Circle>
           </Group>
+
+          {/* The hands at work on the quay: the boat's own, with a couple of dock workers lending a hand */}
+          {[...handIds, 'dockworker-a', 'dockworker-b'].slice(0, HAND_JOBS.length).map((id, i) => {
+            const [prop, from, to, speed] = HAND_JOBS[i]
+            return (
+              <Walker
+                key={id}
+                look={{ ...lookFor(id), prop }}
+                clock={clock}
+                x0={from}
+                x1={to}
+                footY={HAND_FOOT - (i % 2) * 6}
+                scale={HAND_SCALE}
+                speed={speed}
+                pauseMs={prop === 'crate' ? 1600 : 4600}
+                offset={i * 1700}
+              />
+            )
+          })}
 
           {/* Your captain, close enough to know */}
           {captain && (

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import type { Boat, GameState, Weather } from '../../../src/game/types'
 import { getBoatClass, getPort } from '../../../src/game/economy'
-import { captainViewById } from '../../../src/game/crew'
+import { captainViewById, handViewsOn } from '../../../src/game/crew'
 import { getVoyage } from '../../../src/game/state'
 import { handCount } from '../../../src/game/hands'
 import { routeWeather } from '../../../src/game/weather'
@@ -56,6 +56,7 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
             captainName={captain?.name}
             condition={boat.condition}
             hands={handCount(game, boat.id)}
+            handIds={handViewsOn(game, boat.id).map((h) => h.id)}
             onOpenCaptain={captain ? () => onOpenCaptain(captain.id) : undefined}
           />
         ) : (
