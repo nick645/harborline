@@ -9,14 +9,19 @@ import { useDerivedValue } from 'react-native-reanimated'
 import { getBoatClass } from '../../../src/game/economy'
 import type { Light } from './light'
 import { lookFor } from './looks'
-import { Figure } from './Figure'
+import { FIGURE_FULL_H } from './Figure'
+import { Walker } from './Walker'
 import { BoatArt } from './BoatArt'
 import { useSceneClock } from './clock'
 import { mix, shade } from './paint'
 
 const W = 358
 const H = 280
-const FIGURE_SCALE = 0.95
+const FIGURE_SCALE = 0.68
+/** Recruits pace a little either side of their spot. */
+const PACE = 12
+const FOOT_Y = 272
+const FIG_TOP = FOOT_Y - FIGURE_FULL_H * FIGURE_SCALE
 const QUAY_Y = 186
 const MOORED = getBoatClass('skiff')
 
@@ -72,8 +77,8 @@ export function QuayScene({
     opacity: useDerivedValue(() => 0.6 * (1 - smoke(1))),
   }
   // Spread the recruits evenly along the quay, keeping the last one inside the frame.
-  const span = W - 36 - 56 * FIGURE_SCALE
-  const xs = recruits.map((_, i) => (recruits.length > 1 ? 18 + (i * span) / (recruits.length - 1) : (W - 56 * FIGURE_SCALE) / 2))
+  const span = W - 36 - 56 * FIGURE_SCALE - 2 * PACE
+  const xs = recruits.map((_, i) => (recruits.length > 1 ? 18 + PACE + (i * span) / (recruits.length - 1) : (W - 56 * FIGURE_SCALE) / 2))
   const wall = lit('#7a5038')
   const night = light.stars > 0
 
@@ -207,10 +212,10 @@ export function QuayScene({
                     <Path path={`M${cx - 14} 120 L ${cx + 14} 120 L ${cx + 44} ${H} L ${cx - 44} ${H} Z`} opacity={0.5}>
                       <LinearGradient start={vec(0, 120)} end={vec(0, H)} colors={[`${light.lamp}00`, `${light.lamp}55`]} />
                     </Path>
-                    <Oval x={xs[i] - 6} y={H - 26} width={66} height={18} color={light.lamp} opacity={0.4} />
+                    <Oval x={xs[i] - PACE - 6} y={FOOT_Y - 10} width={56 * FIGURE_SCALE + 2 * PACE + 12} height={16} color={light.lamp} opacity={0.4} />
                   </>
                 )}
-                <Figure look={lookFor(r.id)} x={xs[i]} y={H - 14 - 100 * FIGURE_SCALE} scale={FIGURE_SCALE} clock={clock} offset={i * 700} rimLight={chosen ? light.lamp : undefined} />
+                <Walker look={lookFor(r.id)} clock={clock} x0={xs[i] - PACE} x1={xs[i] + PACE} footY={FOOT_Y} scale={FIGURE_SCALE} speed={8} pauseMs={4200 + i * 900} offset={i * 1700} rimLight={chosen ? light.lamp : undefined} />
               </Group>
             )
           })}
@@ -223,7 +228,7 @@ export function QuayScene({
           accessibilityRole="button"
           accessibilityLabel={`${r.name}, reputation ${r.reputation} of 5`}
           accessibilityState={{ selected: r.id === selectedId }}
-          style={{ position: 'absolute', left: (xs[i] - 4) * s, top: (H - 14 - 100 * FIGURE_SCALE) * s, width: 64 * s, height: 100 * FIGURE_SCALE * s }}
+          style={{ position: 'absolute', left: (xs[i] - PACE - 4) * s, top: (FIG_TOP - 4) * s, width: (56 * FIGURE_SCALE + 2 * PACE + 8) * s, height: (FOOT_Y - FIG_TOP + 8) * s }}
         />
       ))}
     </View>

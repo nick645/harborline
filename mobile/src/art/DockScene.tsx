@@ -11,7 +11,8 @@ import type { BoatClass } from '../../../src/game/types'
 import type { Light } from './light'
 import type { Look } from './looks'
 import { BoatArt } from './BoatArt'
-import { Figure } from './Figure'
+import { FIGURE_FULL_H } from './Figure'
+import { Walker } from './Walker'
 import { boatWidth } from './boatGeometry'
 import { useSceneClock } from './clock'
 import { mix } from './paint'
@@ -20,8 +21,10 @@ import { SCENE_H, SCENE_W } from './BoatScene'
 const WATER = 170
 const DECK = 232
 const QUAY = 262
-const CAPTAIN_SCALE = 1.85
-const CAPTAIN_X = 208
+const CAPTAIN_SCALE = 1.15
+const CAPTAIN_X0 = 140
+const CAPTAIN_X1 = 250
+const FOOT_Y = SCENE_H - 10
 
 type Props = {
   width: number
@@ -57,8 +60,7 @@ export function DockScene({ width, light, cls, captain, captainName, condition, 
     return `M-7 ${f * 0.3} Q -3.5 ${-f} 0 0 Q 3.5 ${-f} 7 ${f * 0.3}`
   })
 
-  const figH = 100 * CAPTAIN_SCALE
-  const figY = SCENE_H + 8 - figH
+  const figY = FOOT_Y - FIGURE_FULL_H * CAPTAIN_SCALE
 
   return (
     <View style={{ width, height: SCENE_H * s }}>
@@ -125,8 +127,7 @@ export function DockScene({ width, light, cls, captain, captainName, condition, 
           {/* Your captain, close enough to know */}
           {captain && (
             <Group>
-              <Path path={`M${CAPTAIN_X - 10} ${SCENE_H} C ${CAPTAIN_X + 20} ${SCENE_H - 14}, ${CAPTAIN_X + 90} ${SCENE_H - 14}, ${CAPTAIN_X + 120} ${SCENE_H} Z`} color="#000000" opacity={0.18} />
-              <Figure look={captain} x={CAPTAIN_X} y={figY} scale={CAPTAIN_SCALE} clock={clock} rimLight={night ? light.lamp : undefined} />
+              <Walker look={captain} clock={clock} x0={CAPTAIN_X0} x1={CAPTAIN_X1} footY={FOOT_Y} scale={CAPTAIN_SCALE} rimLight={night ? light.lamp : undefined} />
             </Group>
           )}
         </Group>
@@ -136,7 +137,7 @@ export function DockScene({ width, light, cls, captain, captainName, condition, 
           onPress={onOpenCaptain}
           accessibilityRole="button"
           accessibilityLabel={captainName ? `Open Captain ${captainName}` : 'Open captain'}
-          style={{ position: 'absolute', left: CAPTAIN_X * s, top: figY * s, width: 56 * CAPTAIN_SCALE * s, height: (SCENE_H - figY) * s }}
+          style={{ position: 'absolute', left: CAPTAIN_X0 * s, top: figY * s, width: (CAPTAIN_X1 - CAPTAIN_X0 + 56 * CAPTAIN_SCALE) * s, height: (FOOT_Y - figY) * s }}
         />
       )}
     </View>

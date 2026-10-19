@@ -46,6 +46,11 @@ const TORSO = {
   slim: 'M3 100 C 4 76, 11 64, 21 61 L 35 61 C 45 64, 52 76, 53 100 Z',
   stocky: 'M-1 100 C 0 73, 8 62, 20 60 L 36 60 C 48 62, 56 73, 57 100 Z',
 }
+/** Full-length figures wear their coat down to the hip, so there's a body between head and legs. */
+const TORSO_LONG = {
+  slim: 'M3 100 C 4 76, 11 64, 21 61 L 35 61 C 45 64, 52 76, 53 100 L 51 117 C 40 119, 16 119, 5 117 Z',
+  stocky: 'M-1 100 C 0 73, 8 62, 20 60 L 36 60 C 48 62, 56 73, 57 100 L 55 117 C 42 119, 14 119, 1 117 Z',
+}
 const TORSO_SHADOW = 'M3 100 C 4 76, 11 64, 21 61 L 24 61 C 17 66, 14 80, 15 100 Z'
 const CREAM = '#efe6d6'
 
@@ -96,7 +101,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const skinShadow = shade(look.skin, 0.28)
   const line = shade(look.skin, 0.5)
   const knit = look.coatStyle === 'knit' || look.coatStyle === 'stripes'
-  const torso = TORSO[look.build]
+  const torso = (legs ? TORSO_LONG : TORSO)[look.build]
   const torsoClip = useMemo(() => Skia.Path.MakeFromSVGString(torso)!, [torso])
   const base = look.coatStyle === 'stripes' ? CREAM : look.coat
   const wide = look.build === 'stocky' ? 2.5 : 0
@@ -218,7 +223,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             [28 + hipX, legR, 1],
           ] as const).map(([lx, lt, side]) => (
             <Group key={side} transform={lt}>
-              <RoundedRect x={lx - 5.2} y={92} width={10.4} height={42} r={3} color={shade(look.trousers, side < 0 ? 0.15 : 0)} />
+              <RoundedRect x={lx - 5.2} y={110} width={10.4} height={24} r={3} color={shade(look.trousers, side < 0 ? 0.15 : 0)} />
               <Path path={`M${lx - 6} 132 h 12 q ${side * 7} 0 ${side * 7} 6 v 4 h -19 Z`} color={look.boots} />
               <Rect x={lx - 6} y={131} width={12} height={3} color={shade(look.boots, 0.2)} />
             </Group>
@@ -232,7 +237,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
         </Path>
         {look.coatStyle === 'stripes' && (
           <Group clip={torsoClip}>
-            {[66, 72, 78, 84, 90, 96].map((sy) => (
+            {[66, 72, 78, 84, 90, 96, 102, 108, 114].map((sy) => (
               <Rect key={sy} x={-4} y={sy} width={64} height={2.6} color={look.coat} />
             ))}
           </Group>
@@ -249,6 +254,14 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
           </>
         )}
         <Path path={TORSO_SHADOW} color={shade(look.coat, 0.45)} opacity={0.45} />
+        {legs && (
+          <>
+            {/* Waist: a belt, so the coat reads as a body over the legs */}
+            <Rect x={look.build === 'stocky' ? 0 : 4} y={99} width={look.build === 'stocky' ? 56 : 48} height={4} color={shade(base, 0.5)} />
+            <RoundedRect x={25} y={98.5} width={6} height={5} r={1} color="#c9a24a" />
+            <Path path="M28 103 V 118" color={shade(base, 0.35)} style="stroke" strokeWidth={0.9} />
+          </>
+        )}
         {look.coatStyle === 'peacoat' && (
           <>
             <Path path="M28 79 V 100" color={shade(look.coat, 0.4)} style="stroke" strokeWidth={0.8} />

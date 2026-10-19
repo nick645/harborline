@@ -5,7 +5,7 @@ import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, rect
 import { useDerivedValue } from 'react-native-reanimated'
 import type { Light } from './light'
 import type { Look } from './looks'
-import { Figure } from './Figure'
+import { Walker } from './Walker'
 import { useSceneClock } from './clock'
 
 const W = 358
@@ -54,8 +54,9 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
               <Rect x={294} y={50} width={12} height={18} color={light.lamp} opacity={flicker} />
               <Circle cx={300} cy={59} r={34} color={light.lamp} opacity={0.12} />
             </Group>
-            <Figure look={look} x={36} y={42} scale={2.25} clock={clock} rimLight={light.lamp} wind />
             <Rect x={0} y={226} width={W} height={H - 226} color="#3a2420" />
+            <Path path="M0 244 h 358 M0 262 h 358" color="#2e1c19" style="stroke" strokeWidth={1.4} />
+            <Walker look={look} clock={clock} x0={24} x1={112} footY={270} scale={1.3} rimLight={light.lamp} wind />
             <Group transform={[{ translateX: 252 }, { translateY: 236 }]}>
               <Circle cx={0} cy={0} r={44} color="#8a5a3a" style="stroke" strokeWidth={8} />
               <Circle cx={0} cy={0} r={10} color="#8a5a3a" />
@@ -84,21 +85,21 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
               <Rect x={-6} y={-10} width={12} height={16} color={light.lamp} opacity={flicker} />
               <Circle cx={0} cy={-2} r={40} color={light.lamp} opacity={0.14} />
             </Group>
-            <Figure look={look} x={14} y={30} scale={2.25} clock={clock} rimLight={light.lamp} />
             {/* A chart on the wall */}
             <Rect x={98} y={30} width={40} height={30} color="#d9c9a8" />
             <Path path="M102 52 q 8 -14 16 -4 q 6 6 14 -8 M104 36 h 6 M120 44 a 3 3 0 1 0 0.1 0" color="#6e4733" style="stroke" strokeWidth={1} />
             <Rect x={98} y={30} width={40} height={30} color="#4a2e22" style="stroke" strokeWidth={2.4} />
-            {/* The bar: a polished top and a panelled front down to the bottom of the frame */}
+            {/* The floor, and a table under the window */}
             <Rect x={0} y={214} width={W} height={H - 214}>
-              <LinearGradient start={vec(0, 214)} end={vec(0, H)} colors={['#5a3424', '#2e1c19']} />
+              <LinearGradient start={vec(0, 214)} end={vec(0, H)} colors={['#6e4430', '#3a2420']} />
             </Rect>
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <Rect key={i} x={10 + i * 60} y={228} width={48} height={40} color="#4a2a1e" style="stroke" strokeWidth={2} />
-            ))}
-            <Rect x={0} y={206} width={W} height={10} color="#8a5a3a" />
-            <Rect x={0} y={206} width={W} height={2} color="#c98a5b" opacity={0.7} />
-            {/* On the bar: a candle and a ship in a bottle */}
+            <Path path="M0 232 h 358 M0 252 h 358 M0 272 h 358 M70 214 v 18 M200 232 v 20 M120 252 v 20 M300 214 v 18" color="#2e1c19" style="stroke" strokeWidth={1.2} />
+            <Rect x={160} y={214} width={8} height={56} color="#4a2a1e" />
+            <Rect x={322} y={214} width={8} height={56} color="#4a2a1e" />
+            <Rect x={150} y={206} width={190} height={10} color="#8a5a3a" />
+            <Rect x={150} y={206} width={190} height={2} color="#c98a5b" opacity={0.7} />
+            <Walker look={look} clock={clock} x0={10} x1={98} footY={274} scale={1.3} rimLight={light.lamp} offset={2600} />
+            {/* On the table: a candle and a ship in a bottle */}
             <Group transform={[{ translateX: 236 }, { translateY: 206 }]}>
               <Rect x={-4} y={-18} width={8} height={18} color="#f3e7d8" />
               <Path path="M0 -18 C -3 -22, -1 -26, 0 -28 C 1 -26, 3 -22, 0 -18 Z" color="#ffd27a" opacity={flicker} />
