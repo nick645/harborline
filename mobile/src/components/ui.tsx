@@ -61,9 +61,13 @@ export function Button({
   )
 }
 
-export function Muted({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
+export function Muted({ children, style, numberOfLines }: { children: ReactNode; style?: StyleProp<TextStyle>; numberOfLines?: number }) {
   const t = useTheme()
-  return <Text style={styled({ color: t.muted, fontSize: 13 }, style)}>{children}</Text>
+  return (
+    <Text numberOfLines={numberOfLines} style={styled({ color: t.muted, fontSize: 13 }, style)}>
+      {children}
+    </Text>
+  )
 }
 
 export function Body({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
@@ -177,7 +181,11 @@ export function Tile({ label, sub, onPress, accent, disabled }: { label: string;
       style={({ pressed }) => [styles.tile, { backgroundColor: t.surface, borderColor: accent ?? t.border, opacity: disabled ? 0.45 : pressed ? 0.8 : 1 }]}
     >
       <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 15 }}>{label}</Text>
-      {sub ? <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>{sub}</Text> : null}
+      {sub ? (
+        <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
+          {sub}
+        </Text>
+      ) : null}
     </Pressable>
   )
 }

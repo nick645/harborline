@@ -2,7 +2,7 @@
 // cosmetic. Decorations unlock from things you've done.
 
 import type { GameState } from './types'
-import { DECOR, DECOR_SLOTS, HANGINGS, HOME_BUNTING, HOME_NAME_MAX, HOME_ROOFS, HOME_SIGNS, HOME_WALLS, TAVERN_CLOTHS, TAVERN_FLOORS, TAVERN_NAME_MAX, TAVERN_WALLS, type DecorId, type Milestone } from './data/home'
+import { DECOR, DECOR_SLOTS, HANGINGS, HOME_BUNTING, HOME_NAME_MAX, HOME_ROOFS, HOME_SIGNS, HOME_WALLS, TAVERN_CLOTHS, TAVERN_FLOORS, TAVERN_NAME_MAX, TAVERN_WALLS, type DecorId } from './data/home'
 import { getBoatClass } from './economy'
 import { regionOpen } from './regions'
 import { GameError } from './state'
@@ -25,12 +25,6 @@ export function decorUnlocked(state: GameState, id: DecorId): boolean {
     case 'statue':
       return state.player.ownedBoats.some((b) => ['legendary', 'mythic'].includes(getBoatClass(b.classId).rarity))
   }
-}
-
-/** Record a milestone (mutates; internal). */
-export function markMilestone(s: GameState, m: Milestone) {
-  const list = (s.player.milestones ??= [])
-  if (!list.includes(m)) list.push(m)
 }
 
 type StylePatch = {

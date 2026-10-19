@@ -3,7 +3,7 @@
 // the waterfront as many as its size (village, town, city), coloured and shaped from the
 // port's own seed so no two look alike, and its people on the quay. Design space 358 × 210.
 
-import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, vec, rect, rrect } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Port } from '../../../src/game/types'
 import type { RegionId } from '../../../src/game/data/ports'
@@ -12,6 +12,7 @@ import { lookFor } from './looks'
 import { REGION_STYLE } from './regionStyle'
 import { Walker } from './Walker'
 import { useSceneClock } from './clock'
+import { Stage } from './Stage'
 import { hash, mix, shade } from './paint'
 
 const W = 358
@@ -104,9 +105,8 @@ function Backdrop({ region, light, clock }: { region: RegionId; light: Light; cl
   }
 }
 
-export function PortScene({ width, light, port }: { width: number; light: Light; port: Port }) {
+export function PortScene({ width, height, light, port }: { width: number; height?: number; light: Light; port: Port }) {
   const clock = useSceneClock()
-  const s = width / W
   const st = REGION_STYLE[port.region]
   const seed = hash(port.id)
   const sky = mix(light.sky, st.tint, st.tintAmount)
@@ -127,8 +127,8 @@ export function PortScene({ width, light, port }: { width: number; light: Light;
   const people = Array.from({ length: port.size === 'village' ? 2 : port.size === 'town' ? 3 : 4 }, (_, i) => `${port.id}-local-${i}`)
 
   return (
-    <Canvas style={{ width, height: H * s }}>
-      <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
+    <Stage width={width} height={height} W={W} H={H} sky={[mix(sky, '#000000', 0.08), sky]} ground={lit('#4a2e22')} night={light.stars > 0}>
+      <Group>
         <Rect x={0} y={0} width={W} height={WATER}>
           <LinearGradient start={vec(0, 0)} end={vec(0, WATER)} colors={[sky, skyLow]} />
         </Rect>
@@ -197,6 +197,6 @@ export function PortScene({ width, light, port }: { width: number; light: Light;
           />
         ))}
       </Group>
-    </Canvas>
+    </Stage>
   )
 }

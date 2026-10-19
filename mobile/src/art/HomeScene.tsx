@@ -211,7 +211,7 @@ export function HomeScene({ width, height, light, look }: { width: number; heigh
   const shown = look.captains.slice(0, 5)
 
   return (
-    <Stage width={width} height={height} W={W} H={H} night={light.stars > 0} sky={[mix(light.sky, '#000000', 0.08), light.sky]} ground={'#4a2e22'}>
+    <Stage width={width} height={height} W={W} H={H} night={light.stars > 0} sky={[mix(sky, '#000000', 0.12), sky]} ground={'#4a2e22'}>
       <Group>
         <Rect x={0} y={0} width={W} height={WATER}>
           <LinearGradient start={vec(0, 0)} end={vec(0, WATER)} colors={[sky, skyLow]} />

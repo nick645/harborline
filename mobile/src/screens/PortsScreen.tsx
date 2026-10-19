@@ -9,18 +9,17 @@ import { homeOf, openPorts } from '../../../src/game/regions'
 import { getRegion } from '../../../src/game/data/ports'
 import { fonts, useTheme } from '../theme'
 import { REGION_STYLE } from '../art/regionStyle'
-import type { CaptainsView } from '../components/CaptainsScreen'
-import { VisitScreen } from './VisitScreen'
+import { VisitScreen, type VisitPage } from './VisitScreen'
 
-type VisitProps = Omit<Parameters<typeof VisitScreen>[0], 'portId' | 'view' | 'onView'>
+type VisitProps = Omit<Parameters<typeof VisitScreen>[0], 'portId' | 'page' | 'onPage'>
 
 export function PortsScreen({
   selected,
   onSelect,
-  view,
-  onView,
+  page,
+  onPage,
   ...visit
-}: VisitProps & { selected: string | null; onSelect: (id: string) => void; view: CaptainsView; onView: (v: CaptainsView) => void }) {
+}: VisitProps & { selected: string | null; onSelect: (id: string) => void; page: VisitPage; onPage: (p: VisitPage) => void }) {
   const t = useTheme()
   const { game } = visit
   const home = homeOf(game)
@@ -29,8 +28,9 @@ export function PortsScreen({
   const port = ports.find((p) => p.id === portId)!
 
   return (
-    <View style={{ gap: 10 }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
+    <View style={{ flex: 1, gap: 10 }}>
+      {page === 'menu' && (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
         {ports.map((p) => {
           const on = p.id === portId
           const people = portPeople(game as GameState, p.id)
@@ -66,7 +66,8 @@ export function PortsScreen({
           )
         })}
       </ScrollView>
-      <VisitScreen key={port.id} {...visit} portId={port.id} view={view} onView={onView} />
+      )}
+      <VisitScreen key={port.id} {...visit} portId={port.id} page={page} onPage={onPage} />
     </View>
   )
 }

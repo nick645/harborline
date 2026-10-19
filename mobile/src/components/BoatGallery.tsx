@@ -9,7 +9,7 @@ import { boatWidth } from '../art/boatGeometry'
 import { LIGHT, type Phase } from '../art/light'
 import { lookFor } from '../art/looks'
 import { useSceneClock } from '../art/clock'
-import { Button, Muted, Row } from './ui'
+import { Button, Muted, Row, Strip } from './ui'
 
 const CELL_W = 168
 const CELL_H = 120
@@ -28,7 +28,7 @@ export function BoatGallery() {
         <Button small kind={worn ? 'primary' : 'secondary'} label="worn" onPress={() => setWorn(!worn)} />
         <Button small kind={special ? 'primary' : 'secondary'} label="specials" onPress={() => setSpecial(!special)} />
       </Row>
-      <Row style={{ gap: 6 }}>
+      <Strip gap={6}>
         {BOAT_CLASSES.filter((c) => !special || c.rarity === 'legendary' || c.rarity === 'mythic').map((cls) => {
           const scale = (CELL_W - 30) / boatWidth(cls)
           return (
@@ -42,7 +42,7 @@ export function BoatGallery() {
             </View>
           )
         })}
-      </Row>
+      </Strip>
     </View>
   )
 }

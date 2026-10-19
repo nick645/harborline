@@ -49,7 +49,7 @@ import { routeWeather, weatherSlot } from './weather'
 import { handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
 import { chartTrip, getPortDef, homeOf, portOpen, refreshPortPools } from './regions'
 import { getRegion, HOME_PRICE } from './data/ports'
-import { markMilestone } from './home'
+import type { Milestone } from './data/home'
 import { countParts, dropChances, getPart, hasParts, partName, pickPart, takeParts } from './parts'
 import {
   captainMods,
@@ -524,6 +524,12 @@ function ensureRoutes(s: GameState) {
     if (s.routes.some((x) => x.id === r.id) || !portOpen(s, r.portB)) continue
     s.routes.push({ ...r, demandCargo: rollDemand(s.rng), demandPassenger: rollDemand(s.rng) })
   }
+}
+
+/** Record a milestone that unlocks a home decoration (mutates; internal). */
+export function markMilestone(s: GameState, m: Milestone) {
+  const list = (s.player.milestones ??= [])
+  if (!list.includes(m)) list.push(m)
 }
 
 /** Add a harbour log entry. Exported for the crew actions; not for the UI. */

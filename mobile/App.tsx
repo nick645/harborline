@@ -21,10 +21,11 @@ import { fonts, useTheme } from './src/theme'
 import { lightAt } from './src/art/light'
 import { HarborMap } from './src/components/HarborMap'
 import { BoatChip, type Props as BoatProps } from './src/components/BoatCard'
-import { CaptainsScreen, type CaptainsView } from './src/components/CaptainsScreen'
+import { CaptainsScreen } from './src/components/CaptainsScreen'
+import type { VisitPage } from './src/screens/VisitScreen'
 import { ShipyardScreen } from './src/components/ShipyardScreen'
 import { BoatGallery } from './src/components/BoatGallery'
-import { PortScreen } from './src/components/PortScreen'
+import { Upgrades, Workshop } from './src/components/PortScreen'
 import { BoatScreen } from './src/screens/BoatScreen'
 import { CaptainScreen } from './src/screens/CaptainScreen'
 import { PortsScreen } from './src/screens/PortsScreen'
@@ -73,11 +74,11 @@ function Harbor() {
   const [stack, setStack] = useState<Detail[]>([])
   const [gallery, setGallery] = useState(false)
   const [portsSel, setPortsSel] = useState<string | null>(null)
-  const [portsView, setPortsView] = useState<CaptainsView>('quay')
-  const goToPort = (id: string, view: CaptainsView = 'quay') => {
+  const [portsPage, setPortsPage] = useState<VisitPage>('menu')
+  const goToPort = (id: string, page: VisitPage = 'menu') => {
     setStack([])
     setPortsSel(id)
-    setPortsView(view)
+    setPortsPage(page)
     setTab('ports')
   }
   const detail = stack[stack.length - 1] ?? null
@@ -215,10 +216,10 @@ function Harbor() {
                 selected={portsSel}
                 onSelect={(id) => {
                   setPortsSel(id)
-                  setPortsView('quay')
+                  setPortsPage('menu')
                 }}
-                view={portsView}
-                onView={setPortsView}
+                page={portsPage}
+                onPage={setPortsPage}
                 onSend={(boatId, routeId, trips) => act((g, at) => assignRoute(g, boatId, routeId, at, trips))}
                 onScout={(id, a) => act((g) => scoutRecruit(g, id, a))}
                 onHire={(id) => act((g, at) => hireCaptain(g, id, at))}
@@ -229,7 +230,7 @@ function Harbor() {
               />
             )}
 
-            {tab === 'shipyard' && <ShipyardScreen game={game} onBuy={(id) => act((g, at) => buyBoat(g, id, at))} />}
+            {tab === 'shipyard' && <ShipyardScreen game={game} now={now} onBuy={(id) => act((g, at) => buyBoat(g, id, at))} />}
 
             {tab === 'home' && (
               <HomeScreen
@@ -237,24 +238,18 @@ function Harbor() {
                 now={now}
                 onStyle={(patch) => act((g) => styleHome(g, patch))}
                 onPlace={(slot, id) => act((g) => placeDecor(g, slot, id))}
-                works={<PortScreen
-                game={game}
-                onBuild={(id) => act((g, at) => buyUpgrade(g, id, at))}
-                onCraft={(id) => act((g, at) => craftBoat(g, id, at))}
-                onScrap={() => act((g) => scrapStandardParts(g))}
-                onMelt={(rarity, slot, track) => act((g, at) => meltSpares(g, rarity, slot, track, at))}
-              />}
-                log={<View style={{ gap: 6 }}>
-                <StormAlertsToggle />
-                {game.log.length === 0 && <Muted>Nothing to report yet.</Muted>}
-                {game.log.map((e, i) => (
-                  <Body key={`${e.at}-${i}`} style={{ fontSize: 14, color: e.kind === 'sunk' || e.kind === 'lost' ? t.bad : t.text }}>
-                    <Text style={{ color: t.muted, fontSize: 12 }}>{duration(now - e.at)} ago </Text>
-                    {e.text}
-                  </Body>
-                ))}
-                {__DEV__ && (
-                  <Card style={{ marginTop: 12 }}>
+                upgrades={<Upgrades game={game} onBuild={(id) => act((g, at) => buyUpgrade(g, id, at))} />}
+                workshop={
+                  <Workshop
+                    game={game}
+                    onCraft={(id) => act((g, at) => craftBoat(g, id, at))}
+                    onScrap={() => act((g) => scrapStandardParts(g))}
+                    onMelt={(rarity, slot, track) => act((g, at) => meltSpares(g, rarity, slot, track, at))}
+                  />
+                }
+                alerts={<StormAlertsToggle />}
+                dev={__DEV__ ? <View style={{ flex: 1, gap: 8 }}>
+                  <Card>
                     <Muted>Play-test tools (development builds only)</Muted>
                     <Row>
                       <Button small kind="secondary" label="+10,000c" onPress={() => act((g) => ({ ...g, player: { ...g.player, coins: g.player.coins + 10_000 } }))} />
@@ -319,9 +314,8 @@ function Harbor() {
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />
                     </Row>
                   </Card>
-                )}
-                {__DEV__ && gallery && <BoatGallery />}
-              </View>}
+                {gallery && <BoatGallery />}
+              </View> : undefined}
               />
             )}
           </>
