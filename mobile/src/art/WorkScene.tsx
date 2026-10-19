@@ -2,7 +2,7 @@
 // lines, checking the manifest, swinging a lantern. One of your boats is moored behind them.
 // Tap a captain to open them. Design space is 358 × 240.
 
-import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
 import { Pressable, View } from 'react-native'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { BoatClass } from '../../../src/game/types'
@@ -13,6 +13,7 @@ import { boatWidth } from './boatGeometry'
 import { FIGURE_FULL_H } from './Figure'
 import { Walker } from './Walker'
 import { useSceneClock } from './clock'
+import { Stage, stageFrame } from './Stage'
 import { mix } from './paint'
 
 const W = 358
@@ -35,9 +36,13 @@ const JOBS: [Prop, number, number][] = [
 
 type Person = { id: string; name: string; rare: boolean; region: import('../../../src/game/data/ports').RegionId }
 
-export function WorkScene({ width, light, cls, captains, onOpen }: { width: number; light: Light; cls: BoatClass | null; captains: Person[]; onOpen: (id: string) => void }) {
+export function WorkScene({ width, height, light, cls, captains, onOpen }: { width: number; height?: number; light: Light; cls: BoatClass | null; captains: Person[]; onOpen: (id: string) => void }) {
   const clock = useSceneClock()
-  const s = width / W
+  // Where the drawing sits in the frame (see Stage), so tap targets land on it.
+  const frame = stageFrame(width, height, W, H)
+  const s = frame.s
+  const dy = frame.above * s
+  const dx = -frame.cropX * s
   const lit = (c: string) => mix(c, light.silhouette, light.dim * 0.8)
   const ride = useDerivedValue(() => [{ translateY: Math.sin(clock.value / 900) * 1.5 }])
   const waves = useDerivedValue(() => [{ translateX: -((clock.value / 80) % 36) }])
@@ -46,9 +51,9 @@ export function WorkScene({ width, light, cls, captains, onOpen }: { width: numb
   const boatScale = cls ? Math.min(1.1, 230 / boatWidth(cls)) : 1
 
   return (
-    <View style={{ width, height: H * s }}>
-      <Canvas style={{ width, height: H * s }}>
-        <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
+    <View style={{ width, height: frame.total * s }}>
+      <Stage width={width} height={height} W={W} H={H} night={light.stars > 0} sky={[mix(light.sky, '#000000', 0.08), light.sky]} ground={'#3a2420'}>
+        <Group>
           <Rect x={0} y={0} width={W} height={120}>
             <LinearGradient start={vec(0, 0)} end={vec(0, 120)} colors={[light.sky, light.skyLow]} />
           </Rect>
@@ -111,7 +116,7 @@ export function WorkScene({ width, light, cls, captains, onOpen }: { width: numb
             )
           })}
         </Group>
-      </Canvas>
+      </Stage>
       {shown.map((c, i) => {
         const [, from, to] = JOBS[i]
         const left = Math.min(from, to) - FIG_W / 2
@@ -121,7 +126,7 @@ export function WorkScene({ width, light, cls, captains, onOpen }: { width: numb
             onPress={() => onOpen(c.id)}
             accessibilityRole="button"
             accessibilityLabel={`Open Captain ${c.name}`}
-            style={{ position: 'absolute', left: left * s, top: (FOOT_Y - (i % 2) * 10 - FIG_H) * s, width: (Math.abs(to - from) + FIG_W) * s, height: FIG_H * s }}
+            style={{ position: 'absolute', left: left * s + dx, top: (FOOT_Y - (i % 2) * 10 - FIG_H) * s + dy, width: (Math.abs(to - from) + FIG_W) * s, height: FIG_H * s }}
           />
         )
       })}

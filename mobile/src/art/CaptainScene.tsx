@@ -1,19 +1,20 @@
 // Your captain where they are right now: at the helm of their boat, or ashore at the tavern
 // window with something warm. Design space is 358 × 280.
 
-import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, rect, rrect, vec } from '@shopify/react-native-skia'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { Light } from './light'
 import type { Look } from './looks'
 import { Walker } from './Walker'
 import { useSceneClock } from './clock'
+import { Stage } from './Stage'
 
 const W = 358
 const H = 280
 
 export type CaptainPlace = 'helm' | 'port'
 
-export function CaptainScene({ width, light, look, place }: { width: number; light: Light; look: Look; place: CaptainPlace }) {
+export function CaptainScene({ width, height, light, look, place }: { width: number; height?: number; light: Light; look: Look; place: CaptainPlace }) {
   const clock = useSceneClock()
   const s = width / W
   const roll = useDerivedValue(() => [{ translateY: Math.sin(clock.value / 540) * 5 }])
@@ -35,8 +36,8 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
   }
 
   return (
-    <Canvas style={{ width, height: H * s }}>
-      <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
+    <Stage width={width} height={height} W={W} H={H} indoor={place === 'port'} night={light.stars > 0} sky={['#4a2f2a', '#4a2f2a']} ground={'#3a2420'}>
+      <Group>
         {place === 'helm' ? (
           <Group>
             <Rect x={0} y={0} width={W} height={H} color="#4a2f2a" />
@@ -124,6 +125,6 @@ export function CaptainScene({ width, light, look, place }: { width: number; lig
           </Group>
         )}
       </Group>
-    </Canvas>
+    </Stage>
   )
 }

@@ -5,7 +5,7 @@
 // figure is drawn at the same scale, a little smaller toward the back of the room.
 // Tap anyone you could hire to step closer. Design space is 358 × 290.
 
-import { Canvas, Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
 import { Pressable, View } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Light } from './light'
@@ -19,6 +19,7 @@ import type { RegionId } from '../../../src/game/data/ports'
 import { Figure, FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
 import { useSceneClock } from './clock'
+import { Stage, stageFrame } from './Stage'
 
 const W = 358
 const H = 290
@@ -121,6 +122,7 @@ function WallHanging({ kind }: { kind: Hanging }) {
 
 export function TavernScene({
   width,
+  height,
   light,
   hands,
   captain,
@@ -130,6 +132,8 @@ export function TavernScene({
   custom,
 }: {
   width: number
+  /** Screen height to fill; extra goes into sky above. */
+  height?: number
   light: Light
   hands: Person[]
   captain: Person | null
@@ -141,7 +145,11 @@ export function TavernScene({
   custom?: TavernLook
 }) {
   const clock = useSceneClock()
-  const s = width / W
+  // Where the drawing sits in the frame (see Stage), so tap targets land on it.
+  const frame = stageFrame(width, height, W, H)
+  const s = frame.s
+  const dy = frame.above * s
+  const dx = -frame.cropX * s
   const fire = useDerivedValue(() => [{ scaleY: 0.85 + 0.2 * Math.sin(clock.value / 90) + 0.08 * Math.sin(clock.value / 37) }])
   const fireGlow = useDerivedValue(() => 0.5 + 0.12 * Math.sin(clock.value / 120))
   const flicker = useDerivedValue(() => 0.85 + 0.15 * Math.sin(clock.value / 300))
@@ -181,9 +189,9 @@ export function TavernScene({
     : null
 
   return (
-    <View style={{ width, height: H * s }}>
-      <Canvas style={{ width, height: H * s }}>
-        <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
+    <View style={{ width, height: frame.total * s }}>
+      <Stage width={width} height={height} W={W} H={H} indoor sky={['#3a2420', '#3a2420']} ground={'#3a2420'}>
+        <Group>
           {/* Back wall, beams and a window */}
           <Rect x={0} y={0} width={W} height={BACK}>
             <LinearGradient start={vec(0, 0)} end={vec(0, BACK)} colors={[...(custom?.wall ?? REGION_STYLE[region].tavernWall)]} />
@@ -331,7 +339,7 @@ export function TavernScene({
             </Circle>
           )}
         </Group>
-      </Canvas>
+      </Stage>
 
       {/* Tap targets: hands at the table, any wandering hands, and the rare captain */}
       {seated
@@ -343,18 +351,18 @@ export function TavernScene({
             accessibilityRole="button"
             accessibilityLabel={p.hand!.name}
             accessibilityState={{ selected: p.hand!.id === selectedId }}
-            style={{ position: 'absolute', left: (p.x - 4) * s, top: (TABLE_Y - 54) * s, width: (SEAT_W + 8) * s, height: 58 * s }}
+            style={{ position: 'absolute', left: (p.x - 4) * s + dx, top: (TABLE_Y - 54) * s + dy, width: (SEAT_W + 8) * s, height: 58 * s }}
           />
         ))}
       {extraHands.map((h, i) => (
-        <Pressable key={h.id} onPress={() => onSelect(h.id)} accessibilityRole="button" accessibilityLabel={h.name} style={{ position: 'absolute', left: (70 + i * 40) * s, top: walkTop * s, width: 110 * s, height: (FRONT_FOOT - walkTop) * s }} />
+        <Pressable key={h.id} onPress={() => onSelect(h.id)} accessibilityRole="button" accessibilityLabel={h.name} style={{ position: 'absolute', left: (70 + i * 40) * s + dx, top: walkTop * s + dy, width: 110 * s, height: (FRONT_FOOT - walkTop) * s }} />
       ))}
       {captain && (
         <Pressable
           onPress={() => onSelect(captain.id)}
           accessibilityRole="button"
           accessibilityLabel={captain.name}
-          style={{ position: 'absolute', left: (CAPTAIN_X - 4) * s, top: walkTop * s, width: 50 * s, height: (FRONT_FOOT - walkTop) * s }}
+          style={{ position: 'absolute', left: (CAPTAIN_X - 4) * s + dx, top: walkTop * s + dy, width: 50 * s, height: (FRONT_FOOT - walkTop) * s }}
         />
       )}
     </View>

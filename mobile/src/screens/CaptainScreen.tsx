@@ -1,6 +1,7 @@
 // One captain: where they are right now, what's known of them, and their logbook.
 
-import { Alert, Pressable, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native'
+import { useState } from 'react'
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 import type { GameState } from '../../../src/game/types'
 import { boatOfCaptain, boatsManagedBy, captainViewById, managerRole, promotionOptions } from '../../../src/game/crew'
 import { coins } from '../../../src/format'
@@ -10,7 +11,7 @@ import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
 import { homeTavern } from '../homeTavern'
 import { fonts, useTheme } from '../theme'
-import { Anchors, Body, Button, Card, Muted, Row, Tag, Title } from '../components/ui'
+import { Anchors, Body, Button, Card, Measure, Muted, Row, Segments, Tag, Title } from '../components/ui'
 
 type Props = {
   game: GameState
@@ -28,7 +29,7 @@ const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'T
 
 export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFire, onTakeOver, onManagerCrewing, onPromote }: Props) {
   const t = useTheme()
-  const { width } = useWindowDimensions()
+  const [panel, setPanel] = useState<'log' | 'orders'>('log')
   const c = captainViewById(game, captainId)
   if (!c) return <Muted>That captain has moved on.</Muted>
   const boat = boatOfCaptain(game, c.id)
@@ -44,8 +45,8 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
       : `Ashore, at ${homeTavern(game).name}`
 
   return (
-    <View style={{ gap: 12 }}>
-      <CaptainScene width={Math.min(width - 24, 720)} light={lightAt(now)} look={lookFor(c.id, c.rare, c.region)} place={atSea ? 'helm' : 'port'} />
+    <View style={{ flex: 1, gap: 8 }}>
+      <Measure>{(w, h) => <CaptainScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={lookFor(c.id, c.rare, c.region)} place={atSea ? 'helm' : 'port'} />}</Measure>
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
@@ -62,10 +63,13 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
           From {c.homePort} · takes tier {c.sailsTiers[0]}–{c.sailsTiers[1]} boats
         </Muted>
         <SkillRange band={c.skillBand} />
-        {boat && <Button small kind="secondary" label={`Go to ${boat.nickname}`} onPress={() => onOpenBoat(boat.id)} />}
       </Card>
 
-      {role && (
+      <Segments items={[{ id: 'log', label: 'Logbook' }, { id: 'orders', label: role ? 'Desk' : 'Orders' }]} value={panel} onChange={setPanel} />
+      <View style={{ minHeight: 170, gap: 8 }}>
+      {panel === 'orders' && boat && <Button small kind="secondary" label={`Go to ${boat.nickname}`} onPress={() => onOpenBoat(boat.id)} />}
+
+      {panel === 'orders' && role && (
         <Card>
           <Body>
             <Text style={{ fontFamily: fonts.bold }}>{role.name}</Text> · {role.description}
@@ -93,6 +97,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
         </Card>
       )}
 
+      {panel === 'log' && (
       <View style={[styles.logbook, { backgroundColor: t.paper }]}>
         <Text style={{ fontFamily: fonts.title, fontSize: 22, color: t.ink }}>Logbook</Text>
         {c.traits.length === 0 && <Text style={[styles.pencil, { color: t.pencil }]}>Nothing written yet.</Text>}
@@ -117,7 +122,9 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
             : `Still getting the measure of them: ${Math.min(c.voyageCount, DEVELOPMENT_KNOWN_AFTER)} of ${DEVELOPMENT_KNOWN_AFTER} voyages.`}
         </Text>
       </View>
+      )}
 
+      {panel === 'orders' && (
       <Row>
         {boat && !c.bonded && boat.state === 'idle' && <Button small kind="secondary" label="Step ashore" onPress={() => onAshore(c.id)} />}
         {c.hiredBy && <Button small kind="secondary" label="Take over from their manager" onPress={() => onTakeOver(c.id)} />}
@@ -145,6 +152,8 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
           />
         )}
       </Row>
+      )}
+      </View>
     </View>
   )
 }

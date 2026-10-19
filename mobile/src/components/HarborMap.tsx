@@ -54,11 +54,13 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
   const fogAnchor = fogAt ? fogPull(fogAt) : null
   const b = bounds(fogAnchor ? [...open, { ...open[0], ...fogAnchor }] : open)
   // Never crop: widen whichever side is short so the chart stays between 0.62 and 1.0 tall.
+  // Frame the charted waters to the box's own shape: widen or heighten the view (more sea, never
+  // a crop) until it matches, so the chart fills the space with no bands.
   let vw = b.x1 - b.x0
-  let vh = b.y1 - b.y0
-  if (vh > vw) vw = vh
-  if (vh < vw * 0.62) vh = vw * 0.62
-  if (next) vh += 120 * (vw / 1000)
+  let vh = b.y1 - b.y0 + (next ? 120 * ((b.x1 - b.x0) / 1000) : 0)
+  const boxAspect = box.w / Math.max(1, box.h)
+  if (vw / vh < boxAspect) vw = vh * boxAspect
+  else vh = vw / boxAspect
   const view = { x: (b.x0 + b.x1) / 2 - vw / 2, y: (b.y0 + b.y1) / 2 - vh / 2 + (next ? 60 * (vw / 1000) : 0), w: vw, h: vh }
   // Sizes in map units that stay the same on screen whatever the zoom.
   const k = vw / 1000
@@ -71,7 +73,7 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
   }
 
   return (
-    <Svg width={Math.min(box.w, (box.h * view.w) / view.h)} height={Math.min(box.h, (box.w * view.h) / view.w)} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}>
+    <Svg width={box.w} height={box.h} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}>
       <Rect x={view.x} y={view.y} width={view.w} height={view.h} rx={28 * k} fill={light.sea} />
       {[0.25, 0.55, 0.82].map((f) => (
         <Path

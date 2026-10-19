@@ -3,7 +3,7 @@
 // they work, and your captains ashore wandering about. Design space is 358 × 270.
 
 import type { ReactNode } from 'react'
-import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, Text as SkText, matchFont, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, Text as SkText, matchFont, rect, rrect, vec } from '@shopify/react-native-skia'
 import { Platform } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { RegionId } from '../../../src/game/data/ports'
@@ -13,6 +13,7 @@ import { lookFor } from './looks'
 import { REGION_STYLE } from './regionStyle'
 import { Walker } from './Walker'
 import { useSceneClock } from './clock'
+import { Stage } from './Stage'
 import { mix, shade, tint } from './paint'
 
 const W = 358
@@ -196,7 +197,7 @@ function Upgrades({ up, lit, clock, wall, roof }: { up: Record<string, number>; 
   )
 }
 
-export function HomeScene({ width, light, look }: { width: number; light: Light; look: HomeLookProps }) {
+export function HomeScene({ width, height, light, look }: { width: number; height?: number; light: Light; look: HomeLookProps }) {
   const clock = useSceneClock()
   const s = width / W
   const st = REGION_STYLE[look.region]
@@ -211,8 +212,8 @@ export function HomeScene({ width, light, look }: { width: number; light: Light;
   const shown = look.captains.slice(0, 5)
 
   return (
-    <Canvas style={{ width, height: H * s }}>
-      <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
+    <Stage width={width} height={height} W={W} H={H} night={light.stars > 0} sky={[mix(light.sky, '#000000', 0.08), light.sky]} ground={'#4a2e22'}>
+      <Group>
         <Rect x={0} y={0} width={W} height={WATER}>
           <LinearGradient start={vec(0, 0)} end={vec(0, WATER)} colors={[sky, skyLow]} />
         </Rect>
@@ -289,6 +290,6 @@ export function HomeScene({ width, light, look }: { width: number; light: Light;
           />
         ))}
       </Group>
-    </Canvas>
+    </Stage>
   )
 }

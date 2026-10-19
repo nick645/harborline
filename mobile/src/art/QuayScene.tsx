@@ -3,7 +3,7 @@
 // standing in their own look. The one you're looking at stands in a pool of lamplight.
 // Design space is 358 × 280; tap targets are real buttons laid over the canvas.
 
-import { Canvas, Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Oval, Path, RadialGradient, Rect, RoundedRect, rect, rrect, vec } from '@shopify/react-native-skia'
 import { Pressable, View } from 'react-native'
 import { useDerivedValue } from 'react-native-reanimated'
 import { getBoatClass } from '../../../src/game/economy'
@@ -15,6 +15,7 @@ import { FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
 import { BoatArt } from './BoatArt'
 import { useSceneClock } from './clock'
+import { Stage, stageFrame } from './Stage'
 import { mix, shade } from './paint'
 
 const W = 358
@@ -33,6 +34,7 @@ const BUNTING = ['#c2452a', '#e9b23c', '#2f5d62', '#f3e7d8', '#7a4e5e']
 
 export function QuayScene({
   width,
+  height,
   light,
   recruits,
   selectedId,
@@ -41,6 +43,8 @@ export function QuayScene({
   region = 'bay',
 }: {
   width: number
+  /** Screen height to fill; extra goes into sky above. */
+  height?: number
   light: Light
   recruits: Recruit[]
   selectedId: string | null
@@ -51,7 +55,11 @@ export function QuayScene({
   region?: RegionId
 }) {
   const clock = useSceneClock()
-  const s = width / W
+  // Where the drawing sits in the frame (see Stage), so tap targets land on it.
+  const frame = stageFrame(width, height, W, H)
+  const s = frame.s
+  const dy = frame.above * s
+  const dx = -frame.cropX * s
   const lit = (c: string) => mix(c, light.silhouette, light.dim * 0.8)
   const flicker = useDerivedValue(() => 0.85 + 0.15 * Math.sin(clock.value / 300))
   const bob = useDerivedValue(() => [{ translateY: Math.sin(clock.value / 650) * 2.5 }, { rotate: Math.sin(clock.value / 900) * 0.012 }])
@@ -97,9 +105,9 @@ export function QuayScene({
   const night = light.stars > 0
 
   return (
-    <View style={{ width, height: H * s }}>
-      <Canvas style={{ width, height: H * s }}>
-        <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
+    <View style={{ width, height: frame.total * s }}>
+      <Stage width={width} height={height} W={W} H={H} night={light.stars > 0} sky={[mix(light.sky, '#000000', 0.08), light.sky]} ground={'#4a2e22'}>
+        <Group>
           {/* Sky and sea */}
           <Rect x={0} y={0} width={W} height={112}>
             <LinearGradient start={vec(0, 0)} end={vec(0, 112)} colors={[sky, skyLow]} />
@@ -260,13 +268,13 @@ export function QuayScene({
             />
           ))}
         </Group>
-      </Canvas>
+      </Stage>
       {onEnterTavern && (
         <Pressable
           onPress={onEnterTavern}
           accessibilityRole="button"
           accessibilityLabel={`Go into ${st.tavern}`}
-          style={{ position: 'absolute', left: 250 * s, top: 4 * s, width: 108 * s, height: 180 * s }}
+          style={{ position: 'absolute', left: 250 * s + dx, top: 4 * s + dy, width: 108 * s, height: 180 * s }}
         />
       )}
       {recruits.map((r, i) => (
@@ -276,7 +284,7 @@ export function QuayScene({
           accessibilityRole="button"
           accessibilityLabel={`${r.name}, reputation ${r.reputation} of 5`}
           accessibilityState={{ selected: r.id === selectedId }}
-          style={{ position: 'absolute', left: (xs[i] - PACE - 4) * s, top: (FIG_TOP - 4) * s, width: (56 * FIGURE_SCALE + 2 * PACE + 8) * s, height: (FOOT_Y - FIG_TOP + 8) * s }}
+          style={{ position: 'absolute', left: (xs[i] - PACE - 4) * s + dx, top: (FIG_TOP - 4) * s + dy, width: (56 * FIGURE_SCALE + 2 * PACE + 8) * s, height: (FOOT_Y - FIG_TOP + 8) * s }}
         />
       ))}
     </View>

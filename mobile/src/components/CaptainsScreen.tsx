@@ -27,7 +27,7 @@ import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
 import { SkillRange } from '../screens/CaptainScreen'
 import { fonts, useTheme } from '../theme'
-import { Anchors, Button, Card, Muted, Row, Tag, Title } from './ui'
+import { Anchors, Button, Card, Measure, Muted, Row, Strip, Tag, Title } from './ui'
 
 type Props = {
   game: GameState
@@ -255,44 +255,38 @@ function Moment({ c, action, tavern }: { c: CaptainView; action: ScoutAction; ta
 function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; onOpenCaptain: (id: string) => void }) {
   const t = useTheme()
   const roster = rosterViews(game)
-  const { width } = useWindowDimensions()
-  if (roster.length === 0) return <Muted>No captains yet. Find one on the quay.</Muted>
+  if (roster.length === 0) return <Muted>No captains yet. Find one on the quay in the Ports tab.</Muted>
   const moored = game.player.ownedBoats.find((b) => b.state === 'idle') ?? game.player.ownedBoats[0]
   return (
-    <View style={{ gap: 10 }}>
-      <WorkScene
-        width={Math.min(width - 24, 720)}
-        light={lightAt(now)}
-        cls={moored ? getBoatClass(moored.classId) : null}
-        captains={roster}
-        onOpen={onOpenCaptain}
-      />
-      {roster.map((c) => {
-        const boat = boatOfCaptain(game, c.id)
-        const role = managerRole(c.role)
-        const where = role ? role.name : boat ? (boat.state === 'sailing' || boat.state === 'returning' ? `At the helm of ${boat.nickname}` : `Aboard ${boat.nickname}`) : 'Ashore'
-        return (
-          <Pressable key={c.id} onPress={() => onOpenCaptain(c.id)} accessibilityRole="button" accessibilityLabel={`Open Captain ${c.name}`}>
-            <Card>
-              <Row style={{ flexWrap: 'nowrap' }}>
-                <Portrait id={c.id} rare={c.rare} region={c.region} />
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Row style={{ justifyContent: 'space-between' }}>
-                    <Title size={20}>{c.name}</Title>
-                    <Anchors n={c.reputation} size={12} />
-                  </Row>
-                  <Muted>
-                    {where} · {c.voyageCount} voyage{c.voyageCount === 1 ? '' : 's'}
-                    {c.hiredBy ? ' · hired by a manager' : ''}
-                  </Muted>
-                  <SkillRange band={c.skillBand} />
-                </View>
-                <Text style={{ color: t.muted, fontSize: 20 }}>›</Text>
-              </Row>
-            </Card>
-          </Pressable>
-        )
-      })}
+    <View style={{ flex: 1, gap: 10 }}>
+      <Measure>
+        {(w, h) => <WorkScene width={Math.min(w, 720)} height={h} light={lightAt(now)} cls={moored ? getBoatClass(moored.classId) : null} captains={roster} onOpen={onOpenCaptain} />}
+      </Measure>
+      <Strip>
+        {roster.map((c) => {
+          const boat = boatOfCaptain(game, c.id)
+          const role = managerRole(c.role)
+          const where = role ? role.name : boat ? (boat.state === 'sailing' || boat.state === 'returning' ? `At sea · ${boat.nickname}` : `Aboard ${boat.nickname}`) : 'Ashore'
+          return (
+            <Pressable
+              key={c.id}
+              onPress={() => onOpenCaptain(c.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open Captain ${c.name}`}
+              style={({ pressed }) => ({ width: 132, padding: 8, gap: 4, borderRadius: 14, borderWidth: 1, borderColor: c.rare ? t.legendary : t.border, backgroundColor: t.surface, opacity: pressed ? 0.8 : 1 })}
+            >
+              <Portrait id={c.id} rare={c.rare} region={c.region} />
+              <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 17 }}>
+                {c.name}
+              </Text>
+              <Anchors n={c.reputation} size={11} />
+              <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
+                {where}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </Strip>
     </View>
   )
 }
