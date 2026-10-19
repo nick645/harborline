@@ -19,6 +19,7 @@ import {
   settleAway,
   adriftDeadline,
   GameError,
+  moveHome,
 } from './state'
 import { createRng, rollConditionLoss } from './rolls'
 import { generateCaptain } from './captains'
@@ -26,7 +27,7 @@ import { getBoatClass, handFee, handsNeeded, repairCostPerPoint, routeDistance, 
 import { missingAbilityIds } from './abilities'
 import { naturalWeather, seasonAt, stormAlerts } from './weather'
 import { upcomingAlerts } from './alerts'
-import { chartingNext, regionOpen } from './regions'
+import { chartingNext, homeOf, regionOpen } from './regions'
 import { buyDrink, handView, hireHand } from './crew'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
@@ -667,5 +668,27 @@ describe('charting the map', () => {
     expect(s.portPools!.greyhollow.recruits).toHaveLength(3)
     expect(s.portPools!.mistle.hands).toHaveLength(2)
     expect(s.portPools!.mistle.recruits[0].region).toBe('fogbanks')
+  })
+})
+
+describe('moving home', () => {
+  it('buys a harbour office in a town or city; routes then run from there', () => {
+    let s = newGame(4, T0)
+    expect(() => moveHome(s, 'gullwick', T0)).toThrow(GameError) // a village
+    expect(() => moveHome(s, 'greyhollow', T0)).toThrow(GameError) // not charted
+    s.player.coins = 100_000
+    s = moveHome(s, 'brindle', T0)
+    expect(homeOf(s)).toBe('brindle')
+    expect(s.player.coins).toBe(100_000 - 25_000)
+    expect(s.routes.every((r) => r.portA === 'brindle')).toBe(true)
+    expect(s.routes.map((r) => r.portB).sort()).toEqual(['cobble', 'farhaven', 'gullwick', 'saltmarsh'])
+    // Boats can sail from the new home, and moving back to Saltmarsh is free.
+    const boat = s.player.ownedBoats.find((b) => b.captainId)!
+    s = assignRoute(s, boat.id, 'brindle-saltmarsh', T0)
+    expect(() => moveHome(s, 'saltmarsh', T0)).toThrow(GameError) // a boat is at sea
+    s = settle(s, T0 + 10 * 60 * 60 * 1000)
+    const coins = s.player.coins
+    s = moveHome(s, 'saltmarsh', T0 + 10 * 60 * 60 * 1000)
+    expect(s.player.coins).toBe(coins)
   })
 })

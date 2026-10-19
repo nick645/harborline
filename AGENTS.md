@@ -95,6 +95,12 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   are **Sleeper / All talk / True to form**. Reputation limits boat tiers (rep r sails r−1..r+1)
   and drifts toward true ability every 10 voyages. The quay offers captains around your level.
   Managers hire and fire crew for their boats; the player can take over or switch that off.
+- The map (user-approved 2026-10-18): 5 regions / 18 ports (`data/ports.ts`), opened by charting at
+  sea (trips to the prior region's outer ports; stormier = faster); round trips from home; every
+  port has a quay and tavern sized by population, people dressed by region; home can be moved to
+  any charted town or city (harbour office, price by region). Chart sizes, pay discount and home
+  prices are Claude's picks. Sim (wide, 40 h): tier 2 at 4.6 h; Fogbanks 1.7 h, Sunward 7 h,
+  Ironcliffs 24 h, Lantern Reach > 40 h.
 - Lost at sea (user-approved 2026-10-16): a sunk boat's captain is lost if she isn't raised within
   6 h (absolute time, runs while away); the wreck stays salvageable; bonded captains are spared;
   managed boats get no exception. Phone warns 1 h before; the sunk boat shows an underwater scene.

@@ -4,8 +4,8 @@ import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
 import { boatOfCaptain, boatsNeedingHands, managerRole, portPeople, quayInfo, rosterViews } from '../../../src/game/crew'
-import { HOME_PORT_ID, type RegionId } from '../../../src/game/data/ports'
-import { getPortDef } from '../../../src/game/regions'
+import type { RegionId } from '../../../src/game/data/ports'
+import { getPortDef, homeOf } from '../../../src/game/regions'
 
 const portRegion = (portId?: string): RegionId => (portId ? getPortDef(portId).region : 'bay')
 import { getBoatClass, handFee } from '../../../src/game/economy'
@@ -14,6 +14,7 @@ import { SCOUT_ACTIONS, type ScoutAction } from '../../../src/game/data/captains
 import { coins, duration } from '../../../src/format'
 import { QuayScene } from '../art/QuayScene'
 import { TavernScene } from '../art/TavernScene'
+import { REGION_STYLE } from '../art/regionStyle'
 import { WorkScene } from '../art/WorkScene'
 import { Figure } from '../art/Figure'
 import { useSceneClock } from '../art/clock'
@@ -45,8 +46,9 @@ const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'T
 
 export function CaptainsScreen(props: Props) {
   const { view: tab, onView: setTab } = props
-  const people = portPeople(props.game, props.portId ?? HOME_PORT_ID)
-  const atPort = props.portId !== undefined && props.portId !== HOME_PORT_ID
+  const home = homeOf(props.game)
+  const people = portPeople(props.game, props.portId ?? home)
+  const atPort = props.portId !== undefined && props.portId !== home
   return (
     <View style={{ gap: 10 }}>
       <Row>
@@ -82,8 +84,8 @@ function Tavern(props: Props) {
   const { game, now, onBuyDrink, onHireHand } = props
   const t = useTheme()
   const { width } = useWindowDimensions()
-  const { hands, captain } = portPeople(game, props.portId ?? HOME_PORT_ID)
-  const region = portRegion(props.portId)
+  const { hands, captain } = portPeople(game, props.portId ?? homeOf(game))
+  const region = portRegion(props.portId ?? homeOf(game))
   const watchesLeft = quayInfo(game, now).watchesLeft
   const [selectedId, setSelected] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -157,9 +159,9 @@ function Quay(props: Props) {
   const { game, now } = props
   const t = useTheme()
   const { width } = useWindowDimensions()
-  const people = portPeople(game, props.portId ?? HOME_PORT_ID)
+  const people = portPeople(game, props.portId ?? homeOf(game))
   const recruits = people.recruits
-  const region = portRegion(props.portId)
+  const region = portRegion(props.portId ?? homeOf(game))
   const [selectedId, setSelected] = useState<string | null>(null)
   const sel = recruits.find((r) => r.id === selectedId) ?? recruits[0] ?? null
   return (
@@ -167,7 +169,7 @@ function Quay(props: Props) {
       <Watches game={game} now={now} />
       <Pressable onPress={() => props.onView('tavern')} accessibilityRole="button">
         <Muted>
-          Tap the tavern to go inside: deckhands drink there{people.captain ? <Text style={{ color: t.legendary }}>, and someone unusual is by the fire ✦</Text> : ''}.
+          Tap {REGION_STYLE[region].tavern} to go inside: deckhands drink there{people.captain ? <Text style={{ color: t.legendary }}>, and someone unusual is by the fire ✦</Text> : ''}.
         </Muted>
       </Pressable>
       {recruits.length > 0 ? (
@@ -181,7 +183,7 @@ function Quay(props: Props) {
 }
 
 /** A captain looking for work: what's known, scouting, and hiring. */
-function RecruitCard({ game, now, onScout, onHire, sel, rare = false }: Props & { sel: CaptainView; rare?: boolean }) {
+function RecruitCard({ game, now, onScout, onHire, sel, portId, rare = false }: Props & { sel: CaptainView; rare?: boolean }) {
   const t = useTheme()
   const info = quayInfo(game, now)
   const [moment, setMoment] = useState<ScoutAction | null>(null)
@@ -205,7 +207,7 @@ function RecruitCard({ game, now, onScout, onHire, sel, rare = false }: Props & 
       ))}
       {!(sel.skillBand[0] <= 1 && sel.skillBand[1] >= 100) && <SkillRange band={sel.skillBand} />}
       {sel.verdict && <Tag label={VERDICT[sel.verdict]} color={sel.verdict === 'sleeper' ? t.good : sel.verdict === 'all-talk' ? t.bad : t.muted} dark />}
-      {moment && <Moment c={sel} action={moment} />}
+      {moment && <Moment c={sel} action={moment} tavern={REGION_STYLE[portRegion(portId ?? homeOf(game))].tavern} />}
       <Row>
         {(Object.keys(SCOUT_ACTIONS) as ScoutAction[]).map((a) => (
           <Button
@@ -224,13 +226,13 @@ function RecruitCard({ game, now, onScout, onHire, sel, rare = false }: Props & 
 }
 
 /** A scouting action told as a little moment on the quay. */
-function Moment({ c, action }: { c: CaptainView; action: ScoutAction }) {
+function Moment({ c, action, tavern }: { c: CaptainView; action: ScoutAction; tavern: string }) {
   const t = useTheme()
   const first = c.name.split(' ')[0]
   const latest = c.traits[c.traits.length - 1]
   const text =
     action === 'ask'
-      ? `You stand a round at the Gull & Lantern. Someone at the bar leans in: “${latest?.rumour ?? '…'}”`
+      ? `You stand a round at ${tavern}. Someone at the bar leans in: “${latest?.rumour ?? '…'}”`
       : action === 'logbook'
         ? `${first} lets you leaf through their logbook under the lamp. Tidy entries, a few smudged ones. Skill somewhere between ${c.skillBand[0]} and ${c.skillBand[1]}.`
         : `You take ${first} out past the breakwater as the lamps come on. By the time you tie up, you have a feeling: ${c.verdict ? VERDICT[c.verdict] : '…'}.`

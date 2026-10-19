@@ -7,6 +7,7 @@ import { getBoatClass, getPort } from '../../../src/game/economy'
 import { captainViewById, handViewsOn } from '../../../src/game/crew'
 import { getVoyage } from '../../../src/game/state'
 import { handCount } from '../../../src/game/hands'
+import { getPortDef, homeOf } from '../../../src/game/regions'
 import { routeWeather } from '../../../src/game/weather'
 import { WEATHER } from '../../../src/game/data/weather'
 import { coins, duration, percent } from '../../../src/format'
@@ -74,7 +75,7 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
         <View style={[styles.pill, { backgroundColor: 'rgba(29,20,32,0.75)' }]}>
           <View style={[styles.dot, { backgroundColor: mode === 'sunk' ? t.bad : t[weather] }]} />
           <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 13 }}>
-            {mode === 'sunk' ? 'Sunk' : mode === 'docked' ? 'Moored at Saltmarsh Quay' : `${WEATHER[weather].name}${WEATHER[weather].lossRisk ? ` · ${percent(WEATHER[weather].lossRisk)} risk` : ''}`}
+            {mode === 'sunk' ? 'Sunk' : mode === 'docked' ? `Moored at ${getPortDef(homeOf(game)).name}` : `${WEATHER[weather].name}${WEATHER[weather].lossRisk ? ` · ${percent(WEATHER[weather].lossRisk)} risk` : ''}`}
           </Text>
         </View>
       </View>
@@ -104,7 +105,7 @@ export function BoatScreen({ game, boat, now, onOpenCaptain, controls }: Props) 
         </Muted>
         {v && dest && (
           <Row style={{ flexWrap: 'nowrap' }}>
-            <Muted>Saltmarsh</Muted>
+            <Muted>{getPortDef(homeOf(game)).name.split(' ')[0]}</Muted>
             <View style={[styles.track, { backgroundColor: t.border }]}>
               <View style={{ width: `${progress * 100}%`, height: 6, borderRadius: 3, backgroundColor: t.accent }} />
             </View>

@@ -93,6 +93,14 @@ scripts/sim.ts       balance harness
 
 - When a boat sinks, her captain clings to the wreckage. Raise her within **6 hours** (the clock runs while you're away) or the captain is lost at sea and leaves your roster. The wreck itself stays on the seabed and can still be raised. Bonded captains wait with their ship. With alerts on, the phone warns you an hour before.
 
+## The map
+
+- The chart grows as you sail. You start in **Saltmarsh Bay** (5 ports). Beyond it lie **the Fogbanks**, **Sunward Shoals**, **the Ironcliffs** and **Lantern Reach**: 18 ports in all, villages, towns and cities.
+- Each region opens when its chart fills, from completed trips to the outer ports of the region before (calm +1, choppy +2, rough +4, storm +7 points; 150 / 700 / 2,200 / 5,000 to open). The map shows the next region under fog, the ports that chart it, and the progress.
+- Every voyage is a round trip from home. Farther ports pay more per trip but take longer; far waters pay slightly less per load so pay per minute stays level. Each region's sea leans its own way: stormy Ironcliffs, calm Shoals, restless Fogbanks.
+- **Every open port can be visited**: its town (each region looks different), weather and demand, a quick send for docked boats, and its own quay and tavern, as big as the port (village 2 captains/2 hands, town 3/3, city 5/4). People dress like their region. Watches are shared.
+- **Moving home**: buy the harbour office in any charted town or city (25k in the bay up to 2M in Lantern Reach) and your fleet sails from there; upgrades come with you, and moving back to an office you own is free. Every boat must be in port first.
+
 ## Deckhands and the tavern
 
 - A boat of tier *t* needs *t − 1* deckhands (none on tier 1, five on a tier-6). They're found at the **Gull & Lantern** (Captains → The tavern): 4 new faces every 6 hours. Hiring one onto a boat is a one-off fee of 5% of the boat's tier price; there are no wages.

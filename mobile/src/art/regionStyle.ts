@@ -13,6 +13,10 @@ export interface RegionStyle {
   /** A tint laid over the sky and sea. */
   tint: string
   tintAmount: number
+  /** The tavern's name, its walls and its floor. */
+  tavern: string
+  tavernWall: [string, string]
+  tavernFloor: [string, string]
   /** Clothes: if set, people from here pick from these instead of the usual. */
   hats?: HatKind[]
   coats?: string[]
@@ -27,6 +31,9 @@ export const REGION_STYLE: Record<RegionId, RegionStyle> = {
     roofs: ['#4a2e22', '#3a2420', '#5a3424'],
     tint: '#000000',
     tintAmount: 0,
+    tavern: 'The Gull & Lantern',
+    tavernWall: ['#4a2e22', '#6e4430'],
+    tavernFloor: ['#6e4430', '#3a2420'],
   },
   fogbanks: {
     land: '#5b6470',
@@ -34,6 +41,9 @@ export const REGION_STYLE: Record<RegionId, RegionStyle> = {
     roofs: ['#3f4650', '#2e333a', '#4a5260'],
     tint: '#a8b4c0',
     tintAmount: 0.28,
+    tavern: 'The Foghorn',
+    tavernWall: ['#3f4650', '#5b6470'],
+    tavernFloor: ['#5a5452', '#2e2a2a'],
     hats: ['souwester', 'beanie', 'souwester', 'cap'],
     coats: ['#4a5a66', '#5b6470', '#3f4a52', '#6b7480'],
     coatStyles: ['oilskin', 'raincoat', 'oilskin', 'knit'],
@@ -45,6 +55,9 @@ export const REGION_STYLE: Record<RegionId, RegionStyle> = {
     roofs: ['#c2452a', '#2f8a8a', '#e9772f'],
     tint: '#ffd27a',
     tintAmount: 0.12,
+    tavern: 'The Painted Parrot',
+    tavernWall: ['#c97a5a', '#e8b07a'],
+    tavernFloor: ['#c9a26a', '#8a6a3a'],
     hats: ['brim', 'brim', 'bare', 'bun'],
     coats: ['#e9b23c', '#2f8a8a', '#e8a0b4', '#f3efe6', '#e9772f'],
     coatStyles: ['stripes', 'peacoat', 'stripes', 'knit'],
@@ -56,6 +69,9 @@ export const REGION_STYLE: Record<RegionId, RegionStyle> = {
     roofs: ['#1d2128', '#2a2e36', '#e8eef2'],
     tint: '#cfe0f0',
     tintAmount: 0.18,
+    tavern: 'The Iron Kettle',
+    tavernWall: ['#2a2e36', '#4a4f58'],
+    tavernFloor: ['#4a3a30', '#221a16'],
     hats: ['beanie', 'beanie', 'cap', 'souwester'],
     coats: ['#23395b', '#3a3026', '#2e2a33', '#46566e'],
     coatStyles: ['knit', 'knit', 'peacoat', 'oilskin'],
@@ -67,6 +83,9 @@ export const REGION_STYLE: Record<RegionId, RegionStyle> = {
     roofs: ['#1d1218', '#2a1e30', '#7a1f2a'],
     tint: '#ff9a4a',
     tintAmount: 0.16,
+    tavern: 'The Last Lamp',
+    tavernWall: ['#3a1e2a', '#5a2e36'],
+    tavernFloor: ['#4a2a22', '#1d1218'],
     hats: ['cap', 'brim', 'bare', 'cap'],
     coats: ['#4a3346', '#7a4e5e', '#2a1e30', '#5a3c4c'],
     coatStyles: ['peacoat', 'peacoat', 'raincoat', 'stripes'],

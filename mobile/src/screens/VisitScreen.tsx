@@ -7,8 +7,8 @@ import type { GameState } from '../../../src/game/types'
 import { getBoatClass, routeDistance } from '../../../src/game/economy'
 import { quoteVoyage } from '../../../src/game/state'
 import { routeWeather } from '../../../src/game/weather'
-import { getPortDef } from '../../../src/game/regions'
-import { HOME_PORT_ID, getRegion } from '../../../src/game/data/ports'
+import { getPortDef, homeOf } from '../../../src/game/regions'
+import { HOME_PORT_ID, HOME_PRICE, getRegion } from '../../../src/game/data/ports'
 import { WEATHER } from '../../../src/game/data/weather'
 import type { ScoutAction } from '../../../src/game/data/captains'
 import { coins, duration } from '../../../src/format'
@@ -28,18 +28,22 @@ type Props = {
   onBuyDrink: (handId: string) => boolean
   onHireHand: (handId: string, boatId: string) => void
   onOpenCaptain: (id: string) => void
+  onMoveHome: (portId: string) => void
 }
 
 const SIZE = { village: 'Village', town: 'Town', city: 'City' } as const
 
-export function VisitScreen({ game, portId, now, onSend, ...people }: Props) {
+export function VisitScreen({ game, portId, now, onSend, onMoveHome, ...people }: Props) {
   const t = useTheme()
   const { width } = useWindowDimensions()
   const port = getPortDef(portId)
   const region = getRegion(port.region)
   const route = game.routes.find((r) => r.portB === portId)
   const [view, setView] = useState<CaptainsView>('quay')
-  const home = portId === HOME_PORT_ID
+  const home = portId === homeOf(game)
+  const owned = (game.player.homesOwned ?? [HOME_PORT_ID]).includes(portId)
+  const price = owned ? 0 : HOME_PRICE[port.region]
+  const busy = game.player.ownedBoats.some((b) => b.state !== 'idle')
   const weather = route ? routeWeather(game, route.id, now) : null
   const docked = game.player.ownedBoats.filter((b) => b.state === 'idle' && b.captainId && !b.managedBy)
 
@@ -54,7 +58,7 @@ export function VisitScreen({ game, portId, now, onSend, ...people }: Props) {
         </Row>
         <Muted>
           {SIZE[port.size]} · {region.name}
-          {route ? ` · ${routeDistance(route)} leagues from home` : ' · your home port'}
+          {home ? ' · your home port' : route ? ` · ${routeDistance(route)} leagues from home` : ''}
         </Muted>
         <Body style={{ fontSize: 14, color: '#e2d2c8' }}>{region.blurb}</Body>
         {route && (
@@ -90,6 +94,18 @@ export function VisitScreen({ game, portId, now, onSend, ...people }: Props) {
             })
           )}
         </>
+      )}
+
+      {!home && port.size !== 'village' && (
+        <Card>
+          <Body style={{ fontWeight: '700' }}>{owned ? 'Your harbour office here' : 'The harbour office is for sale'}</Body>
+          <Muted>
+            Make {port.name} home: your fleet sails from here, and its quay and tavern become your own. Port upgrades come with you.
+            {owned ? ' You own it, so moving back is free.' : ''}
+          </Muted>
+          {busy && <Muted>Bring every boat into port (and raise any wrecks) first.</Muted>}
+          <Button label={owned ? `Move home to ${port.name}` : `Buy and move home · ${coins(price)}c`} disabled={busy || game.player.coins < price} onPress={() => onMoveHome(portId)} />
+        </Card>
       )}
 
       <Heading>{home ? 'Hiring at home' : `Hiring in ${port.name}`}</Heading>

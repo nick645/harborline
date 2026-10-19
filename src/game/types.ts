@@ -222,6 +222,10 @@ export interface Player {
   portUpgrades: Record<string, number>
   /** Highest boat tier ever owned: unlocks manager roles and grows the fleet cap. */
   maxTierReached: number
+  /** Where the fleet sails from. Absent in older saves: Saltmarsh Quay. */
+  home?: string
+  /** Harbour offices bought; moving back to one is free. Saltmarsh is always yours. */
+  homesOwned?: string[]
   /** Absolute timestamp of the last settle while the player was present. */
   lastSeenAt: number
 }

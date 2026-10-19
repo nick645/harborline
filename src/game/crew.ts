@@ -9,7 +9,8 @@ import { addRumour, captainMods, captainView, combineMods, makeBand, poolRefresh
 import { getBoatClass, handFee, handsNeeded } from './economy'
 import { getHandTrait, handCount, handsOn } from './hands'
 import { DRINK_WATCHES } from './data/hands'
-import { HOME_PORT_ID, type RegionId } from './data/ports'
+import type { RegionId } from './data/ports'
+import { homeOf } from './regions'
 import { hooksOf } from './abilities'
 import { captainsAboard, GameError, getBoat, getCaptain, log, managerOf, topTier } from './state'
 import { nextUpgradeCost, scoutLevel, upgradeLevel } from './upgrades'
@@ -52,7 +53,7 @@ export function tavernViews(state: GameState): { hands: HandView[]; captain: Cap
 
 /** Who's looking for work at one port: its quay and tavern (home uses the main pools). */
 export function portPeople(state: GameState, portId: string): { recruits: CaptainView[]; hands: HandView[]; captain: CaptainView | null } {
-  if (portId === HOME_PORT_ID) return { recruits: recruitViews(state), ...tavernViews(state) }
+  if (portId === homeOf(state)) return { recruits: recruitViews(state), ...tavernViews(state) }
   const p = state.portPools?.[portId]
   return { recruits: (p?.recruits ?? []).map(captainView), hands: (p?.hands ?? []).map(handView), captain: p?.captain ? captainView(p.captain) : null }
 }

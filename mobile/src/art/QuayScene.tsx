@@ -9,6 +9,7 @@ import { useDerivedValue } from 'react-native-reanimated'
 import { getBoatClass } from '../../../src/game/economy'
 import type { Light } from './light'
 import { lookFor } from './looks'
+import { REGION_STYLE } from './regionStyle'
 import type { RegionId } from '../../../src/game/data/ports'
 import { FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
@@ -87,7 +88,12 @@ export function QuayScene({
   const span = W - 36 - 56 * FIGURE_SCALE - 2 * PACE
   const pairs = Math.floor(recruits.length / 2)
   const xs = recruits.map((_, i) => (recruits.length > 1 ? 18 + PACE + (i * span) / (recruits.length - 1) : (W - 56 * FIGURE_SCALE) / 2))
-  const wall = lit('#7a5038')
+  const st = REGION_STYLE[region]
+  const wall = lit(region === 'bay' ? '#7a5038' : st.walls[0])
+  const roof = lit(region === 'bay' ? '#4a2e22' : st.roofs[0])
+  const sky = mix(light.sky, st.tint, st.tintAmount)
+  const skyLow = mix(light.skyLow, st.tint, st.tintAmount)
+  const sea = mix(light.sea, st.tint, st.tintAmount * 0.7)
   const night = light.stars > 0
 
   return (
@@ -96,7 +102,7 @@ export function QuayScene({
         <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
           {/* Sky and sea */}
           <Rect x={0} y={0} width={W} height={112}>
-            <LinearGradient start={vec(0, 0)} end={vec(0, 112)} colors={[light.sky, light.skyLow]} />
+            <LinearGradient start={vec(0, 0)} end={vec(0, 112)} colors={[sky, skyLow]} />
           </Rect>
           <Circle cx={Math.min(200, light.sunX)} cy={Math.min(90, light.sunY)} r={20} color={light.sun} />
           <Group opacity={light.stars}>
@@ -106,7 +112,7 @@ export function QuayScene({
           </Group>
           <Path path="M0 112 L 30 100 L 70 106 L 110 96 L 160 104 L 250 98 L 250 112 Z" color={light.land} />
           <Rect x={0} y={110} width={W} height={80}>
-            <LinearGradient start={vec(0, 110)} end={vec(0, 190)} colors={[light.sea, mix(light.sea, '#0e0a18', 0.3)]} />
+            <LinearGradient start={vec(0, 110)} end={vec(0, 190)} colors={[sea, mix(sea, '#0e0a18', 0.3)]} />
           </Rect>
           <Group transform={waves}>
             {[124, 146, 168].map((wy, i) => (
@@ -132,7 +138,7 @@ export function QuayScene({
               <Path key={i} path={`M0 ${8 + i * 10.5} h 108`} color={shade(wall, 0.25)} style="stroke" strokeWidth={0.8} />
             ))}
             <Path path="M0 0 V 150 M108 0 V 150" color={lit('#4a2e22')} style="stroke" strokeWidth={5} />
-            <Path path="M-10 2 L 54 -36 L 118 2 Z" color={lit('#4a2e22')} />
+            <Path path="M-10 2 L 54 -36 L 118 2 Z" color={roof} />
             <Path path="M-10 2 L 54 -36 L 118 2" color={lit('#2e1c19')} style="stroke" strokeWidth={3} strokeJoin="round" />
             <Rect x={70} y={-42} width={12} height={26} color={lit('#4a2e22')} />
             {[16, 62].map((wx) => (
@@ -259,7 +265,7 @@ export function QuayScene({
         <Pressable
           onPress={onEnterTavern}
           accessibilityRole="button"
-          accessibilityLabel="Go into the Gull & Lantern"
+          accessibilityLabel={`Go into ${st.tavern}`}
           style={{ position: 'absolute', left: 250 * s, top: 4 * s, width: 108 * s, height: 180 * s }}
         />
       )}

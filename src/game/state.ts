@@ -4,7 +4,7 @@
 
 import type { AwayReport, Boat, Captain, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage } from './types'
 import { BOAT_CLASSES } from './data/boats'
-import { ROUTES } from './data/routes'
+import { ROUTES, routesFrom } from './data/routes'
 import { NICKNAMES } from './data/nicknames'
 import { WEATHER, LOST_TRIP_CONDITION, WEATHER_SLOT_MS } from './data/weather'
 import {
@@ -47,8 +47,8 @@ import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, r
 import { hooksOf, type TripContext } from './abilities'
 import { routeWeather, weatherSlot } from './weather'
 import { handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
-import { chartTrip, getPortDef, portOpen, refreshPortPools } from './regions'
-import { getRegion } from './data/ports'
+import { chartTrip, getPortDef, homeOf, portOpen, refreshPortPools } from './regions'
+import { getRegion, HOME_PRICE } from './data/ports'
 import { countParts, dropChances, getPart, hasParts, partName, pickPart, takeParts } from './parts'
 import {
   captainMods,
@@ -477,9 +477,48 @@ export function settleAway(state: GameState, now: number): { state: GameState; r
 
 // ---------- internals (mutate the given state) ----------
 
+/**
+ * Move the fleet's home to another town or city: buy its harbour office (free if you already own
+ * it). Routes then run from there, with fresh demand; every boat must be in port first.
+ * Port upgrades, captains and the tavern's regulars come along.
+ */
+export function moveHome(state: GameState, portId: string, now: number): GameState {
+  const port = getPortDef(portId)
+  if (portId === homeOf(state)) throw new GameError("That's already home")
+  if (!portOpen(state, portId)) throw new GameError("Those waters aren't charted yet")
+  if (port.size === 'village') throw new GameError('Only a town or city has a harbour office')
+  if (state.player.ownedBoats.some((b) => b.state === 'sailing' || b.state === 'returning')) throw new GameError('Bring every boat home first')
+  if (state.player.ownedBoats.some((b) => b.state === 'sunk')) throw new GameError('Raise your wrecks before you move')
+  const owned = new Set(state.player.homesOwned ?? ['saltmarsh'])
+  const price = owned.has(portId) ? 0 : HOME_PRICE[port.region]
+  if (state.player.coins < price) throw new GameError('Not enough coins')
+  const s = structuredClone(state)
+  s.player.coins -= price
+  owned.add(portId)
+  s.player.homesOwned = [...owned]
+  s.player.home = portId
+  s.routes = []
+  ensureRoutes(s)
+  // Boats keep their last port as the route there from the new home, or forget it.
+  for (const b of s.player.ownedBoats) {
+    const dest = b.currentRoute ? s.routes.find((r) => r.portB === getRoute(state, b.currentRoute!).portB) : null
+    b.currentRoute = dest?.id ?? null
+    if (!dest) b.managedBy = null
+  }
+  // The new home's people become the home quay and tavern on the next refresh.
+  delete s.portPools?.[portId]
+  s.recruitPool.slot = -1
+  if (s.tavern) s.tavern.slot = -1
+  refreshRecruitPool(s, now, scoutLevel(s))
+  refreshTavern(s, now)
+  refreshPortPools(s, now)
+  log(s, now, 'info', `Moved home to ${port.name}${price ? ` for ${price.toLocaleString('en-US')}c` : ''}`)
+  return s
+}
+
 /** Every open port has a route from home, with its own demand; add any that are missing. */
 function ensureRoutes(s: GameState) {
-  for (const r of ROUTES) {
+  for (const r of routesFrom(homeOf(s))) {
     if (s.routes.some((x) => x.id === r.id) || !portOpen(s, r.portB)) continue
     s.routes.push({ ...r, demandCargo: rollDemand(s.rng), demandPassenger: rollDemand(s.rng) })
   }

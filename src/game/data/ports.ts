@@ -114,6 +114,9 @@ export function getRegion(id: RegionId): RegionDef {
   return REGIONS.find((r) => r.id === id)!
 }
 
+/** What a harbour office costs, by region: the price of moving your home port there. */
+export const HOME_PRICE: Record<RegionId, number> = { bay: 25_000, fogbanks: 50_000, sunward: 150_000, ironcliffs: 600_000, lantern: 2_000_000 }
+
 /** The home bay's extent, used by the old web prototype's map. */
 export const MAP_WIDTH = 1000
 export const MAP_HEIGHT = 700

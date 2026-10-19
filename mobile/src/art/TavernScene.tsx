@@ -10,6 +10,7 @@ import { Pressable, View } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Light } from './light'
 import { lookFor, type Look } from './looks'
+import { REGION_STYLE } from './regionStyle'
 import type { RegionId } from '../../../src/game/data/ports'
 import { Figure, FIGURE_FULL_H } from './Figure'
 import { Chatter, Walker } from './Walker'
@@ -126,7 +127,7 @@ export function TavernScene({
         <Group transform={[{ scale: s }]} clip={rrect(rect(0, 0, W, H), 20, 20)}>
           {/* Back wall, beams and a window */}
           <Rect x={0} y={0} width={W} height={BACK}>
-            <LinearGradient start={vec(0, 0)} end={vec(0, BACK)} colors={['#4a2e22', '#6e4430']} />
+            <LinearGradient start={vec(0, 0)} end={vec(0, BACK)} colors={REGION_STYLE[region].tavernWall} />
           </Rect>
           {Array.from({ length: 9 }, (_, i) => (
             <Path key={i} path={`M${i * 42 + 10} 0 V ${BACK}`} color="#3a2420" style="stroke" strokeWidth={1} opacity={0.5} />
@@ -186,7 +187,7 @@ export function TavernScene({
 
           {/* Floor */}
           <Rect x={0} y={BACK} width={W} height={H - BACK}>
-            <LinearGradient start={vec(0, BACK)} end={vec(0, H)} colors={['#6e4430', '#3a2420']} />
+            <LinearGradient start={vec(0, BACK)} end={vec(0, H)} colors={REGION_STYLE[region].tavernFloor} />
           </Rect>
           <Path path="M0 206 h 358 M0 230 h 358 M0 258 h 358 M60 190 v 16 M180 206 v 24 M300 190 v 16 M120 230 v 28 M240 230 v 28" color="#2e1c19" style="stroke" strokeWidth={1} />
 

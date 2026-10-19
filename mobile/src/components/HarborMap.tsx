@@ -8,8 +8,8 @@ import type { GameState, Port, Weather } from '../../../src/game/types'
 import { getBoatClass, getPort } from '../../../src/game/economy'
 import { getVoyage } from '../../../src/game/state'
 import { routeWeather, weatherChangesAt } from '../../../src/game/weather'
-import { chartingNext, openPorts } from '../../../src/game/regions'
-import { HOME_PORT_ID, PORTS, REGIONS } from '../../../src/game/data/ports'
+import { chartingNext, homeOf, openPorts } from '../../../src/game/regions'
+import { PORTS, REGIONS } from '../../../src/game/data/ports'
 import { WEATHER } from '../../../src/game/data/weather'
 import { duration } from '../../../src/format'
 import { fonts, useTheme } from '../theme'
@@ -65,7 +65,7 @@ export function HarborMap({ game, now, onOpenPort }: { game: GameState; now: num
   const view = { x: (b.x0 + b.x1) / 2 - vw / 2, y: (b.y0 + b.y1) / 2 - vh / 2 + (next ? 60 * (vw / 1000) : 0), w: vw, h: vh }
   // Sizes in map units that stay the same on screen whatever the zoom.
   const k = vw / 1000
-  const home = getPort(HOME_PORT_ID)
+  const home = getPort(homeOf(game))
   const atSea = game.player.ownedBoats.filter((x) => x.state === 'sailing' || x.state === 'returning')
   const regions = REGIONS.filter((r) => open.some((p) => p.region === r.id))
   const weatherOf = (portId: string): Weather | null => {

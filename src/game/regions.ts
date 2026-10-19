@@ -8,6 +8,11 @@ import { QUAY_REPUTATION } from './data/captains'
 import { generateCaptain, recruitSlot } from './captains'
 import { generateHand, newHandId } from './hands'
 
+/** Where the fleet sails from. */
+export function homeOf(state: GameState): string {
+  return state.player.home ?? HOME_PORT_ID
+}
+
 export function getPortDef(id: string): Port {
   return PORTS.find((p) => p.id === id)!
 }
@@ -48,7 +53,7 @@ export function refreshPortPools(s: GameState, t: number) {
   s.portPools ??= {}
   const range = QUAY_REPUTATION[s.player.maxTierReached]
   for (const p of openPorts(s)) {
-    if (p.id === HOME_PORT_ID || s.portPools[p.id]?.slot === slot) continue
+    if (p.id === homeOf(s) || s.portPools[p.id]?.slot === slot) continue
     const size = PORT_POOLS[p.size]
     s.portPools[p.id] = {
       slot,

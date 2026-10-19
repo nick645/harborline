@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import type { GameState, PartRarity, PartType, Track } from '../../../src/game/types'
 import { craftableClasses, meltGroups } from '../../../src/game/state'
+import { getPortDef, homeOf } from '../../../src/game/regions'
 import { UPGRADES, upgradeQuote } from '../../../src/game/crew'
 import { getBoatClass } from '../../../src/game/economy'
 import { getAbility } from '../../../src/game/abilities'
@@ -26,7 +27,7 @@ type Props = {
 export function PortScreen({ game, onBuild, onCraft, onScrap, onMelt }: Props) {
   return (
     <View style={{ gap: 10 }}>
-      <Title size={24}>Saltmarsh Quay</Title>
+      <Title size={24}>{getPortDef(homeOf(game)).name}</Title>
       {UPGRADES.map((u) => {
         const q = upgradeQuote(game, u.id)
         return (
