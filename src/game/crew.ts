@@ -5,7 +5,7 @@ import type { Boat, Captain, CaptainRole, Deckhand, GameState, Track } from './t
 import { captainTiers, SCOUT_ACCURACY, SCOUT_ACTIONS, SCOUT_BAND_WIDTH, PROMOTION_VOYAGES, type ScoutAction } from './data/captains'
 import { MANAGER_ROLES, type ManagerRoleDef } from './data/managers'
 import { UPGRADES, type UpgradeId } from './data/upgrades'
-import { addRumour, captainMods, captainView, combineMods, makeBand, poolRefreshesAt, severance, verdictFor, willSail, type CaptainView } from './captains'
+import { addRumour, captainMods, captainView, combineMods, leastKnownSkill, narrowSkill, poolRefreshesAt, severance, verdictFor, willSail, type CaptainView } from './captains'
 import { getBoatClass, handFee, handsNeeded } from './economy'
 import { getHandTrait, handBerths, handsOn } from './hands'
 import type { RegionId } from './data/ports'
@@ -217,14 +217,17 @@ export function scoutRecruit(state: GameState, captainId: string, action: ScoutA
   const c = findRecruit(s, captainId)
   if (!c) throw new GameError('That captain has left the quay')
   const level = scoutLevel(s)
+  const width = SCOUT_BAND_WIDTH[level]
   if (action === 'logbook') {
-    const width = SCOUT_BAND_WIDTH[level]
-    if (c.skillBand[1] - c.skillBand[0] <= width) throw new GameError('Their logbook has nothing more to tell you')
-    c.skillBand = makeBand(s.rng, c.trueSkill, width)
+    // Their logbook shows one skill at a time: whichever you know least about.
+    if (!narrowSkill(s.rng, c, leastKnownSkill(c), width)) throw new GameError('Their logbook has nothing more to tell you')
   } else {
     if (action === 'run') {
       if (c.verdict) throw new GameError('You already took them out')
       c.verdict = verdictFor(c)
+      // Out on the water you see how they handle her, and what they might become.
+      narrowSkill(s.rng, c, leastKnownSkill(c), width)
+      c.potentialKnown = true
     }
     if (!addRumour(s.rng, c, SCOUT_ACCURACY[level]) && action === 'ask') throw new GameError('Nobody has anything more to say')
   }

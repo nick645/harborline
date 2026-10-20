@@ -21,6 +21,7 @@ import { seasonAt, seasonEndsAt } from '../src/game/weather'
 import { fleetCap } from '../src/game/upgrades'
 import { coins, duration } from '../src/format'
 import { PROMOTION_VOYAGES, QUAY_REPUTATION } from '../src/game/data/captains'
+import { devMakeLegend } from './src/devTools'
 import { TAVERN_RARE_BOOST } from '../src/game/data/hands'
 import { generateCaptain } from '../src/game/captains'
 import { chartingNext, homeOf } from '../src/game/regions'
@@ -446,11 +447,19 @@ function Harbor() {
                             // Dev: a guaranteed rare captain, two anchors above the quay.
                             const s = structuredClone(g)
                             const rep = Math.min(5, QUAY_REPUTATION[s.player.maxTierReached][1] + TAVERN_RARE_BOOST)
-                            const c = generateCaptain(s.rng, `c${s.nextCaptainSeq++}`, [rep, rep])
+                            const c = generateCaptain(s.rng, `c${s.nextCaptainSeq++}`, [rep, rep], 'tavern')
                             c.rare = true
                             if (s.tavern) s.tavern.captain = c
                             return s
                           })
+                        }
+                      />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Make my first captain a Legend"
+                        onPress={() =>
+                          act(devMakeLegend)
                         }
                       />
                       <Button small kind="secondary" label={gallery ? 'Hide boats' : 'Boat gallery'} onPress={() => setGallery(!gallery)} />

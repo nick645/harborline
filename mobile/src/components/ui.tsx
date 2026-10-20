@@ -194,7 +194,7 @@ export function Tile({ label, sub, onPress, accent, disabled }: { label: string;
 export function Measure({ children }: { children: (w: number, h: number) => ReactNode }) {
   const [box, setBox] = useState<{ w: number; h: number } | null>(null)
   return (
-    <View style={{ flex: 1, minHeight: 80, alignItems: 'center', justifyContent: 'center' }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+    <View style={{ flex: 1, minHeight: 80, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
       {box && box.w > 0 && children(Math.floor(box.w), Math.floor(box.h))}
     </View>
   )

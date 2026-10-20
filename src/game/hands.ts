@@ -83,7 +83,7 @@ export function refreshTavern(s: GameState, t: number) {
     tv.slot = slot
     if (!tv.captain && rollChance(s.rng, TAVERN_RARE_CHANCE)) {
       const rep = Math.min(5, QUAY_REPUTATION[s.player.maxTierReached][1] + TAVERN_RARE_BOOST)
-      tv.captain = newRecruit(s.rng, `c${s.nextCaptainSeq++}`, [rep, rep], t)
+      tv.captain = newRecruit(s.rng, `c${s.nextCaptainSeq++}`, [rep, rep], t, false, 'tavern')
       tv.captain.rare = true
     }
   }

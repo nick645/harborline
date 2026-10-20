@@ -11,7 +11,8 @@ import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
 import { homeTavern } from '../homeTavern'
 import { fonts, useTheme } from '../theme'
-import { Anchors, Body, Button, Card, Measure, Muted, Row, Segments, Tag, Title } from '../components/ui'
+import { Body, Button, Card, Measure, Muted, Row, Segments, Tag, Title } from '../components/ui'
+import { Lodestone, RankAbilities, SkillSheet, Standing } from '../components/SkillSheet'
 
 type Props = {
   game: GameState
@@ -29,7 +30,7 @@ const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'T
 
 export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFire, onTakeOver, onManagerCrewing, onPromote }: Props) {
   const t = useTheme()
-  const [panel, setPanel] = useState<'log' | 'orders'>('log')
+  const [panel, setPanel] = useState<'skills' | 'log' | 'orders'>('skills')
   const c = captainViewById(game, captainId)
   if (!c) return <Muted>That captain has moved on.</Muted>
   const boat = boatOfCaptain(game, c.id)
@@ -49,9 +50,12 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
       <Measure>{(w, h) => <CaptainScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={lookFor(c.id, c.rare, c.region)} place={atSea ? 'helm' : 'port'} />}</Measure>
 
       <Card>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <Title size={26}>{c.name}</Title>
-          <Anchors n={c.reputation} />
+        <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+          <Row style={{ flexShrink: 1, flexWrap: 'nowrap', gap: 6 }}>
+            <Title size={26}>{c.name}</Title>
+            {c.potential && (!c.rank || (c.rank === 'legend' && c.potential === 'mythic')) && <Lodestone potential={c.potential} size={20} />}
+          </Row>
+          <Standing c={c} />
         </Row>
         <Row>
           {c.verdict && <Tag label={VERDICT[c.verdict]} color={c.verdict === 'sleeper' ? t.good : c.verdict === 'all-talk' ? t.bad : t.muted} dark />}
@@ -62,10 +66,17 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
         <Muted>
           From {c.homePort} · takes tier {c.sailsTiers[0]}–{c.sailsTiers[1]} boats
         </Muted>
-        <SkillRange band={c.skillBand} />
       </Card>
 
-      <Segments items={[{ id: 'log', label: 'Logbook' }, { id: 'orders', label: role ? 'Desk' : 'Orders' }]} value={panel} onChange={setPanel} />
+      <Segments
+        items={[
+          { id: 'skills', label: 'Skills' },
+          { id: 'log', label: 'Logbook' },
+          { id: 'orders', label: role ? 'Desk' : 'Orders' },
+        ]}
+        value={panel}
+        onChange={setPanel}
+      />
       <View style={{ minHeight: 170, gap: 8 }}>
       {panel === 'orders' && boat && <Button small kind="secondary" label={`Go to ${boat.nickname}`} onPress={() => onOpenBoat(boat.id)} />}
 
@@ -95,6 +106,21 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
             />
           </Pressable>
         </Card>
+      )}
+
+      {panel === 'skills' && (
+        <View style={[styles.logbook, { backgroundColor: t.paper }]}>
+          <SkillSheet c={c} paper />
+          <RankAbilities c={c} paper />
+          {c.potential && (!c.rank || (c.rank === 'legend' && c.potential === 'mythic')) && (
+            <Row style={{ gap: 6, flexWrap: 'nowrap' }}>
+              <Lodestone potential={c.potential} />
+              <Text style={{ flex: 1, fontFamily: fonts.titleItalic, fontSize: 16, color: t.ink }}>
+                {c.rank === 'legend' ? 'A Legend, and still more in them: the sea may yet make them Mythic.' : c.potential === 'mythic' ? 'Something in them the sea has rarely seen. Keep them sailing.' : 'The makings of a Legend, if the sea brings it out of them.'}
+              </Text>
+            </Row>
+          )}
+        </View>
       )}
 
       {panel === 'log' && (
@@ -153,25 +179,8 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
   )
 }
 
-export function SkillRange({ band }: { band: [number, number] }) {
-  const t = useTheme()
-  const [lo, hi] = band
-  const unknown = lo <= 1 && hi >= 100
-  return (
-    <Row style={{ flexWrap: 'nowrap' }}>
-      <Muted>Skill</Muted>
-      <View style={[styles.skillTrack, { backgroundColor: t.border }]}>
-        {!unknown && <View style={[styles.skillBand, { left: `${lo - 1}%`, width: `${Math.max(2, hi - lo + 1)}%`, backgroundColor: t.accent }]} />}
-      </View>
-      <Muted>{unknown ? '?' : `${lo}–${hi}`}</Muted>
-    </Row>
-  )
-}
-
 const styles = StyleSheet.create({
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
   logbook: { borderRadius: 8, padding: 14, paddingLeft: 20, gap: 8, borderLeftWidth: 6, borderLeftColor: '#c2a98c' },
   pencil: { fontFamily: fonts.titleItalic, fontSize: 18, lineHeight: 22 },
-  skillTrack: { flex: 1, height: 8, borderRadius: 4, overflow: 'hidden' },
-  skillBand: { position: 'absolute', top: 0, bottom: 0, borderRadius: 4 },
 })

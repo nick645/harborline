@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, Weather } from './types'
+import { SKILL_IDS } from './data/captains'
 import {
   assignRoute,
   buyBoat,
@@ -49,6 +50,11 @@ function timeWith(s: GameState, routeId: string, weather: Weather, from = T0): n
 }
 
 /** Add a boat of any class directly, bypassing shop and crafting rules, with a captain who fits it. */
+/** Every captain an average hand in all five skills, so a test sees the boat and weather alone. */
+function average(s: GameState) {
+  for (const c of s.player.roster) for (const id of SKILL_IDS) c.skills[id] = 50
+}
+
 function give(s: GameState, classId: string): string {
   const id = `t${s.player.ownedBoats.length + 1}`
   const tier = getBoatClass(classId).sizeTier
@@ -507,6 +513,7 @@ describe('deckhands', () => {
   it('bigger boats need hands from the tavern; short-handed trips run longer', () => {
     let s = newGame(9, T0)
     const id = give(s, 'coastal-trawler') // tier 3: needs 2 hands
+    average(s)
     const cls = getBoatClass('coastal-trawler')
     expect(handsNeeded(cls)).toBe(2)
     expect(handsNeeded(getBoatClass('skiff'))).toBe(0)
@@ -541,6 +548,7 @@ describe('deckhands', () => {
     let s = newGame(9, T0)
     const id = give(s, 'harbor-skiff')
     s.player.coins = 100_000
+    average(s)
     s.tavern!.hands[0].trait = 'quick'
     wonOver(s)
     s = hireHand(s, s.tavern!.hands[0].id, id, T0)

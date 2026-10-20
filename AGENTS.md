@@ -125,6 +125,13 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   picks. A new game has one keen captain who's easy to win. Managers don't court. Sim (wide,
   6 h): first purchase 50 → 58 min, tier 2 4.6 → 4.8 h; 40 h: tier 4 31.8 → 33.3 h.
 
+- Skills and ranks (user-approved 2026-10-19): five sea skills (Helm, Charts, Trade, Nerve,
+  Command) on a greyed-out page that scouting fills in a skill at a time; a lodestone marks
+  Legend or Mythic potential (much likelier for the tavern's unusual captains); skills grow by
+  doing; Legend (overall 90) and Mythic (96) are ranks above five anchors with signature
+  abilities. Numbers are Claude's picks. Sim (wide, 6 h): tier 2 4.8 → 4.96 h, first purchase
+  58 → 60 min (both at the edge of their targets).
+
 ## Originality
 
 The user does not want this to read as a copy of Pocket Planes or of EA's college football

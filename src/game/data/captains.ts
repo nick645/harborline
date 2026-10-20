@@ -60,11 +60,101 @@ export const GROWTH: Record<DevelopmentStyle, { startAfter: number; every: numbe
   peaked: { startAfter: 0, every: 25, step: -1 },
 }
 
-// ---------- skill ----------
+// ---------- skills ----------
 
-/** Skill 50 is neutral. Each point above or below moves pay and storm damage. */
-export const SKILL_PAY_PER_POINT = 0.004 // 100 → +20%, 1 → −20%
-export const SKILL_DAMAGE_PER_POINT = 0.003 // 100 → −15%, 1 → +15%
+export type SkillId = 'helm' | 'charts' | 'trade' | 'nerve' | 'command'
+
+export interface SkillDef {
+  id: SkillId
+  name: string
+  /** What it does, for the logbook page. */
+  description: string
+}
+
+/** Five sea skills, each shaping a different part of a trip. 50 is neutral in every one. */
+export const SKILLS: SkillDef[] = [
+  { id: 'helm', name: 'Helm', description: 'Less hull damage, in any weather' },
+  { id: 'charts', name: 'Charts', description: 'Faster trips' },
+  { id: 'trade', name: 'Trade', description: 'Better pay' },
+  { id: 'nerve', name: 'Nerve', description: 'Less chance of losing a cargo in rough water and storms' },
+  { id: 'command', name: 'Command', description: 'Gets more from the hands aboard: less damage, quicker trips' },
+]
+export const SKILL_IDS = SKILLS.map((x) => x.id)
+
+/** Per point above or below 50. */
+export const SKILL_PAY_PER_POINT = 0.004 // Trade 100 → +20% pay
+export const SKILL_DAMAGE_PER_POINT = 0.003 // Helm 100 → −15% hull damage
+export const SKILL_SPEED_PER_POINT = 0.002 // Charts 100 → −10% trip time
+export const SKILL_NERVE_PER_POINT = 0.006 // Nerve 100 → −30% loss risk
+export const SKILL_COMMAND_PER_POINT = 0.002 // Command 100 → −10% damage and −5% time with hands aboard
+/** Below 50, Charts, Nerve and Command cost only this share of what they'd give above it. */
+export const SKILL_BELOW_AVERAGE = 0.5
+
+/** How far each skill strays from a captain's overall ability when they're generated. */
+export const SKILL_SPREAD = 14
+
+/**
+ * Learning by doing: on each voyage, each skill has this chance (times how much the voyage used
+ * it) of going up a point, by development style. Peaked captains slowly slip instead.
+ */
+export const LEARN_RATE: Record<DevelopmentStyle, { startAfter: number; rate: number }> = {
+  steady: { startAfter: 0, rate: 0.1 },
+  'quick-study': { startAfter: 0, rate: 0.2 },
+  'late-bloomer': { startAfter: 40, rate: 0.25 },
+  peaked: { startAfter: 0, rate: -0.04 },
+}
+/** How much a voyage works each skill, by weather. Trade and charts are always in use. */
+export const SKILL_USE: Record<SkillId, Record<Weather, number>> = {
+  helm: { calm: 0.4, choppy: 0.8, rough: 1.6, storm: 2 },
+  charts: { calm: 1, choppy: 1, rough: 1, storm: 1 },
+  trade: { calm: 1, choppy: 1, rough: 1, storm: 1 },
+  nerve: { calm: 0.2, choppy: 0.5, rough: 1.2, storm: 2.5 },
+  command: { calm: 0.3, choppy: 0.3, rough: 0.3, storm: 0.3 },
+}
+/** Command is worked by every hand aboard, on top of the base above. */
+export const COMMAND_USE_PER_HAND = 0.3
+
+// ---------- potential and the ranks above five anchors ----------
+
+/** What a captain could become. Hidden until scouting or the sea turns it up. */
+export type Potential = 'none' | 'legend' | 'mythic'
+/** Odds of each potential: most captains, and the unusual ones by the tavern fire. */
+export const POTENTIAL_ODDS = { quay: { legend: 0.04, mythic: 0.004 }, tavern: { legend: 0.3, mythic: 0.06 } }
+/** A captain with no potential never has a skill ceiling above this. */
+export const ORDINARY_CEILING = 88
+/** Ceilings for those who could go further. */
+export const LEGEND_CEILING: [number, number] = [90, 97]
+export const MYTHIC_CEILING: [number, number] = [96, 100]
+/** Overall skill (the average of the five) that makes a Legend, or a Mythic. */
+export const LEGEND_AT = 90
+export const MYTHIC_AT = 96
+/** A captain's own potential shows after this many voyages, if scouting hasn't turned it up. */
+export const POTENTIAL_KNOWN_AFTER = 20
+
+export type Rank = 'legend' | 'mythic'
+
+export interface RankAbilityDef {
+  id: string
+  name: string
+  description: string
+}
+
+/** A Legend's signature: one of these, for good. */
+export const LEGEND_ABILITIES: RankAbilityDef[] = [
+  { id: 'iron-keel', name: 'Iron keel', description: 'Her boat can’t sink while they’re at the helm' },
+  { id: 'fair-winds', name: 'Fair winds', description: 'Trips 20% faster' },
+  { id: 'silver-tongue', name: 'Silver tongue', description: '+20% pay' },
+  { id: 'wreck-reader', name: 'Wreck-reader', description: 'An extra part roll on every trip' },
+  { id: 'storm-rider', name: 'Storm rider', description: '+40% pay in storms' },
+]
+
+/** A Mythic captain's own: rarer, stranger, on top of their Legend signature. */
+export const MYTHIC_ABILITIES: RankAbilityDef[] = [
+  { id: 'calm-bringer', name: 'Calm-bringer', description: 'No hull damage in rough water or storms' },
+  { id: 'tide-turner', name: 'Tide-turner', description: 'Trips 35% faster and half the fuel' },
+  { id: 'drowned-luck', name: 'Drowned luck', description: 'Two extra part rolls on every trip' },
+  { id: 'stormcaller', name: 'Stormcaller', description: 'Storms pay double and never take the cargo' },
+]
 
 export const SKILL_MIN = 5
 export const SKILL_MAX = 95

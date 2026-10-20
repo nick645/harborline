@@ -15,13 +15,13 @@ import {
   setManaged,
   takeOverCaptain,
 } from './crew'
-import { captainView, generateCaptain, newRecruit, recordVoyage, verdictFor } from './captains'
+import { captainMods, captainView, generateCaptain, migrateCaptain, newRecruit, recordVoyage, unknownBands, verdictFor } from './captains'
 import { createRng } from './rolls'
 import { fleetCap, scoutLevel } from './upgrades'
 import { naturalWeather } from './weather'
 import { getPart } from './parts'
 import { getBoatClass } from './economy'
-import { HIRE_FEE, SCOUT_ACCURACY, SCOUT_BAND_WIDTH, skillToAnchors, WATCHES_BASE } from './data/captains'
+import { HIRE_FEE, LEGEND_AT, SCOUT_ACCURACY, SCOUT_BAND_WIDTH, SKILL_IDS, skillToAnchors, WATCHES_BASE } from './data/captains'
 import { WEATHER_SLOT_MS } from './data/weather'
 import { ROUTES } from './data/routes'
 
@@ -55,7 +55,7 @@ describe('generation', () => {
       expect(c.fee).toBeLessThanOrEqual(HIRE_FEE[c.reputation] * 1.1 + 10)
       expect(c.hiddenTraits.length).toBeGreaterThanOrEqual(2)
       expect(c.hiddenTraits.length).toBeLessThanOrEqual(4)
-      expect(c.skillBand).toEqual([1, 100])
+      for (const id of SKILL_IDS) expect(c.bands[id]).toEqual([1, 100])
       expect(c.rumours).toHaveLength(1)
     }
     expect(right / 3000).toBeGreaterThan(0.65)
@@ -71,11 +71,17 @@ describe('scouting', () => {
     expect(s.recruitPool.watchesLeft).toBe(WATCHES_BASE)
     s = scoutRecruit(s, r.id, 'logbook')
     const after = s.recruitPool.recruits[0]
-    expect(after.skillBand[1] - after.skillBand[0]).toBe(SCOUT_BAND_WIDTH[1])
-    expect(after.trueSkill).toBeGreaterThanOrEqual(after.skillBand[0])
-    expect(after.trueSkill).toBeLessThanOrEqual(after.skillBand[1])
+    // One skill at a time comes out of the logbook; the rest stay greyed out.
+    const learned = SKILL_IDS.filter((id) => after.bands[id][1] - after.bands[id][0] < 99)
+    expect(learned).toHaveLength(1)
+    const id = learned[0]
+    expect(after.bands[id][1] - after.bands[id][0]).toBe(SCOUT_BAND_WIDTH[1])
+    expect(after.skills[id]).toBeGreaterThanOrEqual(after.bands[id][0])
+    expect(after.skills[id]).toBeLessThanOrEqual(after.bands[id][1])
+    expect(captainView(after).potential).toBeNull()
     s = scoutRecruit(s, r.id, 'run')
     expect(s.recruitPool.recruits[0].verdict).toBe(verdictFor(r))
+    expect(s.recruitPool.recruits[0].potentialKnown).toBe(true)
     expect(s.recruitPool.watchesLeft).toBe(WATCHES_BASE - 2 - 3)
     expect(() => scoutRecruit(s, r.id, 'run')).toThrow()
     expect(() => scoutRecruit(scoutRecruit(s, r.id, 'ask'), r.id, 'logbook')).toThrow() // out of watches or nothing new
@@ -129,7 +135,8 @@ describe('captains at sea', () => {
     const s = newGame(1, T0)
     const t = timeWith(s, ROUTES[3].id, 'calm')
     const base = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t, 'true').payout
-    crew(s, 0, { trueSkill: 100, hiddenTraits: ['haggler', 'thrifty'], skillBand: [1, 100] })
+    const top = Object.fromEntries(SKILL_IDS.map((id) => [id, 100])) as Captain['skills']
+    crew(s, 0, { trueSkill: 100, skills: top, hiddenTraits: ['haggler', 'thrifty'], bands: unknownBands() })
     const truth = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t, 'true').payout
     const known = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t).payout
     expect(truth).toBeGreaterThan(base)
@@ -142,11 +149,15 @@ describe('captains at sea', () => {
     const c = captain(4)
     for (let i = 0; i < 200; i++) {
       recordVoyage(rng, c, { track: 'cargo', weather: 'calm', t: T0 })
-      expect(c.trueSkill).toBeGreaterThanOrEqual(c.skillBand[0])
-      expect(c.trueSkill).toBeLessThanOrEqual(c.skillBand[1])
+      for (const id of SKILL_IDS) {
+        expect(c.skills[id]).toBeGreaterThanOrEqual(c.bands[id][0])
+        expect(c.skills[id]).toBeLessThanOrEqual(c.bands[id][1])
+      }
     }
-    expect(c.skillBand[1] - c.skillBand[0]).toBeLessThan(15)
-    expect(c.skillBand[1] - c.skillBand[0]).toBeGreaterThanOrEqual(6)
+    for (const id of SKILL_IDS) {
+      expect(c.bands[id][1] - c.bands[id][0]).toBeLessThan(15)
+      expect(c.bands[id][1] - c.bands[id][0]).toBeGreaterThanOrEqual(6)
+    }
     expect(c.developmentKnown).toBe(true)
   })
 
@@ -217,8 +228,9 @@ describe('reputation and boat size', () => {
 
   it('a good captain earns a bigger reputation at sea; an overrated one slips', () => {
     const rng = createRng(8)
-    const sleeper = captain(8, { reputation: 1, trueSkill: 75, ceiling: 75, development: 'steady' })
-    const allTalk = captain(9, { reputation: 4, trueSkill: 30, ceiling: 30, development: 'steady' })
+    const even = (n: number) => Object.fromEntries(SKILL_IDS.map((id) => [id, n])) as Captain['skills']
+    const sleeper = captain(8, { reputation: 1, trueSkill: 75, ceiling: 75, skills: even(75), ceilings: even(75), development: 'steady' })
+    const allTalk = captain(9, { reputation: 4, trueSkill: 30, ceiling: 30, skills: even(30), ceilings: even(30), development: 'steady' })
     for (let i = 0; i < 40; i++) {
       recordVoyage(rng, sleeper, { track: 'cargo', weather: 'calm', t: T0 })
       recordVoyage(rng, allTalk, { track: 'cargo', weather: 'calm', t: T0 })
@@ -419,5 +431,72 @@ describe('the Derelict Queen', () => {
     const other = captain(77, { id: 'other' })
     s.player.roster.push(other)
     expect(() => assignCaptain(s, other.id, queen.id)).toThrow()
+  })
+})
+
+describe('five skills, potential and the ranks above five anchors', () => {
+  const even = (n: number) => Object.fromEntries(SKILL_IDS.map((id) => [id, n])) as Captain['skills']
+
+  it('storms work Nerve and Helm far harder than calm water does', () => {
+    const calm = captain(11, { skills: even(40), ceilings: even(90), development: 'quick-study' })
+    const storm = captain(11, { skills: even(40), ceilings: even(90), development: 'quick-study' })
+    const r1 = createRng(1)
+    const r2 = createRng(1)
+    for (let i = 0; i < 60; i++) {
+      recordVoyage(r1, calm, { track: 'cargo', weather: 'calm', t: T0 })
+      recordVoyage(r2, storm, { track: 'cargo', weather: 'storm', t: T0 })
+    }
+    expect(storm.skills.nerve - 40).toBeGreaterThan((calm.skills.nerve - 40) * 3)
+    expect(storm.skills.helm).toBeGreaterThan(calm.skills.helm)
+    // Skills never pass their ceilings.
+    for (const id of SKILL_IDS) expect(storm.skills[id]).toBeLessThanOrEqual(storm.ceilings[id])
+  })
+
+  it('the unusual captains by the tavern fire are far likelier to have the makings of a Legend', () => {
+    let quay = 0
+    let tavern = 0
+    for (let i = 0; i < 4000; i++) {
+      if (generateCaptain(createRng(i), 'q', [3, 3], 'quay').potential !== 'none') quay++
+      if (generateCaptain(createRng(i), 't', [3, 3], 'tavern').potential !== 'none') tavern++
+    }
+    expect(quay / 4000).toBeLessThan(0.07)
+    expect(tavern / 4000).toBeGreaterThan(0.28)
+  })
+
+  it('ordinary captains top out below a Legend', () => {
+    for (let i = 0; i < 500; i++) {
+      const c = generateCaptain(createRng(i), 'q', [5, 5])
+      if (c.potential === 'none') expect(c.ceiling).toBeLessThan(LEGEND_AT)
+    }
+  })
+
+  it('with the potential, they become a Legend at the top of the scale, then a Mythic, each with a signature', () => {
+    const c = captain(12, { skills: even(LEGEND_AT - 1), ceilings: even(100), potential: 'mythic', development: 'quick-study' })
+    const rng = createRng(3)
+    let i = 0
+    while (!c.rank && i++ < 500) recordVoyage(rng, c, { track: 'cargo', weather: 'storm', t: T0, hands: 3 })
+    expect(c.rank).toBe('legend')
+    expect(c.reputation).toBe(5)
+    expect(c.rankAbilities).toHaveLength(1)
+    expect(captainView(c).potential).toBe('mythic')
+    while (c.rank !== 'mythic' && i++ < 2000) recordVoyage(rng, c, { track: 'cargo', weather: 'storm', t: T0, hands: 3 })
+    expect(c.rank).toBe('mythic')
+    expect(c.rankAbilities).toHaveLength(2)
+    expect(captainView(c).rankAbilities.map((a) => a.name)).toHaveLength(2)
+  })
+
+  it("a Legend's iron keel keeps her afloat", () => {
+    const s = newGame(1, T0)
+    const c = crew(s, 0, { rank: 'legend', rankAbilities: ['iron-keel'] })
+    expect(captainMods(c, { track: 'cargo', weather: 'storm', t: T0 }, 'known').noSink).toBe(true)
+  })
+
+  it('old saves: one skill becomes five, and what was known stays known', () => {
+    const c = captain(13) as Captain & { skillBand?: [number, number] }
+    const old = { ...c, skills: undefined, ceilings: undefined, bands: undefined, skillBand: [40, 60] } as unknown as Captain
+    migrateCaptain(createRng(1), old)
+    for (const id of SKILL_IDS) expect(old.bands[id][1] - old.bands[id][0]).toBe(20)
+    expect(old.potential).toBe('none')
+    expect('skillBand' in old).toBe(false)
   })
 })

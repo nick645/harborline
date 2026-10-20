@@ -43,6 +43,7 @@ import {
   shortHandedMult,
   voyagePayout,
 } from './economy'
+import { LEGEND_ABILITIES, MYTHIC_ABILITIES } from './data/captains'
 import { leadingRival, leaning, rivalName, termsFee } from './courting'
 import { KEEN_DECIDES_MS, KEEN_RIVAL_FINISH, KEEN_YOURS, MANAGER_RIVAL_MAX } from './data/courting'
 import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick } from './rolls'
@@ -58,6 +59,7 @@ import {
   combineMods,
   generateBondedCaptain,
   generateCaptain,
+  migrateCaptain,
   newRecruit,
   getTrait,
   proveTrait,
@@ -186,7 +188,7 @@ function tripContext(state: GameState, boat: Boat, routeId: string, t: number): 
 
 /** Everything the people aboard change about a trip: captains' traits, and a full crew of hands. */
 function tripMods(state: GameState, boat: Boat, ctx: TripContext, view: 'known' | 'true'): CaptainMods {
-  const trip = { track: ctx.cls.track, weather: ctx.weather, t: ctx.t }
+  const trip = { track: ctx.cls.track, weather: ctx.weather, t: ctx.t, hands: handCount(state, boat.id) }
   const mods = combineMods(captainsAboard(state, boat).map((c) => captainMods(c, trip, view)))
   const hands = handMods(state, boat, ctx.weather, view)
   return {
@@ -475,6 +477,7 @@ export function settleAway(state: GameState, now: number): { state: GameState; r
   const coinsBefore = s.player.coins
   const awayMs = Math.max(0, now - s.player.lastSeenAt)
   migrateHands(s)
+  for (const p of [...s.player.roster, ...seekers(s).map((x) => x.person)]) if ('reputation' in p) migrateCaptain(s.rng, p)
   ensureRoutes(s)
   const outcome = settleInPlace(s, now)
   for (const b of s.player.ownedBoats) accrueDocked(s, b, now)
@@ -819,7 +822,8 @@ function settleInPlace(s: GameState, now: number) {
 
       // The trip's wear lands on the outbound leg. A hull that reaches 0 goes down with the cargo.
       const raw = Math.round(rollConditionLoss(s.rng, ctx.weather, boat.condition) * mods.damageMult)
-      boat.condition = Math.max(0, boat.condition - Math.max(0, Math.round(h.damage?.(raw, ctx) ?? raw)))
+      // A Legend's iron keel holds her together, if only just.
+      boat.condition = Math.max(mods.noSink ? 1 : 0, boat.condition - Math.max(0, Math.round(h.damage?.(raw, ctx) ?? raw)))
       if (boat.condition === 0) {
         boat.state = 'sunk'
         boat.etaMs = null
@@ -983,12 +987,17 @@ function manageCrew(s: GameState, boat: Boat, manager: Captain, at: number) {
 function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number) {
   const revealEvery = hooksOf(boat).traitRevealEvery
   for (const c of captainsAboard(s, boat)) {
-    const news = recordVoyage(s.rng, c, { track: ctx.cls.track, weather: ctx.weather, t: ctx.t }, revealEvery)
+    const news = recordVoyage(s.rng, c, { track: ctx.cls.track, weather: ctx.weather, t: ctx.t, hands: handCount(s, boat.id) }, revealEvery)
     for (const id of news.proven) log(s, at, 'captain', `${c.name} showed what they're made of: ${getTrait(id).name}`)
     for (const id of news.disproven) log(s, at, 'captain', `Turns out ${c.name} isn't ${getTrait(id).name.toLowerCase()} after all`)
     if (news.developmentRevealed) log(s, at, 'captain', `You're getting the measure of ${c.name}`)
     if (news.reputationChange > 0) log(s, at, 'captain', `Word is getting round about ${c.name}: reputation up to ${c.reputation} anchors`)
     if (news.reputationChange < 0) log(s, at, 'captain', `${c.name}'s reputation has slipped to ${c.reputation} anchor${c.reputation === 1 ? '' : 's'}`)
+    if (news.potentialRevealed) log(s, at, 'captain', `${c.name} has the makings of ${c.potential === 'mythic' ? 'something the sea has rarely seen' : 'a Legend'}`)
+    if (news.rankUp) {
+      const a = [...LEGEND_ABILITIES, ...MYTHIC_ABILITIES].find((x) => x.id === news.rankUp!.ability)!
+      log(s, at, 'captain', `${c.name} is ${news.rankUp.rank === 'mythic' ? 'Mythic' : 'a Legend'} now. ${a.name}: ${a.description.toLowerCase()}`)
+    }
   }
 }
 

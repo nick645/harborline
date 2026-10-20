@@ -26,9 +26,9 @@ import { Figure } from '../art/Figure'
 import { useSceneClock } from '../art/clock'
 import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
-import { SkillRange } from '../screens/CaptainScreen'
+import { Lodestone, SkillSheet, Standing } from './SkillSheet'
 import { fonts, useTheme } from '../theme'
-import { Anchors, Button, Card, Measure, Muted, Row, Segments, Strip, Title } from './ui'
+import { Button, Card, Measure, Muted, Row, Segments, Strip, Title } from './ui'
 import { Bearing } from './Bearing'
 
 type Props = {
@@ -228,7 +228,6 @@ function CourtPanel({ game, now, onCourt, personId, name, hand }: Props & { pers
 
 function Quay(props: Props) {
   const { game, now } = props
-  const t = useTheme()
   const people = portPeople(game, props.portId ?? homeOf(game))
   const recruits = people.recruits
   const region = portRegion(props.portId ?? homeOf(game))
@@ -237,11 +236,6 @@ function Quay(props: Props) {
   return (
     <View style={{ flex: 1, gap: 8 }}>
       <Watches game={game} now={now} />
-      <Pressable onPress={() => props.onView('tavern')} accessibilityRole="button">
-        <Muted numberOfLines={1}>
-          Tap {tavernName(game, props.portId)} to go inside: deckhands drink there{people.captain ? <Text style={{ color: t.legendary }}> ✦</Text> : ''}.
-        </Muted>
-      </Pressable>
       {recruits.length > 0 ? (
         <Measure>
           {(w, h) => (
@@ -271,11 +265,14 @@ function RecruitCard(props: Props & { sel: CaptainView; rare?: boolean }) {
   return (
     <Card accent={rare ? t.legendary : undefined} style={{ gap: 6, padding: 10 }}>
       <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-        <Title size={21}>
-          {rare ? '✦ ' : ''}
-          {sel.name}
-        </Title>
-        <Anchors n={sel.reputation} size={12} />
+        <Row style={{ flexShrink: 1, flexWrap: 'nowrap', gap: 6 }}>
+          <Title size={21}>
+            {rare ? '✦ ' : ''}
+            {sel.name}
+          </Title>
+          {sel.potential && <Lodestone potential={sel.potential} />}
+        </Row>
+        <Standing c={sel} size={12} />
       </Row>
       <Muted numberOfLines={1}>
         {sel.homePort} · tier {sel.sailsTiers[0]}–{sel.sailsTiers[1]} boats · asks {coins(sel.fee)}c
@@ -301,7 +298,7 @@ function RecruitCard(props: Props & { sel: CaptainView; rare?: boolean }) {
               {sel.traits.map((tr) => `“${tr.rumour}”`).join('  ')}
             </Text>
           ) : null}
-          {!(sel.skillBand[0] <= 1 && sel.skillBand[1] >= 100) && <SkillRange band={sel.skillBand} />}
+          <SkillSheet c={sel} compact />
           <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
             {(Object.keys(SCOUT_ACTIONS) as ScoutAction[]).map((a) => (
               <View key={a} style={{ flex: 1 }}>
@@ -320,7 +317,7 @@ function RecruitCard(props: Props & { sel: CaptainView; rare?: boolean }) {
       {court?.canSign ? (
         <Button small label={`Sign them on · ${coins(sel.fee)}c`} disabled={game.player.coins < sel.fee} onPress={() => onHire(sel.id)} />
       ) : (
-        <Muted numberOfLines={1}>{court?.leaning ? 'If you stay level with every rival, they sign with you.' : 'Get level with every rival before they decide.'}</Muted>
+        panel === 'court' && <Muted numberOfLines={1}>{court?.leaning ? 'If you stay level with every rival, they sign with you.' : 'Get level with every rival before they decide.'}</Muted>
       )}
     </Card>
   )
@@ -335,8 +332,8 @@ function Moment({ c, action, tavern }: { c: CaptainView; action: ScoutAction; ta
     action === 'ask'
       ? `You stand a round at ${tavern}. Someone at the bar leans in: “${latest?.rumour ?? '…'}”`
       : action === 'logbook'
-        ? `${first} lets you leaf through their logbook under the lamp. Tidy entries, a few smudged ones. Skill somewhere between ${c.skillBand[0]} and ${c.skillBand[1]}.`
-        : `You take ${first} out past the breakwater as the lamps come on. By the time you tie up, you have a feeling: ${c.verdict ? VERDICT[c.verdict] : '…'}.`
+        ? `${first} lets you leaf through their logbook under the lamp. Tidy entries, a few smudged ones, and one skill comes clear.`
+        : `You take ${first} out past the breakwater as the lamps come on. By the time you tie up, you have a feeling: ${c.verdict ? VERDICT[c.verdict] : '…'}.${c.potential === 'mythic' ? ' And something more: the sea itself seems to listen to them.' : c.potential === 'legend' ? ' And something more: they have the makings of a Legend.' : ''}`
   return (
     <View style={{ backgroundColor: t.surface2, borderRadius: 10, padding: 10 }}>
       <Text style={{ color: t.text, fontFamily: fonts.body, fontSize: 14, lineHeight: 20 }}>{text}</Text>
@@ -371,7 +368,10 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
               <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 17 }}>
                 {c.name}
               </Text>
-              <Anchors n={c.reputation} size={11} />
+              <Row style={{ gap: 4, flexWrap: 'nowrap' }}>
+                <Standing c={c} size={11} />
+                {c.potential && (!c.rank || (c.rank === 'legend' && c.potential === 'mythic')) && <Lodestone potential={c.potential} size={14} />}
+              </Row>
               <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
                 {where}
               </Text>

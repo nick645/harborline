@@ -146,10 +146,23 @@ export interface Captain {
   reputation: number
   /** Fee to hire, set by reputation, not by true skill. */
   fee: number
-  /** HIDDEN: 1–100. */
+  /** HIDDEN: overall ability, 1–100: the average of `skills`, kept in step with them. */
   trueSkill: number
-  /** HIDDEN: where trueSkill grows toward. */
+  /** HIDDEN: the average of `ceilings`. */
   ceiling: number
+  /** HIDDEN: the five sea skills, 1–100 each. */
+  skills: Record<import('./data/captains').SkillId, number>
+  /** HIDDEN: where each skill can grow to. */
+  ceilings: Record<import('./data/captains').SkillId, number>
+  /** Displayed range for each skill; always contains the truth, [1, 100] until learned. */
+  bands: Record<import('./data/captains').SkillId, [number, number]>
+  /** HIDDEN until `potentialKnown`: whether they could become a Legend, or a Mythic. */
+  potential: import('./data/captains').Potential
+  potentialKnown: boolean
+  /** Earned at sea: a Legend, or a Mythic, above five anchors. */
+  rank?: import('./data/captains').Rank
+  /** Signature abilities that came with the rank (a Legend's, then a Mythic's). */
+  rankAbilities?: string[]
   /** HIDDEN until developmentKnown. */
   development: DevelopmentStyle
   developmentKnown: boolean
@@ -159,8 +172,6 @@ export interface Captain {
   revealedTraits: string[]
   /** What's been heard, true or not. */
   rumours: Rumour[]
-  /** Displayed skill range; always contains trueSkill, never narrower than the minimum. */
-  skillBand: [number, number]
   verdict: Verdict | null
   voyageCount: number
   exposure: Exposure
