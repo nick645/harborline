@@ -15,7 +15,7 @@ import {
   setManaged,
   takeOverCaptain,
 } from './crew'
-import { captainView, generateCaptain, recordVoyage, verdictFor } from './captains'
+import { captainView, generateCaptain, newRecruit, recordVoyage, verdictFor } from './captains'
 import { createRng } from './rolls'
 import { fleetCap, scoutLevel } from './upgrades'
 import { naturalWeather } from './weather'
@@ -108,6 +108,8 @@ describe('hiring and firing', () => {
     let s = newGame(1, T0)
     s.player.coins = 1e6
     const r = s.recruitPool.recruits[0]
+    expect(() => hireCaptain(s, r.id, T0)).toThrow(/weighing up/)
+    r.courting!.yours = 100 // won over
     s = hireCaptain(s, r.id, T0)
     expect(s.player.coins).toBe(1e6 - r.fee)
     const hired = () => s.player.roster.find((c) => c.id === r.id)!
@@ -234,11 +236,13 @@ describe('the hidden truth never reaches the UI', () => {
     expect(v).not.toHaveProperty('development')
   })
 
-  it('no UI file touches a hidden captain field', () => {
-    const files = [join(__dirname, '..', 'App.tsx'), ...readdirSync(join(__dirname, '..', 'components')).map((f) => join(__dirname, '..', 'components', f))]
+  it('no UI file, web or phone, touches a hidden captain field', () => {
+    const root = join(__dirname, '..', '..')
+    const dir = (...p: string[]) => readdirSync(join(root, ...p)).filter((f) => f.endsWith('.tsx')).map((f) => join(root, ...p, f))
+    const files = [join(root, 'src', 'App.tsx'), ...dir('src', 'components'), join(root, 'mobile', 'App.tsx'), ...dir('mobile', 'src', 'components'), ...dir('mobile', 'src', 'screens')]
     for (const f of files) {
       const src = readFileSync(f, 'utf8')
-      for (const hidden of ['trueSkill', 'hiddenTraits', '.ceiling', '.development', "'true')"]) {
+      for (const hidden of ['trueSkill', 'hiddenTraits', '.ceiling', '.development', "'true')", '.wants']) {
         expect(src.includes(hidden), `${f} mentions ${hidden}`).toBe(false)
       }
     }
@@ -355,7 +359,9 @@ describe('managers and crew', () => {
     const starter = getBoat(s, dinghy).captainId!
     s.player.roster = s.player.roster.filter((c) => c.id !== starter) // nobody ashore to reuse
     getBoat(s, dinghy).captainId = null
-    s = settle(s, T0 + 2 * 3600_000)
+    // Managers don't court: they sign someone the rival lines haven't got a hold on yet.
+    s.recruitPool.recruits[0] = newRecruit(s.rng, 'fresh', [1, 1], T0 + 3600_000)
+    s = settle(s, T0 + 1.25 * 3600_000)
     const hired = s.player.roster.find((c) => c.id === getBoat(s, dinghy).captainId)!
     expect(hired.hiredBy).toBe(vet.id)
     expect(s.log.some((e) => e.text.includes('hired'))).toBe(true)

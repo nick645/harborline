@@ -2,7 +2,7 @@
 // the input is never mutated. All timers are absolute timestamps, so catching up after
 // any gap is a single settle pass, never a tick loop.
 
-import type { AwayReport, Boat, Captain, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage } from './types'
+import type { AwayReport, Boat, Captain, Deckhand, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage } from './types'
 import { BOAT_CLASSES } from './data/boats'
 import { ROUTES, routesFrom } from './data/routes'
 import { NICKNAMES } from './data/nicknames'
@@ -43,10 +43,12 @@ import {
   shortHandedMult,
   voyagePayout,
 } from './economy'
+import { leadingRival, leaning, rivalName, termsFee } from './courting'
+import { KEEN_DECIDES_MS, KEEN_RIVAL_FINISH, KEEN_YOURS, MANAGER_RIVAL_MAX } from './data/courting'
 import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick } from './rolls'
 import { hooksOf, type TripContext } from './abilities'
 import { routeWeather, weatherSlot } from './weather'
-import { handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
+import { handBerths, handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
 import { chartTrip, getPortDef, homeOf, portOpen, refreshPortPools } from './regions'
 import { getRegion, HOME_PRICE } from './data/ports'
 import type { Milestone } from './data/home'
@@ -56,6 +58,7 @@ import {
   combineMods,
   generateBondedCaptain,
   generateCaptain,
+  newRecruit,
   getTrait,
   proveTrait,
   recordVoyage,
@@ -112,6 +115,12 @@ export function newGame(seed: number, now: number): GameState {
   state.player.roster.push(first)
   state.player.ownedBoats[0].captainId = first.id
   refreshRecruitPool(state, now, scoutLevel(state))
+  // One keen young captain on the quay, already leaning your way and barely known to the rival
+  // lines: a drink and a walk round the harbour win them over. The second boat's first hire,
+  // and the first courtship the player learns on.
+  const keen = newRecruit(rng, `c${state.nextCaptainSeq++}`, [1, 1], now)
+  state.recruitPool.recruits[0] = keen
+  keen.courting = { ...keen.courting!, yours: KEEN_YOURS, arrivedAt: now, decidesAt: now + KEEN_DECIDES_MS, rivals: keen.courting!.rivals.map((r) => ({ ...r, start: 10, finish: KEEN_RIVAL_FINISH })) }
   refreshTavern(state, now)
   refreshPortPools(state, now)
   return state
@@ -507,10 +516,15 @@ export function moveHome(state: GameState, portId: string, now: number): GameSta
     b.currentRoute = dest?.id ?? null
     if (!dest) b.managedBy = null
   }
-  // The new home's people become the home quay and tavern on the next refresh.
-  delete s.portPools?.[portId]
-  s.recruitPool.slot = -1
-  if (s.tavern) s.tavern.slot = -1
+  // The people looking for work stay where they are: the old home's quay and tavern become an
+  // ordinary port's, and the new home's become yours.
+  const oldHome = homeOf(state)
+  const incoming = s.portPools?.[portId]
+  s.portPools ??= {}
+  s.portPools[oldHome] = { slot: s.recruitPool.slot, recruits: s.recruitPool.recruits, hands: s.tavern?.hands ?? [], captain: s.tavern?.captain ?? null }
+  s.recruitPool.recruits = incoming?.recruits ?? []
+  s.tavern = { slot: s.tavern?.slot ?? -1, hands: incoming?.hands ?? [], captain: incoming?.captain ?? null }
+  delete s.portPools[portId]
   refreshRecruitPool(s, now, scoutLevel(s))
   refreshTavern(s, now)
   refreshPortPools(s, now)
@@ -615,6 +629,8 @@ function revealRefusal(s: GameState, boat: Boat, at: number): boolean {
 }
 
 function startTrip(s: GameState, boat: Boat, routeId: string, at: number, tripIndex: number, tripsTotal: number) {
+  // She leaves from home: anyone signed on and waiting for her comes aboard.
+  for (const h of s.player.deckhands ?? []) if (h.boatId === boat.id) delete h.waiting
   const q = quoteVoyage(s, boat.id, routeId, at, 'true')
   s.voyages.push({
     boatId: boat.id,
@@ -654,25 +670,97 @@ function nextAutoDeparture(s: GameState, boat: Boat): number {
 }
 
 type SettleEvent =
-  | { at: number; kind: 'arrive' | 'dock'; voyage: Voyage; boatId: string }
-  | { at: number; kind: 'auto'; boatId: string }
+  | { at: number; kind: 'arrive' | 'dock'; voyage: Voyage; key: string }
+  | { at: number; kind: 'auto'; key: string }
+  | { at: number; kind: 'decide'; key: string }
+
+/** Everyone looking for work, wherever they are, and how to take them off the market. */
+export function seekers(s: GameState): { person: Captain | Deckhand; kind: 'captain' | 'hand'; region: string; remove: () => void }[] {
+  const out: ReturnType<typeof seekers> = []
+  const home = getPortDef(homeOf(s)).region
+  const pool = <T extends { id: string }>(list: T[], kind: 'captain' | 'hand', region: string) => {
+    for (const p of list) out.push({ person: p as unknown as Captain | Deckhand, kind, region, remove: () => list.splice(list.indexOf(p), 1) })
+  }
+  pool(s.recruitPool.recruits, 'captain', home)
+  if (s.tavern) {
+    const tv = s.tavern
+    pool(tv.hands, 'hand', home)
+    if (tv.captain) out.push({ person: tv.captain, kind: 'captain', region: home, remove: () => (tv.captain = null) })
+  }
+  for (const [id, p] of Object.entries(s.portPools ?? {})) {
+    const region = getPortDef(id).region
+    pool(p.recruits, 'captain', region)
+    pool(p.hands, 'hand', region)
+    if (p.captain) out.push({ person: p.captain, kind: 'captain', region, remove: () => (p.captain = null) })
+  }
+  return out
+}
+
+/**
+ * Someone's time is up: they sign with you if you courted them and are level with or ahead of
+ * every rival (and the coins and a berth are there), else with the rival they lean toward most.
+ */
+function decide(s: GameState, id: string, at: number) {
+  const found = seekers(s).find((p) => p.person.id === id)
+  if (!found?.person.courting) return
+  const c = found.person.courting
+  const courted = c.known.length > 0 || c.walked || c.shown || c.terms > 0 || c.drinkSlot !== null
+  found.remove()
+  const rival = rivalName(leadingRival(c, at).id)
+  // Nobody signs with a line that never spoke to them.
+  const yes = courted && leaning(c, at)
+  if (found.kind === 'captain') {
+    const cap = found.person as Captain
+    const fee = termsFee(cap.fee, c)
+    if (yes && s.player.coins >= fee) {
+      delete cap.courting
+      s.player.coins -= fee
+      s.player.roster.push(cap)
+      log(s, at, 'captain', `${cap.name} chose your line and signed on for ${fee.toLocaleString('en-US')}c`)
+      return
+    }
+    if (courted) log(s, at, 'captain', yes ? `${cap.name} chose you, but you couldn't pay their fee: they went to ${rival}` : `${cap.name} signed with ${rival}`)
+    return
+  }
+  const hand = found.person as Deckhand
+  // The biggest boat short of hands, docked ones first. A boat at sea gets them when she docks:
+  // they wait at home, and nobody changes ships at sea.
+  const berth = s.player.ownedBoats
+    .filter((b) => b.state !== 'sunk' && handBerths(s, b.id) < handsNeeded(getBoatClass(b.classId)))
+    .sort((a, b) => Number(b.state === 'idle') - Number(a.state === 'idle') || getBoatClass(b.classId).sizeTier - getBoatClass(a.classId).sizeTier)[0]
+  const fee = berth ? termsFee(handFee(getBoatClass(berth.classId)), c) : 0
+  if (yes && berth && s.player.coins >= fee) {
+    delete hand.courting
+    s.player.coins -= fee
+    const waiting = berth.state !== 'idle'
+    ;(s.player.deckhands ??= []).push({ ...hand, boatId: berth.id, ...(waiting ? { waiting } : {}) })
+    log(s, at, 'info', `${hand.name} chose your line and signed on with ${berth.nickname}${waiting ? ', waiting at home for her to dock' : ''}`)
+    return
+  }
+  if (courted) {
+    const why = !yes ? '' : !berth ? ': none of your boats had a berth for them' : ": you couldn't pay their fee"
+    log(s, at, 'info', `${hand.name} signed with ${rival}${why}`)
+  }
+}
 
 function nextEvent(s: GameState, now: number): SettleEvent | null {
   let best: SettleEvent | null = null
   const consider = (ev: SettleEvent) => {
     if (ev.at > now) return
-    if (!best || ev.at < best.at || (ev.at === best.at && ev.boatId < best.boatId)) best = ev
+    if (!best || ev.at < best.at || (ev.at === best.at && ev.key < best.key)) best = ev
   }
   for (const v of s.voyages) {
     consider(
       v.paid
-        ? { at: v.startedAt + v.durationMs, kind: 'dock', voyage: v, boatId: v.boatId }
-        : { at: v.startedAt + v.durationMs / 2, kind: 'arrive', voyage: v, boatId: v.boatId },
+        ? { at: v.startedAt + v.durationMs, kind: 'dock', voyage: v, key: v.boatId }
+        : { at: v.startedAt + v.durationMs / 2, kind: 'arrive', voyage: v, key: v.boatId },
     )
   }
   for (const b of s.player.ownedBoats) {
-    if (b.state === 'idle' && isAutomated(s, b)) consider({ at: nextAutoDeparture(s, b), kind: 'auto', boatId: b.id })
+    if (b.state === 'idle' && isAutomated(s, b)) consider({ at: nextAutoDeparture(s, b), kind: 'auto', key: b.id })
   }
+  // People looking for work make up their minds; keys sort after boats at the same moment.
+  for (const p of seekers(s)) if (p.person.courting) consider({ at: p.person.courting.decidesAt, kind: 'decide', key: `~${p.person.id}` })
   return best
 }
 
@@ -684,7 +772,11 @@ function settleInPlace(s: GameState, now: number) {
   // Each trip has at most two events, runs are capped by the fuel tank, and managed boats
   // depart at most once per trip, so this is bounded by the voyages that fit before `now`.
   for (let ev = nextEvent(s, now); ev; ev = nextEvent(s, now)) {
-    const boat = getBoat(s, ev.boatId)
+    if (ev.kind === 'decide') {
+      decide(s, ev.key.slice(1), ev.at)
+      continue
+    }
+    const boat = getBoat(s, ev.key)
 
     if (ev.kind === 'auto') {
       autoDepart(s, boat, ev.at)
@@ -732,6 +824,7 @@ function settleInPlace(s: GameState, now: number) {
         boat.state = 'sunk'
         boat.etaMs = null
         boat.sunkAt = ev.at
+        ;(s.player.record ??= { stormTrips: 0 }).lastSunkAt = ev.at
         s.voyages = s.voyages.filter((x) => x !== v)
         sunk.push(boat.nickname)
         log(s, ev.at, 'sunk', `${boat.nickname} sank in ${WEATHER[ctx.weather].name.toLowerCase()} seas`)
@@ -758,7 +851,10 @@ function settleInPlace(s: GameState, now: number) {
       recordCaptains(s, boat, ctx, ev.at)
       if (!v.lost) {
         recordHands(s, boat)
-        if (ctx.weather === 'storm') markMilestone(s, 'storm-trip')
+        if (ctx.weather === 'storm') {
+          markMilestone(s, 'storm-trip')
+          ;(s.player.record ??= { stormTrips: 0 }).stormTrips++
+        }
         const opened = chartTrip(s, getRoute(s, v.routeId).portB, ctx.weather)
         if (opened) {
           ensureRoutes(s)
@@ -818,8 +914,11 @@ function autoDepart(s: GameState, boat: Boat, at: number) {
     // Managers sign on missing hands from the tavern when the coins are there.
     const cls = getBoatClass(boat.classId)
     refreshTavern(s, at)
-    while (handCount(s, boat.id) < handsNeeded(cls) && s.player.coins >= handFee(cls) && s.tavern!.hands.length) {
-      const hand = s.tavern!.hands.shift()!
+    // Managers can only sign hands the rival lines haven't got a hold on yet.
+    const open = () => s.tavern!.hands.find((h) => !h.courting || leadingRival(h.courting, at).standing < MANAGER_RIVAL_MAX)
+    for (let hand = open(); hand && handBerths(s, boat.id) < handsNeeded(cls) && s.player.coins >= handFee(cls); hand = open()) {
+      s.tavern!.hands.splice(s.tavern!.hands.indexOf(hand), 1)
+      delete hand.courting
       s.player.coins -= handFee(cls)
       ;(s.player.deckhands ??= []).push({ ...hand, boatId: boat.id })
       log(s, at, 'info', `${manager.name} signed on ${hand.name} for ${boat.nickname}`)
@@ -866,11 +965,13 @@ function manageCrew(s: GameState, boat: Boat, manager: Captain, at: number) {
 
   refreshRecruitPool(s, at, scoutLevel(s))
   const budget = Math.min(s.player.coins, Math.max(MANAGER_HIRE_BUDGET_MIN, boatValue(cls) * MANAGER_HIRE_BUDGET_SHARE))
+  // Managers don't court: they sign only people the rival lines haven't got a hold on yet.
   const pick = s.recruitPool.recruits
-    .filter((c) => willSail(c, cls.sizeTier) && c.fee <= budget)
+    .filter((c) => willSail(c, cls.sizeTier) && c.fee <= budget && (!c.courting || leadingRival(c.courting, at).standing < MANAGER_RIVAL_MAX))
     .sort((a, b) => b.reputation - a.reputation || a.fee - b.fee)[0]
   if (!pick) return
   s.recruitPool.recruits = s.recruitPool.recruits.filter((c) => c.id !== pick.id)
+  delete pick.courting
   s.player.coins -= pick.fee
   pick.hiredBy = manager.id
   s.player.roster.push(pick)

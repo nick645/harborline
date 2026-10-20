@@ -7,12 +7,13 @@ import { MANAGER_ROLES, type ManagerRoleDef } from './data/managers'
 import { UPGRADES, type UpgradeId } from './data/upgrades'
 import { addRumour, captainMods, captainView, combineMods, makeBand, poolRefreshesAt, severance, verdictFor, willSail, type CaptainView } from './captains'
 import { getBoatClass, handFee, handsNeeded } from './economy'
-import { getHandTrait, handCount, handsOn } from './hands'
-import { DRINK_WATCHES } from './data/hands'
+import { getHandTrait, handBerths, handsOn } from './hands'
 import type { RegionId } from './data/ports'
 import { homeOf } from './regions'
 import { hooksOf } from './abilities'
-import { captainsAboard, GameError, getBoat, getCaptain, log, managerOf, topTier } from './state'
+import { captainsAboard, GameError, getBoat, getCaptain, log, managerOf, seekers, topTier } from './state'
+import { applyCourt, boatToShow, canSign, courtingView, termsFee, type CourtingView } from './courting'
+import { COURT_ACTIONS, WANTS, type CourtAction } from './data/courting'
 import { nextUpgradeCost, scoutLevel, upgradeLevel } from './upgrades'
 
 // ---------- views ----------
@@ -64,7 +65,7 @@ export function handViewsOn(state: GameState, boatId: string): HandView[] {
 
 /** Boats that still need hands, for the tavern's hire buttons. */
 export function boatsNeedingHands(state: GameState): Boat[] {
-  return state.player.ownedBoats.filter((b) => b.state !== 'sunk' && handCount(state, b.id) < handsNeeded(getBoatClass(b.classId)))
+  return state.player.ownedBoats.filter((b) => b.state !== 'sunk' && handBerths(state, b.id) < handsNeeded(getBoatClass(b.classId)))
 }
 
 export function rosterViews(state: GameState): CaptainView[] {
@@ -233,29 +234,66 @@ export function scoutRecruit(state: GameState, captainId: string, action: ScoutA
   return s
 }
 
+/** Sign a captain now: only once they're won over (otherwise they decide when their time is up). */
 export function hireCaptain(state: GameState, captainId: string, now: number): GameState {
   const c = findRecruit(state, captainId)
   if (!c) throw new GameError('That captain has left the quay')
-  if (state.player.coins < c.fee) throw new GameError('Not enough coins')
+  if (!canSign(c.courting, now)) throw new GameError(`${c.name} is still weighing up offers`)
+  const fee = termsFee(c.fee, c.courting)
+  if (state.player.coins < fee) throw new GameError('Not enough coins')
   const s = structuredClone(state)
   const hired = findRecruit(s, captainId)!
   removeRecruit(s, captainId)
-  s.player.coins -= hired.fee
+  delete hired.courting
+  s.player.coins -= fee
   s.player.roster.push(hired)
-  log(s, now, 'captain', `Hired ${hired.name}`)
+  log(s, now, 'captain', `${hired.name} signed on with your line`)
+  return s
+}
+
+/** What the player may see of someone's courtship, captain or hand. */
+export function courtingOf(state: GameState, personId: string, now: number): CourtingView | null {
+  const p = seekers(state).find((x) => x.person.id === personId)
+  return p?.person.courting ? courtingView(p.person.courting, now) : null
+}
+
+/** The boat you'd show someone: your best docked at home that they'd sail on. */
+export function boatToShowTo(state: GameState, personId: string): Boat | null {
+  const p = seekers(state).find((x) => x.person.id === personId)
+  if (!p) return null
+  return p.kind === 'captain'
+    ? boatToShow(state, (b) => willSail(p.person as Captain, getBoatClass(b.classId).sizeTier))
+    : boatToShow(state, (b) => handsNeeded(getBoatClass(b.classId)) > 0)
+}
+
+/**
+ * Make your case to someone looking for work: a drink, a walk round your harbour, a look at
+ * your best boat, or better terms. Watches as the action says (fewer for hands).
+ */
+export function court(state: GameState, personId: string, action: CourtAction, now: number): GameState {
+  const found = seekers(state).find((x) => x.person.id === personId)
+  if (!found?.person.courting) throw new GameError('They’ve already signed')
+  const def = COURT_ACTIONS[action]
+  const watches = found.kind === 'hand' ? def.handWatches : def.watches
+  if (state.recruitPool.watchesLeft < watches) throw new GameError('Not enough watches left today')
+  const s = structuredClone(state)
+  const p = seekers(s).find((x) => x.person.id === personId)!
+  const boat = action === 'ship' ? boatToShowTo(s, personId) : null
+  const { revealed } = applyCourt(s, p.person.courting!, action, now, { region: p.region, boat }, (why) => {
+    throw new GameError(why)
+  })
+  s.recruitPool.watchesLeft -= watches
+  if (p.kind === 'captain') (p.person as Captain).watchesSpent += watches
+  // A drink with a hand also tells you what they're really like.
+  if (action === 'drink' && p.kind === 'hand') (p.person as Deckhand).known = true
+  if (revealed.length) log(s, now, 'info', `${p.person.name} let slip what they're after: ${revealed.map((w) => WANTS.find((x) => x.id === w)!.name.toLowerCase()).join(', ')}`)
   return s
 }
 
 /** Stand a hand a drink: one watch, and you learn what they're really like. */
-export function buyDrink(state: GameState, handId: string): GameState {
-  if (state.recruitPool.watchesLeft < DRINK_WATCHES) throw new GameError('Not enough watches left today')
-  const s = structuredClone(state)
-  const h = findTavernHand(s, handId)
-  if (!h) throw new GameError("They've left the tavern")
-  if (h.known) throw new GameError('You already know them well')
-  h.known = true
-  s.recruitPool.watchesLeft -= DRINK_WATCHES
-  return s
+/** A drink with a hand at the tavern: what they're really like, and what they're after. */
+export function buyDrink(state: GameState, handId: string, now: number): GameState {
+  return court(state, handId, 'drink', now)
 }
 
 /**
@@ -271,11 +309,13 @@ export function moveHand(state: GameState, handId: string, toBoatId: string, now
   for (const b of [from, to]) if (b.state !== 'idle') throw new GameError(`${b.nickname} isn't docked: crew change ships only at home`)
   const other = swapWithId ? (state.player.deckhands ?? []).find((h) => h.id === swapWithId && h.boatId === toBoatId) : undefined
   if (swapWithId && !other) throw new GameError(`They aren't aboard ${to.nickname}`)
-  if (!other && handCount(state, toBoatId) >= handsNeeded(getBoatClass(to.classId))) throw new GameError(`${to.nickname} has all the hands she needs`)
+  if (!other && handBerths(state, toBoatId) >= handsNeeded(getBoatClass(to.classId))) throw new GameError(`${to.nickname} has all the hands she needs`)
   const s = structuredClone(state)
   for (const h of s.player.deckhands!) {
     if (h.id === handId) h.boatId = toBoatId
     else if (other && h.id === other.id) h.boatId = from.id
+    else continue
+    delete h.waiting
   }
   log(s, now, 'info', other ? `${hand.name} and ${other.name} swapped ships` : `${hand.name} moved from ${from.nickname} to ${to.nickname}`)
   return s
@@ -288,13 +328,17 @@ export function hireHand(state: GameState, handId: string, boatId: string, now: 
   if (!findTavernHand(state, handId)) throw new GameError("They've left the tavern")
   if (boat.state === 'sunk') throw new GameError('Raise her first')
   if (boat.state !== 'idle') throw new GameError(`Hands sign on at the dock: wait for ${boat.nickname} to come home`)
-  if (handCount(state, boatId) >= handsNeeded(cls)) throw new GameError(`${boat.nickname} has all the hands she needs`)
-  if (state.player.coins < handFee(cls)) throw new GameError('Not enough coins')
+  if (handBerths(state, boatId) >= handsNeeded(cls)) throw new GameError(`${boat.nickname} has all the hands she needs`)
+  const waiting = findTavernHand(state, handId)!
+  if (!canSign(waiting.courting, now)) throw new GameError(`${waiting.name} is still weighing up offers`)
+  const fee = termsFee(handFee(cls), waiting.courting)
+  if (state.player.coins < fee) throw new GameError('Not enough coins')
   const s = structuredClone(state)
   const h = findTavernHand(s, handId)!
   if (s.tavern) s.tavern.hands = s.tavern.hands.filter((x) => x.id !== handId)
   for (const p of Object.values(s.portPools ?? {})) p.hands = p.hands.filter((x) => x.id !== handId)
-  s.player.coins -= handFee(cls)
+  delete h.courting
+  s.player.coins -= fee
   ;(s.player.deckhands ??= []).push({ ...h, boatId })
   log(s, now, 'info', `${h.name} signed on with ${boat.nickname}`)
   return s

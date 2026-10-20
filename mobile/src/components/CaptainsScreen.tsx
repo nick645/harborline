@@ -3,7 +3,9 @@ import { Pressable, Text, View } from 'react-native'
 import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
-import { boatOfCaptain, boatsNeedingHands, managerRole, portPeople, quayInfo, rosterViews } from '../../../src/game/crew'
+import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtingOf, managerRole, portPeople, quayInfo, rosterViews } from '../../../src/game/crew'
+import { termsFee } from '../../../src/game/courting'
+import { COURT_ACTIONS, TERMS_MAX, type CourtAction } from '../../../src/game/data/courting'
 import type { RegionId } from '../../../src/game/data/ports'
 import { getPortDef, homeOf } from '../../../src/game/regions'
 
@@ -13,7 +15,6 @@ const portRegion = (portId?: string): RegionId => (portId ? getPortDef(portId).r
 const tavernName = (game: GameState, portId?: string) =>
   (portId ?? homeOf(game)) === homeOf(game) ? homeTavern(game).name : REGION_STYLE[getPortDef(portId!).region].tavern
 import { getBoatClass, handFee } from '../../../src/game/economy'
-import { DRINK_WATCHES } from '../../../src/game/data/hands'
 import { SCOUT_ACTIONS, type ScoutAction } from '../../../src/game/data/captains'
 import { coins, duration } from '../../../src/format'
 import { QuayScene } from '../art/QuayScene'
@@ -27,7 +28,8 @@ import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
 import { SkillRange } from '../screens/CaptainScreen'
 import { fonts, useTheme } from '../theme'
-import { Anchors, Button, Card, Measure, Muted, Row, Strip, Title } from './ui'
+import { Anchors, Button, Card, Measure, Muted, Row, Segments, Strip, Title } from './ui'
+import { Bearing } from './Bearing'
 
 type Props = {
   game: GameState
@@ -36,7 +38,8 @@ type Props = {
   onScout: (id: string, action: ScoutAction) => Promise<boolean>
   onHire: (id: string) => void
   onOpenCaptain: (id: string) => void
-  onBuyDrink: (handId: string) => Promise<boolean>
+  /** Make your case to someone; resolves to whether it went ahead. */
+  onCourt: (id: string, action: CourtAction) => Promise<boolean>
   onHireHand: (handId: string, boatId: string) => void
   /** Which part of the harbour is showing; kept by the app so a boat card can send you to the tavern. */
   view: CaptainsView
@@ -75,7 +78,7 @@ function Watches({ game, now }: { game: GameState; now: number }) {
   const info = quayInfo(game, now)
   return (
     <Row style={{ justifyContent: 'space-between' }}>
-      <Muted>New faces in {duration(info.refreshesAt - now)}</Muted>
+      <Muted>Watches refill in {duration(info.refreshesAt - now)}</Muted>
       <Row style={{ gap: 3 }}>
         {Array.from({ length: Math.max(info.watchesLeft, 0) }, (_, i) => (
           <Text key={i} style={{ color: t.accent, fontSize: 14 }}>●</Text>
@@ -89,36 +92,32 @@ function Watches({ game, now }: { game: GameState; now: number }) {
 }
 
 function Tavern(props: Props) {
-  const { game, now, onBuyDrink, onHireHand } = props
+  const { game, now, onHireHand } = props
   const t = useTheme()
   const { hands, captain } = portPeople(game, props.portId ?? homeOf(game))
   const region = portRegion(props.portId ?? homeOf(game))
-  const watchesLeft = quayInfo(game, now).watchesLeft
   const [selectedId, setSelected] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
   const selHand = hands.find((h) => h.id === selectedId) ?? (captain && selectedId === captain.id ? null : hands[0] ?? null)
   const selCaptain = captain && (selectedId === captain.id || (!selHand && !hands.length)) ? captain : null
-  const boats = boatsNeedingHands(game)
+  const boats = boatsNeedingHands(game).filter((b) => b.state === 'idle')
+  const court = selHand ? courtingOf(game, selHand.id, now) : null
 
   return (
     <View style={{ flex: 1, gap: 8 }}>
       <Watches game={game} now={now} />
       <Measure>
         {(w, h) => (
-      <TavernScene
-        width={Math.min(w, 720)}
-        height={h}
-        light={lightAt(now)}
-        hands={hands}
-        region={region}
-        custom={(props.portId ?? homeOf(game)) === homeOf(game) ? homeTavern(game) : undefined}
-        captain={captain}
-        selectedId={selCaptain?.id ?? selHand?.id ?? null}
-        onSelect={(id) => {
-          setSelected(id)
-          setToast(null)
-        }}
-      />
+          <TavernScene
+            width={Math.min(w, 720)}
+            height={h}
+            light={lightAt(now)}
+            hands={hands}
+            region={region}
+            custom={(props.portId ?? homeOf(game)) === homeOf(game) ? homeTavern(game) : undefined}
+            captain={captain}
+            selectedId={selCaptain?.id ?? selHand?.id ?? null}
+            onSelect={setSelected}
+          />
         )}
       </Measure>
       {captain && !selCaptain && (
@@ -127,56 +126,102 @@ function Tavern(props: Props) {
         </Pressable>
       )}
       {selCaptain ? (
-        <RecruitCard {...props} sel={selCaptain} rare />
+        <RecruitCard key={selCaptain.id} {...props} sel={selCaptain} rare />
       ) : selHand ? (
-        <Card style={{ gap: 6, padding: 10 }}>
-          <Title size={21}>{selHand.name}</Title>
-          {selHand.known ? (
-            <Text style={{ color: t.text, fontFamily: fonts.body, fontSize: 14 }}>
-              <Text style={{ fontFamily: fonts.bold }}>{selHand.known.name}.</Text> {selHand.known.description}
-            </Text>
-          ) : (
-            <Text style={{ fontFamily: fonts.titleItalic, fontSize: 16, color: '#e2d2c8' }}>“{selHand.rumour}”</Text>
-          )}
-          {toast && <Muted>{toast}</Muted>}
-          {!selHand.known && (
-            <Button
-              small
-              kind="secondary"
-              label={`Buy them a drink · ${DRINK_WATCHES} watch`}
-              disabled={watchesLeft < DRINK_WATCHES}
-              onPress={async () => {
-                if (await onBuyDrink(selHand.id)) setToast(`You stand ${selHand.name.split(' ')[0]} a drink by the fire and hear the real story.`)
-              }}
-            />
-          )}
-          {boats.length === 0 ? (
-            <Muted>None of your boats needs hands right now. Boats of tier 2 and up do.</Muted>
-          ) : (
-            <>
+        <Card key={selHand.id} style={{ gap: 6, padding: 10 }}>
+          <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+            <Title size={21}>{selHand.name}</Title>
+            {selHand.known ? (
+              <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 13 }}>{selHand.known.name}</Text>
+            ) : (
+              <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fonts.titleItalic, fontSize: 14, color: '#e2d2c8' }}>
+                “{selHand.rumour}”
+              </Text>
+            )}
+          </Row>
+          {court && <Bearing v={court} now={now} compact />}
+          {court && <CourtPanel {...props} personId={selHand.id} name={selHand.name} hand />}
+          {court?.canSign ? (
+            boats.length ? (
               <Strip>
-                {boats
-                  .filter((b) => b.state === 'idle')
-                  .map((b) => {
-                    const fee = handFee(getBoatClass(b.classId))
-                    return <Button key={b.id} small label={`Hire for ${b.nickname} · ${coins(fee)}c`} disabled={game.player.coins < fee} onPress={() => onHireHand(selHand.id, b.id)} />
-                  })}
+                {boats.map((b) => {
+                  const fee = termsFee(handFee(getBoatClass(b.classId)), court)
+                  return <Button key={b.id} small label={`Sign for ${b.nickname} · ${coins(fee)}c`} disabled={game.player.coins < fee} onPress={() => onHireHand(selHand.id, b.id)} />
+                })}
               </Strip>
-              {boats.some((b) => b.state !== 'idle') && (
-                <Muted>
-                  {boats
-                    .filter((b) => b.state !== 'idle')
-                    .map((b) => b.nickname)
-                    .join(', ')}{' '}
-                  can take hands once docked at home.
-                </Muted>
-              )}
-            </>
+            ) : (
+              <Muted>Ready to sign, but none of your boats docked at home needs hands.</Muted>
+            )
+          ) : (
+            <Muted numberOfLines={2}>If they choose your line, they join your biggest boat short of hands, or wait at home for her.</Muted>
           )}
         </Card>
       ) : (
-        <Muted>The tavern is quiet. New faces come in every six hours.</Muted>
+        <Muted>The tavern is quiet. Someone new will be in soon.</Muted>
       )}
+    </View>
+  )
+}
+
+/** What you can do to win someone over, what you know they want, and how they took it. */
+function CourtPanel({ game, now, onCourt, personId, name, hand }: Props & { personId: string; name: string; hand?: boolean }) {
+  const t = useTheme()
+  const v = courtingOf(game, personId, now)
+  const [said, setSaid] = useState<string | null>(null)
+  if (!v) return null
+  const first = name.split(' ')[0]
+  const watches = quayInfo(game, now).watchesLeft
+  const boat = boatToShowTo(game, personId)
+  const cost = (a: CourtAction) => (hand ? COURT_ACTIONS[a].handWatches : COURT_ACTIONS[a].watches)
+  // Remember what they'd shown you before, so the reaction can tell what's new.
+  const act = async (a: CourtAction) => {
+    const knownBefore = v.known.length
+    if (await onCourt(personId, a)) setSaid(a === 'drink' ? `drink:${knownBefore}` : a)
+  }
+  const latest = v.known[v.known.length - 1]
+  const reaction =
+    said === null
+      ? null
+      : said.startsWith('drink')
+        ? latest && Number(said.split(':')[1]) < v.known.length
+          ? `Over a drink, ${first} lets slip what matters to them: ${latest.name.toLowerCase()}.`
+          : `${first} enjoys the drink, and tells you nothing new.`
+        : said === 'terms'
+          ? `${first} turns the new terms over: ${100 + 25 * v.terms}% of what they first asked.`
+          : said === 'ship'
+            ? `${first} walks the deck of ${boat?.nickname ?? 'your boat'} and runs a hand along the rail.`
+            : `${first} takes in your harbour.`
+  const buttons: { a: CourtAction; label: string; disabled: boolean }[] = [
+    { a: 'drink', label: `Drink${cost('drink') ? ` · ${cost('drink')}` : ''}`, disabled: !v.drinkReady || watches < cost('drink') },
+    { a: 'harbour', label: 'Harbour', disabled: v.walked || watches < cost('harbour') },
+    { a: 'ship', label: 'A boat', disabled: v.shown || !boat },
+    { a: 'terms', label: 'Terms', disabled: v.terms >= TERMS_MAX },
+  ]
+  return (
+    <View style={{ gap: 6 }}>
+      <Text numberOfLines={2} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
+        {v.known.length ? (
+          <>
+            Wants <Text style={{ color: t.text, fontFamily: fonts.semibold }}>{v.known.map((k) => k.name.toLowerCase()).join(', ')}</Text> · {v.known.map((k) => k.hint.toLowerCase()).join('; ')}
+          </>
+        ) : (
+          <>
+            Word is: <Text style={{ fontFamily: fonts.titleItalic, fontSize: 14, color: '#e2d2c8' }}>“{v.heard.heard}”</Text>
+          </>
+        )}
+      </Text>
+      {reaction && (
+        <View style={{ backgroundColor: t.surface2, borderRadius: 10, padding: 8 }}>
+          <Text style={{ color: t.text, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 }}>{reaction}</Text>
+        </View>
+      )}
+      <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
+        {buttons.map((b) => (
+          <View key={b.a} style={{ flex: 1 }}>
+            <Button small kind="secondary" label={b.label} disabled={b.disabled} onPress={() => void act(b.a)} />
+          </View>
+        ))}
+      </Row>
     </View>
   )
 }
@@ -193,8 +238,8 @@ function Quay(props: Props) {
     <View style={{ flex: 1, gap: 8 }}>
       <Watches game={game} now={now} />
       <Pressable onPress={() => props.onView('tavern')} accessibilityRole="button">
-        <Muted>
-          Tap {tavernName(game, props.portId)} to go inside: deckhands drink there{people.captain ? <Text style={{ color: t.legendary }}>, and someone unusual is by the fire ✦</Text> : ''}.
+        <Muted numberOfLines={1}>
+          Tap {tavernName(game, props.portId)} to go inside: deckhands drink there{people.captain ? <Text style={{ color: t.legendary }}> ✦</Text> : ''}.
         </Muted>
       </Pressable>
       {recruits.length > 0 ? (
@@ -211,10 +256,13 @@ function Quay(props: Props) {
   )
 }
 
-/** A captain looking for work: what's known, scouting, and hiring. */
-function RecruitCard({ game, now, onScout, onHire, sel, portId, rare = false }: Props & { sel: CaptainView; rare?: boolean }) {
+/** A captain looking for work: which way they lean, courting them, scouting them, and signing. */
+function RecruitCard(props: Props & { sel: CaptainView; rare?: boolean }) {
+  const { game, now, onScout, onHire, sel, portId, rare = false } = props
   const t = useTheme()
   const info = quayInfo(game, now)
+  const court = courtingOf(game, sel.id, now)
+  const [panel, setPanel] = useState<'court' | 'scout'>('court')
   const [moment, setMoment] = useState<ScoutAction | null>(null)
   const scout = async (action: ScoutAction) => {
     if (await onScout(sel.id, action)) setMoment(action)
@@ -229,32 +277,51 @@ function RecruitCard({ game, now, onScout, onHire, sel, portId, rare = false }: 
         </Title>
         <Anchors n={sel.reputation} size={12} />
       </Row>
-      <Muted>
+      <Muted numberOfLines={1}>
         {sel.homePort} · tier {sel.sailsTiers[0]}–{sel.sailsTiers[1]} boats · asks {coins(sel.fee)}c
         {sel.verdict ? ` · ${VERDICT[sel.verdict]}` : ''}
       </Muted>
-      {moment ? (
-        <Moment c={sel} action={moment} tavern={tavernName(game, portId)} />
-      ) : sel.traits.length ? (
-        <Text numberOfLines={2} style={{ fontFamily: fonts.titleItalic, fontSize: 16, color: '#e2d2c8' }}>
-          {sel.traits.map((tr) => `“${tr.rumour}”`).join('  ')}
-        </Text>
-      ) : null}
-      {!(sel.skillBand[0] <= 1 && sel.skillBand[1] >= 100) && <SkillRange band={sel.skillBand} />}
-      <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
-        {(Object.keys(SCOUT_ACTIONS) as ScoutAction[]).map((a) => (
-          <View key={a} style={{ flex: 1 }}>
-            <Button
-              small
-              kind="secondary"
-              label={`${short[a]} · ${SCOUT_ACTIONS[a].watches}`}
-              disabled={(a === 'run' && sel.verdict !== null) || info.watchesLeft < SCOUT_ACTIONS[a].watches}
-              onPress={() => scout(a)}
-            />
-          </View>
-        ))}
-      </Row>
-      <Button small label={`Hire for ${coins(sel.fee)}c`} disabled={game.player.coins < sel.fee} onPress={() => onHire(sel.id)} />
+      {court && <Bearing v={court} now={now} />}
+      <Segments
+        items={[
+          { id: 'court', label: 'Win them over' },
+          { id: 'scout', label: 'Size them up' },
+        ]}
+        value={panel}
+        onChange={setPanel}
+      />
+      {panel === 'court' ? (
+        court && <CourtPanel {...props} personId={sel.id} name={sel.name} />
+      ) : (
+        <View style={{ gap: 6 }}>
+          {moment ? (
+            <Moment c={sel} action={moment} tavern={tavernName(game, portId)} />
+          ) : sel.traits.length ? (
+            <Text numberOfLines={2} style={{ fontFamily: fonts.titleItalic, fontSize: 16, color: '#e2d2c8' }}>
+              {sel.traits.map((tr) => `“${tr.rumour}”`).join('  ')}
+            </Text>
+          ) : null}
+          {!(sel.skillBand[0] <= 1 && sel.skillBand[1] >= 100) && <SkillRange band={sel.skillBand} />}
+          <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
+            {(Object.keys(SCOUT_ACTIONS) as ScoutAction[]).map((a) => (
+              <View key={a} style={{ flex: 1 }}>
+                <Button
+                  small
+                  kind="secondary"
+                  label={`${short[a]} · ${SCOUT_ACTIONS[a].watches}`}
+                  disabled={(a === 'run' && sel.verdict !== null) || info.watchesLeft < SCOUT_ACTIONS[a].watches}
+                  onPress={() => scout(a)}
+                />
+              </View>
+            ))}
+          </Row>
+        </View>
+      )}
+      {court?.canSign ? (
+        <Button small label={`Sign them on · ${coins(sel.fee)}c`} disabled={game.player.coins < sel.fee} onPress={() => onHire(sel.id)} />
+      ) : (
+        <Muted numberOfLines={1}>{court?.leaning ? 'If you stay level with every rival, they sign with you.' : 'Get level with every rival before they decide.'}</Muted>
+      )}
     </Card>
   )
 }

@@ -27,11 +27,11 @@ import {
   settleAway,
   shopClasses,
 } from '../src/game/state'
-import { getBoatClass, handFee, handsNeeded, repairCostPerPoint } from '../src/game/economy'
+import { getBoatClass, repairCostPerPoint } from '../src/game/economy'
 import { getPart, hasParts } from '../src/game/parts'
 import { fleetCap } from '../src/game/upgrades'
-import { assignCaptain, hireCaptain, hireHand } from '../src/game/crew'
-import { handCount } from '../src/game/hands'
+import { assignCaptain, boatsNeedingHands, court, courtingOf, hireCaptain } from '../src/game/crew'
+import type { CourtAction } from '../src/game/data/courting'
 import { willSail } from '../src/game/captains'
 import { LOW_CONDITION_THRESHOLD, STARTING_COINS, WEAR_MULTIPLIERS } from '../src/game/data/economy'
 import { WEATHER, WEATHER_SLOT_MS } from '../src/game/data/weather'
@@ -138,7 +138,32 @@ const isCrafted = (classId: string) => ['legendary', 'mythic'].includes(getBoatC
 const isStarter = (classId: string) => getBoatClass(classId).price === 0 && getBoatClass(classId).rarity === 'common'
 const roughWater = (w: string) => w === 'rough' || w === 'storm'
 
-function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPolicy, res: RunResult): GameState {
+/** What a sensible player does for someone they want: drink, harbour, a boat, terms if pay talks. */
+function courtWell(s: GameState, id: string, t: number): GameState {
+  const tryCourt = (a: CourtAction) => {
+    try {
+      s = court(s, id, a, t)
+    } catch {
+      // Already done, or no watches left.
+    }
+  }
+  const ahead = () => {
+    const v = courtingOf(s, id, t)
+    return !v || v.canSign
+  }
+  const v = courtingOf(s, id, t)
+  if (!v) return s
+  if (v.drinkReady && !ahead()) tryCourt('drink')
+  if (!v.walked && !ahead()) tryCourt('harbour')
+  if (!v.shown && !ahead()) tryCourt('ship')
+  // Better terms cost real coin: only while still behind, and only for someone who cares.
+  const known = courtingOf(s, id, t)?.known.map((k) => k.id) ?? []
+  const behind = () => (courtingOf(s, id, t)?.bearing ?? 99) < 15
+  if (known.includes('pay') || v.heard.id === 'pay') for (let i = v.terms; i < 2 && !ahead() && behind(); i++) tryCourt('terms')
+  return s
+}
+
+function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPolicy, _res: RunResult): GameState {
   s = scrapStandardParts(s)
   for (const cls of craftableClasses()) {
     if (hasParts(s.player.partInventory, cls.requiredParts) && s.player.ownedBoats.length < fleetCap(s, cls.sizeTier)) s = craftBoat(s, cls.id, t)
@@ -149,31 +174,39 @@ function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPo
   for (const boat of s.player.ownedBoats) {
     if (boat.state === 'sunk' && s.player.coins >= salvageQuote(s, boat.id)) s = salvageBoat(s, boat.id, t)
   }
-  // Hire deckhands from the tavern as soon as the coins are there; until then she sails short-handed.
-  for (const boat of s.player.ownedBoats) {
-    const cls = getBoatClass(boat.classId)
-    while (boat.state !== 'sunk' && handCount(s, boat.id) < handsNeeded(cls) && s.player.coins >= handFee(cls) && s.tavern?.hands.length) {
-      s = hireHand(s, s.tavern.hands[0].id, boat.id, t)
+  // Court the tavern's hands while any boat is short: a drink tells you what they want, then
+  // whatever answers it. Those who lean your way sign on when their time is up.
+  if (boatsNeedingHands(s).length) for (const h of s.tavern?.hands ?? []) s = courtWell(s, h.id, t)
+
+  // Every boat needs a captain. Keep courting so there's one more coming than the fleet needs
+  // (for the boat the bot buys next) once she's half paid for, then put whoever's ashore aboard.
+  const onBoats = new Set(s.player.ownedBoats.map((b) => b.captainId))
+  const ashore = s.player.roster.filter((c) => c.role === 'sailing' && !onBoats.has(c.id)).length
+  const next = commons().filter((c) => c.sizeTier === maxTier(s)).sort((a, b) => a.price - b.price)[0]
+  const spare = next && s.player.coins >= next.price / 2 ? 1 : 0
+  const short = s.player.ownedBoats.filter((b) => !b.captainId).length + spare - ashore
+  if (short > 0) {
+    const tiers = new Set([...s.player.ownedBoats.filter((b) => !b.captainId).map((b) => getBoatClass(b.classId).sizeTier), maxTier(s)])
+    const wanted = s.recruitPool.recruits
+      // No paying for more anchors than the boat needs.
+      .filter((c) => [...tiers].some((tr) => willSail(c, tr) && c.reputation <= Math.max(1, tr)))
+      // Those deciding soonest first: a boat without a captain earns nothing.
+      .sort((a, b) => (a.courting?.decidesAt ?? 0) - (b.courting?.decidesAt ?? 0))
+    for (const c of wanted.slice(0, short + 1)) {
+      s = courtWell(s, c.id, t)
+      try {
+        s = hireCaptain(s, c.id, t)
+      } catch {
+        // Not won over yet: they decide when their time is up.
+      }
     }
   }
-  // Every boat needs a captain: reuse one ashore, else hire the cheapest who'll take her.
   for (const boat of s.player.ownedBoats) {
     if (boat.state !== 'idle' || boat.captainId) continue
     const tier = getBoatClass(boat.classId).sizeTier
     const aboard = new Set(s.player.ownedBoats.map((b) => b.captainId))
-    const ashore = s.player.roster.find((c) => c.role === 'sailing' && !aboard.has(c.id) && willSail(c, tier))
-    if (ashore) {
-      s = assignCaptain(s, ashore.id, boat.id)
-      continue
-    }
-    const hire = s.recruitPool.recruits
-      .filter((c) => willSail(c, tier) && c.fee <= s.player.coins)
-      .sort((a, b) => a.fee - b.fee)[0]
-    if (hire) {
-      s = hireCaptain(s, hire.id, t)
-      s = assignCaptain(s, hire.id, boat.id)
-      res.captainsHired++
-    }
+    const free = s.player.roster.find((c) => c.role === 'sailing' && !aboard.has(c.id) && willSail(c, tier))
+    if (free) s = assignCaptain(s, free.id, boat.id)
   }
   // Heeding storm alerts: careful players call boats home when their route turns rough.
   if (policy !== 'all-in') {
@@ -278,6 +311,8 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     t = Math.min(etas.length ? Math.min(...etas) : Infinity, weatherTurns) + REACTION_MS
   }
   s = settleAway(s, end).state
+  res.captainsHired = s.player.roster.length - 1
+  if (process.env.SIM_TRACE) console.log(s.log.filter((e) => /signed|chose|hired/.test(e.text)).map((e) => `${((e.at - T0) / 60000).toFixed(0)} ${e.text}`).reverse().join('\n'))
   res.crafted = s.player.ownedBoats.filter((b) => isCrafted(b.classId)).length
   res.finalTier = maxTier(s)
   res.finalBoats = s.player.ownedBoats.length

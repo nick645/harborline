@@ -6,7 +6,8 @@ import type { Boat, Deckhand, GameState, RngState, Weather } from './types'
 import { HAND_KNOWN_AFTER, HAND_RUMOUR_ACCURACY, HAND_TRAITS, TAVERN_HANDS, TAVERN_RARE_BOOST, TAVERN_RARE_CHANCE, type HandTraitId } from './data/hands'
 import { FIRST_NAMES, LAST_NAMES, QUAY_REPUTATION } from './data/captains'
 import { rollChance, rollPick, rollWeighted } from './rolls'
-import { generateCaptain, recruitSlot } from './captains'
+import { newRecruit, recruitSlot } from './captains'
+import { newCourting } from './courting'
 
 export function getHandTrait(id: HandTraitId) {
   return HAND_TRAITS.find((t) => t.id === id)!
@@ -23,9 +24,15 @@ export function newHandId(s: GameState): string {
   return `h${s.nextHandSeq - 1}`
 }
 
-/** The hands aboard a boat. */
+/** The hands aboard a boat. Anyone waiting at home for her is aboard once she's docked. */
 export function handsOn(state: GameState, boatId: string): Deckhand[] {
-  return (state.player.deckhands ?? []).filter((h) => h.boatId === boatId)
+  const docked = state.player.ownedBoats.find((b) => b.id === boatId)?.state === 'idle'
+  return (state.player.deckhands ?? []).filter((h) => h.boatId === boatId && (!h.waiting || docked))
+}
+
+/** Berths taken on a boat: hands aboard plus any signed on and waiting at home for her. */
+export function handBerths(state: GameState, boatId: string): number {
+  return (state.player.deckhands ?? []).filter((h) => h.boatId === boatId).length
 }
 
 export function handCount(state: GameState, boatId: string): number {
@@ -57,17 +64,33 @@ export function recordHands(s: GameState, boat: Boat) {
 }
 
 /** New faces at the tavern each 6-hour slot: hands, and now and then a captain above the quay's best. */
+/** A hand new to a tavern, already being courted. */
+export function newTavernHand(s: GameState, t: number, settled = false): Deckhand {
+  const h = generateHand(s.rng, newHandId(s))
+  h.courting = newCourting(s.rng, t, 'hand', settled)
+  return h
+}
+
+/**
+ * Keep the home tavern going: new hands for any who've signed, and each 6-hour slot a small
+ * chance of a captain well above the quay's best. Mutates.
+ */
 export function refreshTavern(s: GameState, t: number) {
   const slot = recruitSlot(t)
-  if (s.tavern?.slot === slot) return
-  const hands = Array.from({ length: TAVERN_HANDS }, () => generateHand(s.rng, newHandId(s)))
-  let captain = null
-  if (rollChance(s.rng, TAVERN_RARE_CHANCE)) {
-    const rep = Math.min(5, QUAY_REPUTATION[s.player.maxTierReached][1] + TAVERN_RARE_BOOST)
-    captain = generateCaptain(s.rng, `c${s.nextCaptainSeq++}`, [rep, rep])
-    captain.rare = true
+  s.tavern ??= { slot: -1, hands: [], captain: null }
+  const tv = s.tavern
+  if (tv.slot !== slot) {
+    tv.slot = slot
+    if (!tv.captain && rollChance(s.rng, TAVERN_RARE_CHANCE)) {
+      const rep = Math.min(5, QUAY_REPUTATION[s.player.maxTierReached][1] + TAVERN_RARE_BOOST)
+      tv.captain = newRecruit(s.rng, `c${s.nextCaptainSeq++}`, [rep, rep], t)
+      tv.captain.rare = true
+    }
   }
-  s.tavern = { slot, hands, captain }
+  if (tv.captain) tv.captain.courting ??= newCourting(s.rng, t, tv.captain, true)
+  const settled = tv.hands.length === 0
+  for (const h of tv.hands) h.courting ??= newCourting(s.rng, t, 'hand', true)
+  while (tv.hands.length < TAVERN_HANDS) tv.hands.push(newTavernHand(s, t, settled))
 }
 
 /** Saves from before hands were people kept a count on each boat: give those boats real hands. */

@@ -181,6 +181,31 @@ export interface Captain {
   rare?: boolean
   /** The region they come from, which shows in how they dress. Absent means the home bay. */
   region?: import('./data/ports').RegionId
+  /** While looking for work: the rivals courting them, and how they lean. */
+  courting?: Courting
+}
+
+/** Someone looking for work, and the rival lines courting them too (see courting.ts). */
+export interface Courting {
+  arrivedAt: number
+  /** When they sign: with you if you're level with or ahead of every rival, else the leader. */
+  decidesAt: number
+  /** Each rival's standing rises steadily from `start` at arrival to `finish` at the deadline. */
+  rivals: { id: import('./data/courting').RivalId; start: number; finish: number }[]
+  /** Your standing, 0–100. */
+  yours: number
+  /** HIDDEN: what they really want. UI sees only `heard` and `known`. */
+  wants: import('./data/courting').WantId[]
+  /** What the quay says they want; right most of the time. */
+  heard: import('./data/courting').WantId
+  /** Wants they've shown you. */
+  known: import('./data/courting').WantId[]
+  /** The 6-hour slot of your last drink with them. */
+  drinkSlot: number | null
+  walked: boolean
+  shown: boolean
+  /** Times you've improved your terms. */
+  terms: number
 }
 
 export interface Deckhand {
@@ -195,6 +220,10 @@ export interface Deckhand {
   boatId: string | null
   voyages: number
   region?: import('./data/ports').RegionId
+  /** While at a tavern: the rival courting them, and how they lean. */
+  courting?: Courting
+  /** Signed on while her boat was at sea: waiting at home, aboard once she docks. */
+  waiting?: boolean
 }
 
 export interface Tavern {
@@ -243,6 +272,8 @@ export interface Player {
   home?: string
   /** Harbour offices bought; moving back to one is free. Saltmarsh is always yours. */
   homesOwned?: string[]
+  /** What people looking for work weigh: storm trips completed, and the last boat lost. */
+  record?: { stormTrips: number; lastSunkAt?: number }
   /** Absolute timestamp of the last settle while the player was present. */
   lastSeenAt: number
 }

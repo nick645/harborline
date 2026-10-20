@@ -12,6 +12,7 @@ import { portPeople } from '../../../src/game/crew'
 import { HOME_PORT_ID, HOME_PRICE, getRegion } from '../../../src/game/data/ports'
 import { WEATHER } from '../../../src/game/data/weather'
 import type { ScoutAction } from '../../../src/game/data/captains'
+import type { CourtAction } from '../../../src/game/data/courting'
 import { coins, duration } from '../../../src/format'
 import { PortScene } from '../art/PortScene'
 import { lightAt } from '../art/light'
@@ -30,7 +31,7 @@ type Props = {
   onSend: (boatId: string, routeId: string, trips: number) => void
   onScout: (id: string, action: ScoutAction) => Promise<boolean>
   onHire: (id: string) => void
-  onBuyDrink: (handId: string) => Promise<boolean>
+  onCourt: (id: string, action: CourtAction) => Promise<boolean>
   onHireHand: (handId: string, boatId: string) => void
   onOpenCaptain: (id: string) => void
   onMoveHome: (portId: string) => void

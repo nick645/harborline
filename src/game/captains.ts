@@ -45,6 +45,7 @@ import {
   type TraitDef,
 } from './data/captains'
 import { nextFloat, nextInt, rollChance, rollNormal, rollPick, rollWeighted } from './rolls'
+import { newCourting, termsFee } from './courting'
 
 const traitsById = new Map(TRAITS.map((t) => [t.id, t]))
 
@@ -174,16 +175,28 @@ export function watchesFor(scoutLevel: number): number {
   return WATCHES_BASE + WATCHES_PER_SCOUT_LEVEL * (scoutLevel - 1)
 }
 
-/** Replace the recruit pool if a new 6-hour slot has started. Mutates. */
+/** Someone new on a quay, already being courted. */
+export function newRecruit(rng: RngState, id: string, repRange: [number, number], t: number, settled = false): Captain {
+  const c = generateCaptain(rng, id, repRange)
+  c.courting = newCourting(rng, t, c, settled)
+  return c
+}
+
+/**
+ * Keep the home quay going: fresh watches each 6-hour slot, and new faces for anyone who has
+ * signed (with you or a rival). People stay until they decide. Mutates.
+ */
 export function refreshRecruitPool(s: GameState, t: number, level: number) {
   const slot = recruitSlot(t)
-  if (s.recruitPool.slot === slot) return
-  const range = QUAY_REPUTATION[s.player.maxTierReached]
-  s.recruitPool = {
-    slot,
-    recruits: Array.from({ length: RECRUIT_POOL_SIZE }, () => generateCaptain(s.rng, `c${s.nextCaptainSeq++}`, range)),
-    watchesLeft: watchesFor(level),
+  if (s.recruitPool.slot !== slot) {
+    s.recruitPool.slot = slot
+    s.recruitPool.watchesLeft = watchesFor(level)
   }
+  const range = QUAY_REPUTATION[s.player.maxTierReached]
+  // An empty quay means a new game or a long time away: these people have been here a while.
+  const settled = s.recruitPool.recruits.length === 0
+  for (const c of s.recruitPool.recruits) c.courting ??= newCourting(s.rng, t, c, true)
+  while (s.recruitPool.recruits.length < RECRUIT_POOL_SIZE) s.recruitPool.recruits.push(newRecruit(s.rng, `c${s.nextCaptainSeq++}`, range, t, settled))
 }
 
 export function severance(c: Captain): number {
@@ -433,7 +446,8 @@ export function captainView(c: Captain): CaptainView {
     name: c.name,
     homePort: c.homePort,
     reputation: c.reputation,
-    fee: c.fee,
+    // Better terms raise what they'll sign for.
+    fee: termsFee(c.fee, c.courting),
     skillBand: [...c.skillBand] as [number, number],
     traits: c.rumours.map((r) => {
       const t = getTrait(r.traitId)

@@ -498,6 +498,11 @@ describe('save', () => {
   })
 })
 
+/** Win over everyone in the home tavern, so tests can sign hands straight away. */
+function wonOver(s: GameState) {
+  for (const h of s.tavern!.hands) if (h.courting) h.courting.yours = 100
+}
+
 describe('deckhands', () => {
   it('bigger boats need hands from the tavern; short-handed trips run longer', () => {
     let s = newGame(9, T0)
@@ -514,7 +519,9 @@ describe('deckhands', () => {
     const before = s.player.coins
     // Green hands only, so traits don't muddy the timing.
     for (const h of s.tavern!.hands) h.trait = 'green'
+    wonOver(s)
     s = hireHand(s, s.tavern!.hands[0].id, id, T0)
+    wonOver(s)
     s = hireHand(s, s.tavern!.hands[0].id, id, T0)
     expect(s.player.coins).toBe(before - 2 * handFee(cls))
     expect(() => hireHand(s, s.tavern!.hands[0].id, id, T0)).toThrow(GameError)
@@ -535,6 +542,7 @@ describe('deckhands', () => {
     const id = give(s, 'harbor-skiff')
     s.player.coins = 100_000
     s.tavern!.hands[0].trait = 'quick'
+    wonOver(s)
     s = hireHand(s, s.tavern!.hands[0].id, id, T0)
     const route = ROUTES[1].id
     expect(quoteVoyage(s, id, route, T0, 'true').durationMs).toBeLessThan(quoteVoyage(s, id, route, T0).durationMs)
@@ -547,8 +555,11 @@ describe('deckhands', () => {
     const a = give(s, 'coastal-trawler')
     const b = give(s, 'coastal-trawler')
     s.player.coins = 100_000
+    wonOver(s)
     s = hireHand(s, s.tavern!.hands[0].id, a, T0)
+    wonOver(s)
     s = hireHand(s, s.tavern!.hands[0].id, a, T0)
+    wonOver(s)
     s = hireHand(s, s.tavern!.hands[0].id, b, T0)
     const [h1, h2] = s.player.deckhands!.filter((h) => h.boatId === a)
     const h3 = s.player.deckhands!.find((h) => h.boatId === b)!
@@ -576,6 +587,7 @@ describe('deckhands', () => {
     let s = newGame(9, T0)
     const id = give(s, 'harbor-skiff')
     s.player.coins = 100_000
+    wonOver(s)
     s = hireHand(s, s.tavern!.hands[0].id, id, T0)
     const route = ROUTES[0].id
     let t = timeWith(s, route, 'calm')
@@ -595,7 +607,7 @@ describe('deckhands', () => {
     let s = newGame(9, T0)
     const h = s.tavern!.hands[0]
     const watches = s.recruitPool.watchesLeft
-    s = buyDrink(s, h.id)
+    s = buyDrink(s, h.id, T0)
     expect(s.tavern!.hands[0].known).toBe(true)
     expect(s.recruitPool.watchesLeft).toBe(watches - 1)
     expect(handView(s.tavern!.hands[0]).known).not.toBeNull()

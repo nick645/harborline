@@ -118,6 +118,13 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   Full crew: −15% hull damage in rough/storm, tier 2+ only (all-in storm chasers: sinkings
   14 → 12, coins +8%; pacing unchanged).
 
+- Courting crew (user-approved 2026-10-19): everyone looking for work is courted by named rival
+  lines and decides at a deadline (by anchors: 1.5 h … 60 h; hands 3 h), signing with you only if
+  you courted them and are level with every rival; hidden wants, learned over a drink, decide
+  what moves them; fees stay, better terms raise them. Numbers in `data/courting.ts` are Claude's
+  picks. A new game has one keen captain who's easy to win. Managers don't court. Sim (wide,
+  6 h): first purchase 50 → 58 min, tier 2 4.6 → 4.8 h; 40 h: tier 4 31.8 → 33.3 h.
+
 ## Originality
 
 The user does not want this to read as a copy of Pocket Planes or of EA's college football

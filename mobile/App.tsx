@@ -6,13 +6,14 @@ import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
 import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, moveHome, sellBoat, settle } from '../src/game/state'
-import { assignCaptain, buyDrink, buyUpgrade, captainViewById, hireHand, moveHand, recruitViewById, tavernHandView, UPGRADES, upgradeQuote, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
+import { assignCaptain, boatToShowTo, buyUpgrade, captainViewById, court, courtingOf, hireHand, moveHand, recruitViewById, tavernHandView, UPGRADES, upgradeQuote, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName, slotName } from '../src/game/parts'
 import { getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../src/game/economy'
 import { quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
 import { MELT_COST, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE } from '../src/game/data/economy'
 import { SCOUT_ACTIONS } from '../src/game/data/captains'
-import { DRINK_WATCHES } from '../src/game/data/hands'
+import { COURT_ACTIONS, type CourtAction } from '../src/game/data/courting'
+import { termsFee } from '../src/game/courting'
 import { HOME_PORT_ID, HOME_PRICE } from '../src/game/data/ports'
 import { MANAGER_ROLES } from '../src/game/data/managers'
 import { getPortDef } from '../src/game/regions'
@@ -302,18 +303,31 @@ function Harbor() {
                 }
                 onHire={(id) => {
                   const r = recruitViewById(game, id)
-                  void ask({ title: `Hire ${r?.name}?`, body: 'They join your captains, ashore at home until you put them aboard.', label: `Hire · ${coins(r?.fee ?? 0)}c` }, (g, at) => hireCaptain(g, id, at))
+                  void ask({ title: `Sign ${r?.name} on?`, body: 'They’re won over. They join your captains, ashore at home until you put them aboard.', label: `Sign · ${coins(r?.fee ?? 0)}c` }, (g, at) => hireCaptain(g, id, at))
                 }}
-                onBuyDrink={(id) =>
-                  ask(
-                    { title: `Stand ${tavernHandView(game, id)?.name.split(' ')[0]} a drink?`, body: 'Over a drink you hear the real story, not the rumour.', label: `Buy a drink · ${plural(DRINK_WATCHES, 'watch')}` },
-                    (g) => buyDrink(g, id),
-                  )
-                }
+                onCourt={(id, a) => {
+                  const who = recruitViewById(game, id) ?? tavernHandView(game, id)
+                  const hand = !recruitViewById(game, id)
+                  const first = who?.name.split(' ')[0] ?? 'them'
+                  const watches = hand ? COURT_ACTIONS[a].handWatches : COURT_ACTIONS[a].watches
+                  const boat = boatToShowTo(game, id)
+                  const fee = recruitViewById(game, id)?.fee
+                  const asks: Record<CourtAction, Ask> = {
+                    drink: { title: `Stand ${first} a drink?`, body: hand ? 'You hear what they’re really like, and what they’re after.' : 'Over a drink, people say what they’re after.', label: `Buy a drink · ${plural(watches, 'watch')}` },
+                    harbour: { title: `Walk ${first} round your harbour?`, body: 'They weigh your upgrades and decorations, your record at sea, and whether these are their home waters.', label: 'Show them round' },
+                    ship: { title: `Show ${first} ${boat?.nickname ?? 'a boat'}?`, body: 'Your best boat docked at home that they’d sail on.', label: 'Show her' },
+                    terms: {
+                      title: `Offer ${first} better terms?`,
+                      body: fee ? `Their fee goes from ${coins(fee)}c to ${coins(Math.round((fee * 1.25) / 10) * 10)}c. It counts for a lot with anyone who cares about pay.` : 'Their fee goes up a quarter. It counts for a lot with anyone who cares about pay.',
+                      label: 'Offer it',
+                    },
+                  }
+                  return ask(asks[a], (g, at) => court(g, id, a, at))
+                }}
                 onHireHand={(id, boatId) => {
                   const b = boatById(boatId)
                   void ask(
-                    { title: `Sign on ${tavernHandView(game, id)?.name} for ${b.nickname}?`, body: 'A one-off fee, no wages.', label: `Hire · ${coins(handFee(getBoatClass(b.classId)))}c` },
+                    { title: `Sign on ${tavernHandView(game, id)?.name} for ${b.nickname}?`, body: 'A one-off fee, no wages.', label: `Hire · ${coins(termsFee(handFee(getBoatClass(b.classId)), courtingOf(game, id, now) ?? undefined))}c` },
                     (g, at) => hireHand(g, id, boatId, at),
                   )
                 }}

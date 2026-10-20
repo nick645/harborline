@@ -110,16 +110,27 @@ scripts/sim.ts       balance harness
 
 ## Deckhands and the tavern
 
-- A boat of tier *t* needs *t − 1* deckhands (none on tier 1, five on a tier-6). They're found at the **Gull & Lantern** (Captains → The tavern): 4 new faces every 6 hours. Hiring one onto a boat is a one-off fee of 5% of the boat's tier price; there are no wages.
+- A boat of tier *t* needs *t − 1* deckhands (none on tier 1, five on a tier-6). They're found at the tavern (4 at home; someone new comes in whenever one signs) and courted like captains (see Courting crew). Signing one onto a boat is a one-off fee of 5% of the boat's tier price; there are no wages.
 - Short-handed boats still sail, but each missing hand makes trips 20% longer. A full crew takes 15% less hull damage in rough water and storms (tier 2+ only). Managers hire hands from the tavern for the boats they run.
-- Each hand has **one hidden trait**: *Steady in a blow* (−8% hull damage in rough water and storms), *Quick on the lines* (−5% trip time), *Easy on the fuel* (−10% fuel), *Green* (nothing yet) or *Butterfingers* (+6% hull damage). The tavern talk about them is right 70% of the time. **Buying them a drink** (1 watch, shared with the quay) shows the truth, and so do 5 voyages. Quotes only count traits you know.
-- **Now and then (1 slot in 10) a rare captain sits by the fire**: two anchors above the best the quay offers you (capped at 5), in a look nobody else wears. Scout and hire them like anyone on the quay.
+- Each hand has **one hidden trait**: *Steady in a blow* (−8% hull damage in rough water and storms), *Quick on the lines* (−5% trip time), *Easy on the fuel* (−10% fuel), *Green* (nothing yet) or *Butterfingers* (+6% hull damage). The tavern talk about them is right 70% of the time. **Buying them a drink** (1 watch, shared with the quay) shows the truth (and what they want), and so do 5 voyages. Quotes only count traits you know.
+- **Now and then (1 slot in 10) a rare captain sits by the fire**: two anchors above the best the quay offers you (capped at 5), in a look nobody else wears. Scout and court them like anyone on the quay.
+
+## Courting crew
+
+Nobody joins on the spot. Everyone looking for work, captains and hands, is also being courted by rival lines (Merrow & Daughters, The Gull Street Line, Black Lantern Shipping, Tallow & Brine), and you have to win them over.
+
+- **A bearing and a deadline.** Each person leans between you and their rivals (a compass on their card). Rivals gain ground steadily until the person decides: about 1.5 h for a 1-anchor captain, 3 h for 2, 12 h for 3, 30 h for 4, 60 h for 5, and 3 h for a hand. At their deadline they sign with you if you courted them and are level with or ahead of every rival (paying their fee from your coins), otherwise with the rival they lean toward most. Anyone so sold on you (80+, 20 clear of every rival) signs on the spot.
+- **What they want.** Captains want two or three things (hands one): good pay, a fine ship, a line that comes home, storm work, staying close to home, a proper harbour, good company. The quay says what one of them is (right 70% of the time).
+- **Winning them over.** *Stand them a drink* (1 watch; once per watch period; they tell you one thing they want, and a hand shows what they're really like). *Walk them round your harbour* (free): counts for anyone who wants a line that comes home (no boat lost in 3 days, or it counts against you), storm work (storm trips you've completed), close to home (your home port is in their region), or a proper harbour (upgrade levels and decorations). *Show them a boat* (free): your best docked boat they'd sail on, which counts with anyone who wants a fine ship (more for bigger and rarer). *Better terms* (twice at most): +25% on their fee each time, which counts for a lot with anyone who wants good pay. Aimed at what they want, an effort moves them a long way; otherwise only a little.
+- **Hands who choose you** join your biggest boat short of hands; if she's at sea they wait at home and come aboard when she docks.
+- **A new game** starts with one keen 1-anchor captain on the quay who already leans your way: a drink and a walk round the harbour win them over.
+- **Managers don't court:** they sign only people the rival lines haven't got a hold on yet.
 
 ## Captains
 
 Every captain starts mostly unknown. Only the sea tells you who they really are.
 
-- **On the quay** (5 recruits, new faces every 6 hours) you see a name, a home port, a **Reputation** of 1–5 anchors, an asking fee, and one dockside rumour. Reputation is right about 70% of the time; the rest are under- or oversold by an anchor. The quay offers captains around your level: 1–2 anchors at tier 1, rising to 3–5 at tier 5+.
+- **On the quay** (5 recruits; someone new arrives whenever one signs) you see a name, a home port, a **Reputation** of 1–5 anchors, an asking fee, and one dockside rumour. Reputation is right about 70% of the time; the rest are under- or oversold by an anchor. The quay offers captains around your level: 1–2 anchors at tier 1, rising to 3–5 at tier 5+.
 - **Reputation decides which boats a captain will take:** 1 anchor sails tiers 1–2, 2 → 1–3, 3 → 2–4, 4 → 3–5, 5 → 4–6. A cruise director won't captain a dinghy, and a deckhand can't take a liner. Every 10 voyages reputation moves an anchor toward the captain's true ability, so a Sleeper works their way up to bigger ships and an overrated captain slips down.
 - **Hidden underneath:** skill (1–100), 2–4 traits, a ceiling, and a development style (Steady learner, Quick study, Late bloomer, Peaked). None of these ever reach the UI directly; a test enforces it.
 - **Scouting spends watches** (6 per pool at scout level 1, +2 per level): *Ask around the docks* (1) adds a trait rumour that's right 60–85% of the time by scout level; *Read their logbook* (2) gives a skill range 60→10 points wide, never exact; *Take them out on a run* (3) gives a verdict — **Sleeper**, **All talk**, or **True to form** — and another rumour.
