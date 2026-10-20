@@ -37,7 +37,7 @@ export function BoatScreen(props: BoatProps) {
   const [panel, setPanel] = useState<Panel>(boat.captainId || boat.state === 'sunk' ? 'send' : 'crew')
   // Dev only: preview the scene in any weather.
   const [preview, setPreview] = useState<Weather | null>(null)
-  const look = captain ? lookFor(captain.id, captain.rare, captain.region) : null
+  const look = captain ? lookFor(captain.id, captain.rare, captain.region, captain.persona?.id) : null
 
   return (
     <View style={{ flex: 1, gap: 8 }}>

@@ -35,7 +35,7 @@ export interface HomeLookProps {
   upgrades: Record<string, number>
   region: RegionId
   /** Your captains ashore. */
-  captains: { id: string; rare: boolean; region: RegionId }[]
+  captains: { id: string; rare: boolean; region: RegionId; persona?: string }[]
 }
 
 const font = matchFont({ fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }), fontSize: 12, fontStyle: 'italic', fontWeight: 'bold' })
@@ -276,7 +276,7 @@ export function HomeScene({ width, height, light, look }: { width: number; heigh
         {shown.map((c, i) => (
           <Walker
             key={c.id}
-            look={lookFor(c.id, c.rare, c.region)}
+            look={lookFor(c.id, c.rare, c.region, c.persona)}
             clock={clock}
             x0={16 + i * 66}
             x1={46 + i * 66}

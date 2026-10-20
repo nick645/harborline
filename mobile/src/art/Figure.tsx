@@ -9,6 +9,7 @@ import type { SharedValue } from 'react-native-reanimated'
 import { useDerivedValue, useSharedValue } from 'react-native-reanimated'
 import { HAT_PATHS, type HairStyle, type Look, type Prop } from './looks'
 import { shade, tint } from './paint'
+import { BackFx, BodyFx, FrontFx, Goggles, HatExtras, HeadFx, LanternHead } from './Flourish'
 
 type Props = {
   look: Look
@@ -51,6 +52,11 @@ const TORSO_LONG = {
   slim: 'M13 68 C 13 63, 17 60, 22 60 L 34 60 C 39 60, 43 63, 43 68 L 41 96 L 42 110 C 34 112, 22 112, 14 110 L 15 96 Z',
   stocky: 'M10 69 C 10 63, 15 60, 21 60 L 35 60 C 41 60, 46 63, 46 69 L 45 96 L 46 110 C 36 112.5, 20 112.5, 10 110 L 11 96 Z',
 }
+/** Robes fall to the boots. */
+const ROBE_LONG = {
+  slim: 'M13 68 C 13 63, 17 60, 22 60 L 34 60 C 39 60, 43 63, 43 68 L 47 138 C 36 141, 20 141, 9 138 Z',
+  stocky: 'M10 69 C 10 63, 15 60, 21 60 L 35 60 C 41 60, 46 63, 46 69 L 50 138 C 38 141.5, 18 141.5, 6 138 Z',
+}
 const TORSO_SHADOW_LONG = 'M13 68 C 13 63, 17 60, 22 60 L 24 60 C 20 64, 19 80, 20 111 C 18 111, 16 110.6, 14 110 L 15 96 Z'
 const TORSO_SHADOW = 'M3 100 C 4 76, 11 64, 21 61 L 24 61 C 17 66, 14 80, 15 100 Z'
 const CREAM = '#efe6d6'
@@ -58,6 +64,13 @@ const CREAM = '#efe6d6'
 /** Where the hands go for each prop: [left hand, right hand], and the shoulders they hang from. */
 const HANDS: Record<Prop, [[number, number], [number, number]]> = {
   none: [[11, 99], [45, 99]],
+  harpoon: [[19, 90], [33, 82]],
+  scroll: [[19, 88], [37, 88]],
+  conch: [[24, 87], [34, 84]],
+  bell: [[22, 90], [37, 84]],
+  line: [[22, 90], [32, 84]],
+  umbrella: [[22, 92], [34, 84]],
+  coin: [[18, 94], [38, 84]],
   spyglass: [[18, 88], [33, 81]],
   mug: [[23, 87], [33, 85]],
   logbook: [[20, 88], [36, 88]],
@@ -103,7 +116,8 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const skinShadow = shade(look.skin, 0.28)
   const line = shade(look.skin, 0.5)
   const knit = look.coatStyle === 'knit' || look.coatStyle === 'stripes'
-  const torso = (legs ? TORSO_LONG : TORSO)[look.build]
+  const robe = look.coatStyle === 'robe'
+  const torso = (legs ? (robe ? ROBE_LONG : TORSO_LONG) : TORSO)[look.build]
   const torsoClip = useMemo(() => Skia.Path.MakeFromSVGString(torso)!, [torso])
   const base = look.coatStyle === 'stripes' ? CREAM : look.coat
   const wide = look.build === 'stocky' ? 2.5 : 0
@@ -117,6 +131,10 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const stride = motion?.stride ?? still
   const act = motion?.act ?? still
   const prop = look.prop
+  const fx = look.fx ?? []
+  const brassArm = fx.includes('brass-arm')
+  const lanternHead = fx.includes('lantern-head')
+  const floating = fx.includes('float')
 
   // Where the hands and the prop go right now: rest pose, plus a swing while walking, plus
   // the prop's action as `act` rises.
@@ -175,7 +193,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
 
   const idle = useDerivedValue(() => [
     { translateX: x },
-    { translateY: y + Math.sin((clock.value + offset) / 600) * 1.5 * scale },
+    { translateY: y + Math.sin((clock.value + offset) / 600) * 1.5 * scale + (floating ? (-7 + Math.sin((clock.value + offset) / 900) * 2.5) * scale : 0) },
     { scale },
   ])
   const breath = useDerivedValue(() => [{ scaleY: 1 + Math.sin((clock.value + offset) / 600) * 0.014 }])
@@ -218,7 +236,8 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   )
 
   return (
-    <Group transform={idle}>
+    <Group transform={idle} opacity={fx.includes('ghost') ? 0.72 : 1}>
+      {(look.aura || fx.length > 0 || look.coatStyle === 'cape') && <BackFx look={look} clock={clock} offset={offset} legs={legs} />}
       {legs && (
         <Group>
           {([
@@ -258,7 +277,15 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
           </>
         )}
         <Path path={legs ? TORSO_SHADOW_LONG : TORSO_SHADOW} color={shade(look.coat, 0.45)} opacity={0.45} />
-        {legs && (
+        {fx.length > 0 && <BodyFx look={look} clock={clock} offset={offset} legs={legs} />}
+        {robe && (
+          <>
+            {/* A robe: a trimmed opening down the front, and a sash */}
+            <Path path={`M28 62 V ${legs ? 140 : 100}`} color={look.scarf} style="stroke" strokeWidth={2} opacity={0.8} />
+            <Rect x={0} y={legs ? 90 : 88} width={56} height={3} color={look.scarf} opacity={0.85} />
+          </>
+        )}
+        {legs && !robe && (
           <>
             {/* Waist: a belt, so the coat reads as a body over the legs */}
             <Rect x={0} y={93} width={56} height={4} color={shade(base, 0.5)} />
@@ -307,6 +334,11 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
         </Group>
       </Group>
 
+      {look.coatStyle === 'fur' &&
+        // Fur at the collar (and the hem, full length).
+        [...Array.from({ length: 7 }, (_, i) => [18 + i * 3.4, 61 + Math.abs(i - 3) * 0.6] as const), ...(legs ? Array.from({ length: 10 }, (_, i) => [13 + i * 3.4, 110] as const) : [])].map(([fx0, fy], i) => (
+          <Circle key={`fur${i}`} cx={fx0} cy={fy} r={2.6} color={tint(look.coat, 0.4)} />
+        ))}
       {look.hairStyle === 'braid' &&
         BRAID.map((b, i) => <Oval key={i} x={b.x - 2.2} y={b.y - 2.6} width={4.4} height={5.2} color={i % 2 ? look.hair : shade(look.hair, 0.15)} />)}
       {BACK_HAIR[look.hairStyle] && <Path path={BACK_HAIR[look.hairStyle]!} color={shade(look.hair, 0.12)} />}
@@ -332,7 +364,8 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
 
       {/* Arms and whatever they're holding */}
       <Path path={sleeveL} color={shade(base, 0.12)} style="stroke" strokeWidth={sleeveW} strokeCap="round" />
-      <Path path={sleeveR} color={shade(base, 0.04)} style="stroke" strokeWidth={sleeveW} strokeCap="round" />
+      <Path path={sleeveR} color={brassArm ? '#c9a24a' : shade(base, 0.04)} style="stroke" strokeWidth={sleeveW} strokeCap="round" />
+      {brassArm && <Path path={sleeveR} color="#7a5a2a" style="stroke" strokeWidth={0.8} strokeCap="round" />}
       {look.coatStyle === 'greatcoat' &&
         [shoulderL, shoulderR].map(([ex, ey], i) => (
           <Group key={i}>
@@ -344,9 +377,12 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
         <PropArt prop={look.prop} hands={[hl, hr]} clock={clock} offset={offset} />
       </Group>
       <Circle cx={handLx} cy={handLy} r={handR} color={skinShadow} />
-      <Circle cx={handRx} cy={handRy} r={handR} color={look.skin} />
+      <Circle cx={handRx} cy={handRy} r={handR} color={brassArm ? '#e6c27a' : look.skin} />
 
-      {/* Head */}
+      {/* Head (or, for the Lantern-headed, a lantern) */}
+      {lanternHead ? (
+        <LanternHead clock={clock} offset={offset} />
+      ) : (
       <Group transform={tilt} origin={vec(28, 56)}>
         <Oval x={14.6} y={35.4} width={4.2} height={7.2} color={skinShadow} />
         <Oval x={37.2} y={35.4} width={4.2} height={7.2} color={look.skin} />
@@ -407,10 +443,14 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
           </>
         )}
 
+        {fx.length > 0 && <HeadFx look={look} clock={clock} offset={offset} />}
+
         {/* Hair, then hat over it */}
-        {look.hat !== 'bare' && look.hat !== 'bun' && <Path path={FRONT_HAIR[look.hairStyle]} color={look.hair} />}
-        <Path path={HAT_PATHS[look.hat]} color={look.hatColor} />
-        {look.hat === 'bare' || look.hat === 'bun' ? (
+        {look.hat !== 'bare' && look.hat !== 'bun' && look.hat !== 'helmet' && look.hat !== 'none' && <Path path={FRONT_HAIR[look.hairStyle]} color={look.hair} />}
+        <Path path={HAT_PATHS[look.hat]} color={look.hatColor} fillType={look.hat === 'helmet' ? 'evenOdd' : 'winding'} />
+        <HatExtras look={look} clock={clock} offset={offset} />
+        {fx.includes('goggles') && <Goggles />}
+        {look.hat === 'bare' || look.hat === 'bun' || look.hat === 'none' ? (
           <Path path="M19 27.6 C 22 24.2, 30 23.4, 35 25.6" color={tint(look.hair, 0.25)} opacity={0.6} style="stroke" strokeWidth={0.9} strokeCap="round" />
         ) : (
           hatTrim && (
@@ -428,6 +468,8 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
           )
         )}
       </Group>
+      )}
+      {(fx.length > 0 || look.companion) && <FrontFx look={look} clock={clock} offset={offset} legs={legs} />}
     </Group>
   )
 }
@@ -484,6 +526,52 @@ function PropArt({ prop, hands, clock, offset }: { prop: Prop; hands: [[number, 
           <Rect x={14} y={72} width={28} height={20} color="#4a2e1e" style="stroke" strokeWidth={1.2} />
         </Group>
       )
+    case 'harpoon':
+      return (
+        <Group>
+          <Path path="M14 112 L 40 40" color="#6e4733" style="stroke" strokeWidth={1.8} strokeCap="round" />
+          <Path path="M40 40 L 43 30 L 38 38 Z M39 41 l 4 -1 M38.4 43 l -3.4 -1.6" color="#c9c4bc" style="stroke" strokeWidth={1.2} strokeJoin="round" />
+          <Path path="M41.6 33 l -3 -2" color="#c9c4bc" style="stroke" strokeWidth={1} />
+        </Group>
+      )
+    case 'scroll':
+      return (
+        <Group>
+          <Rect x={18} y={82} width={20} height={9} color="#efe3c2" />
+          <Path path="M21 85 q 4 2 8 0 t 6 1 M22 88 h 10" color="#8a5a3a" style="stroke" strokeWidth={0.6} />
+          <RoundedRect x={16} y={80.5} width={3.4} height={12} r={1.7} color="#d8c69a" />
+          <RoundedRect x={36.6} y={80.5} width={3.4} height={12} r={1.7} color="#d8c69a" />
+        </Group>
+      )
+    case 'conch':
+      return (
+        <Group>
+          <Path path="M24 88 C 22 80, 30 74, 36 78 C 40 80, 38 86, 34 87 L 26 90 Z" color="#f2d4c0" />
+          <Path path="M27 86 C 27 81, 33 79, 35 82 M29 85 C 30 83, 32 82, 33 84" color="#c98a7a" style="stroke" strokeWidth={0.8} />
+          <Path path="M24 88 L 21 92 L 26 90 Z" color="#e8b8a8" />
+        </Group>
+      )
+    case 'bell':
+      return <BellArt hr={hr} clock={clock} offset={offset} />
+    case 'line':
+      return (
+        <Group>
+          <Path path="M24 92 L 56 34" color="#8a5a3a" style="stroke" strokeWidth={1.3} strokeCap="round" />
+          <Path path="M56 34 L 57 60" color="#e8e2d6" style="stroke" strokeWidth={0.4} />
+          <Path path="M54 60 C 56 58, 59 58, 61 60 C 59 62, 56 62, 54 60 Z M61 60 l 2 -1.6 v 3.2 Z" color="#9ec0cf" />
+        </Group>
+      )
+    case 'umbrella':
+      return (
+        <Group>
+          <Path path="M34 84 V 6" color="#3a2a1e" style="stroke" strokeWidth={1.2} />
+          <Path path="M10 14 C 14 0, 54 0, 58 14 C 54 11, 50 11, 46 14 C 42 11, 38 11, 34 14 C 30 11, 26 11, 22 14 C 18 11, 14 11, 10 14 Z" color="#b8423a" />
+          <Path path="M22 14 C 24 6, 30 2, 34 2 M46 14 C 44 6, 38 2, 34 2" color="#8a2f2a" style="stroke" strokeWidth={0.7} />
+          <Path path="M34 84 q 0 4 -3 4" color="#3a2a1e" style="stroke" strokeWidth={1.2} />
+        </Group>
+      )
+    case 'coin':
+      return <CoinArt hr={hr} clock={clock} offset={offset} />
     case 'lantern':
       return (
         <Group>
@@ -496,4 +584,29 @@ function PropArt({ prop, hands, clock, offset }: { prop: Prop; hands: [[number, 
         </Group>
       )
   }
+}
+
+function BellArt({ hr, clock, offset }: { hr: [number, number]; clock: SharedValue<number>; offset: number }) {
+  const swing = useDerivedValue(() => [{ rotate: Math.sin((clock.value + offset) / 300) * 0.35 }])
+  return (
+    <Group transform={swing} origin={vec(hr[0], hr[1])}>
+      <Path path={`M${hr[0]} ${hr[1]} v 3`} color="#2e1c19" style="stroke" strokeWidth={0.9} />
+      <Path path={`M${hr[0] - 5} ${hr[1] + 12} C ${hr[0] - 5} ${hr[1] + 4}, ${hr[0] + 5} ${hr[1] + 4}, ${hr[0] + 5} ${hr[1] + 12} Z`} color="#d9a441" />
+      <Rect x={hr[0] - 6} y={hr[1] + 11.4} width={12} height={1.6} color="#b8862a" />
+      <Circle cx={hr[0]} cy={hr[1] + 14} r={1.2} color="#8a5a2a" />
+    </Group>
+  )
+}
+
+function CoinArt({ hr, clock, offset }: { hr: [number, number]; clock: SharedValue<number>; offset: number }) {
+  const flip = useDerivedValue(() => {
+    const p = ((clock.value + offset) % 1600) / 1600
+    return [{ translateY: -Math.sin(Math.PI * p) * 14 }, { scaleX: Math.cos(p * Math.PI * 6) }]
+  })
+  return (
+    <Group transform={flip} origin={vec(hr[0], hr[1] - 6)}>
+      <Circle cx={hr[0]} cy={hr[1] - 6} r={2.6} color="#f2c75a" />
+      <Circle cx={hr[0]} cy={hr[1] - 6} r={1.6} color="#d9a441" />
+    </Group>
+  )
 }

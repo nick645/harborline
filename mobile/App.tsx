@@ -37,6 +37,7 @@ import { CaptainsScreen } from './src/components/CaptainsScreen'
 import type { VisitPage } from './src/screens/VisitScreen'
 import { ShipyardScreen } from './src/components/ShipyardScreen'
 import { BoatGallery } from './src/components/BoatGallery'
+import { PersonaGallery } from './src/components/PersonaGallery'
 import { Upgrades, Workshop } from './src/components/PortScreen'
 import { BoatScreen } from './src/screens/BoatScreen'
 import { CaptainScreen } from './src/screens/CaptainScreen'
@@ -462,10 +463,11 @@ function Harbor() {
                           act(devMakeLegend)
                         }
                       />
-                      <Button small kind="secondary" label={gallery ? 'Hide boats' : 'Boat gallery'} onPress={() => setGallery(!gallery)} />
+                      <Button small kind="secondary" label={gallery ? 'Hide galleries' : 'Boat and Legend galleries'} onPress={() => setGallery(!gallery)} />
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />
                     </Row>
                   </Card>
+                {gallery && <PersonaGallery />}
                 {gallery && <BoatGallery />}
               </View> : undefined}
               />

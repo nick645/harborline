@@ -65,6 +65,7 @@ import {
   type TraitDef,
 } from './data/captains'
 import { nextFloat, nextInt, rollChance, rollNormal, rollPick, rollWeighted } from './rolls'
+import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS, type PersonaDef } from './data/personas'
 import { newCourting, termsFee } from './courting'
 
 const traitsById = new Map(TRAITS.map((t) => [t.id, t]))
@@ -165,6 +166,14 @@ export function generateBondedCaptain(rng: RngState, id: string): Captain {
   c.rumours = []
   addRumour(rng, c, SCOUT_ACCURACY[1])
   return c
+}
+
+// ---------- personas ----------
+
+/** Who a captain becomes with their rank: one nobody else in your line already is, if possible. */
+export function pickPersona(rng: RngState, from: PersonaDef[], taken: string[]): string {
+  const free = from.filter((p) => !taken.includes(p.id))
+  return rollPick(rng, free.length ? free : from).id
 }
 
 // ---------- skills ----------
@@ -495,7 +504,7 @@ export interface VoyageNews {
  * narrower skill range now and then, traits revealed by what they've been through, false
  * rumours put to rest. `revealEvery` is shorter aboard boats that bring traits out faster.
  */
-export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealEvery = REVEAL_EVERY): VoyageNews {
+export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealEvery = REVEAL_EVERY, takenPersonas: string[] = []): VoyageNews {
   const news: VoyageNews = { proven: [], disproven: [], developmentRevealed: false, reputationChange: 0, potentialRevealed: false, rankUp: null }
   c.voyageCount++
   const exp: Exposure = c.exposure
@@ -523,6 +532,7 @@ export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealE
     c.rank = 'legend'
     const ability = rollPick(rng, LEGEND_ABILITIES).id
     c.rankAbilities = [ability]
+    c.persona = pickPersona(rng, LEGEND_PERSONAS, takenPersonas)
     c.reputation = 5
     c.potentialKnown = true
     news.rankUp = { rank: 'legend', ability }
@@ -530,6 +540,7 @@ export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealE
     c.rank = 'mythic'
     const ability = rollPick(rng, MYTHIC_ABILITIES).id
     c.rankAbilities = [...(c.rankAbilities ?? []), ability]
+    c.persona = pickPersona(rng, MYTHIC_PERSONAS, takenPersonas)
     news.rankUp = { rank: 'mythic', ability }
   }
   if (!c.potentialKnown && c.voyageCount >= POTENTIAL_KNOWN_AFTER) {
@@ -606,6 +617,8 @@ export interface CaptainView {
   rank: 'legend' | 'mythic' | null
   /** The signatures that came with their rank. */
   rankAbilities: { id: string; name: string; description: string }[]
+  /** Who they became with their rank, and the look that goes with it. */
+  persona: PersonaDef | null
   traits: CaptainTraitView[]
   verdict: Verdict | null
   /** Only once revealed at sea. */
@@ -645,6 +658,7 @@ export function captainView(c: Captain): CaptainView {
     skills: SKILLS.map((d) => ({ id: d.id, name: d.name, description: d.description, band: [...c.bands[d.id]] as [number, number], known: c.bands[d.id][1] - c.bands[d.id][0] < 99 })),
     potential: c.potentialKnown && c.potential !== 'none' ? c.potential : null,
     rank: c.rank ?? null,
+    persona: PERSONAS.find((p) => p.id === c.persona) ?? null,
     rankAbilities: (c.rankAbilities ?? []).map((id) => [...LEGEND_ABILITIES, ...MYTHIC_ABILITIES].find((a) => a.id === id)!),
     traits: c.rumours.map((r) => {
       const t = getTrait(r.traitId)

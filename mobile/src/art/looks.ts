@@ -5,12 +5,23 @@
 import { hash } from './paint'
 import type { RegionId } from '../../../src/game/data/ports'
 import { REGION_STYLE } from './regionStyle'
+import { PERSONA_LOOKS } from './personas'
 
-export type HatKind = 'cap' | 'souwester' | 'beanie' | 'brim' | 'bun' | 'bare' | 'tricorn'
+export type HatKind =
+  | 'cap' | 'souwester' | 'beanie' | 'brim' | 'bun' | 'bare' | 'tricorn'
+  // Worn only by Legends and Mythics.
+  | 'lamphat' | 'bicorne' | 'hood' | 'straw' | 'plumed' | 'beacon' | 'helmet' | 'kelp' | 'coral' | 'crown' | 'bandana' | 'none'
 export type HairStyle = 'cropped' | 'swept' | 'long' | 'curls' | 'braid'
 export type FacialHair = 'none' | 'stubble' | 'moustache' | 'beard' | 'mutton'
-export type Coat = 'peacoat' | 'oilskin' | 'knit' | 'stripes' | 'raincoat' | 'greatcoat'
-export type Prop = 'none' | 'spyglass' | 'mug' | 'logbook' | 'rope' | 'lantern' | 'crate'
+export type Coat = 'peacoat' | 'oilskin' | 'knit' | 'stripes' | 'raincoat' | 'greatcoat' | 'cape' | 'robe' | 'fur'
+export type Prop = 'none' | 'spyglass' | 'mug' | 'logbook' | 'rope' | 'lantern' | 'crate' | 'harpoon' | 'scroll' | 'conch' | 'bell' | 'line' | 'umbrella' | 'coin'
+/** Something that rides on a Legend's shoulder. */
+export type Companion = 'gull' | 'cat' | 'heron' | 'octopus'
+/** Flourishes only Legends and Mythics have: light, weather, creatures, and stranger things. */
+export type Fx =
+  | 'embers' | 'beam' | 'bubbles' | 'cloud' | 'lightning' | 'frost' | 'rings' | 'float' | 'ghost' | 'tentacles'
+  | 'twinkles' | 'water' | 'moon' | 'whale' | 'bluefire' | 'fish' | 'glints' | 'halo' | 'brass-arm' | 'lantern-head'
+  | 'moss' | 'medals' | 'tooth' | 'beads' | 'monocle' | 'goggles' | 'flow-hair' | 'feathers'
 export type Build = 'slim' | 'stocky'
 export type Extra = 'none' | 'pipe' | 'earring' | 'scar'
 
@@ -38,6 +49,14 @@ export interface Look {
   boots: string
   /** A rare tavern find: a look nobody else has. */
   rare?: boolean
+  /** A Legend's or Mythic's persona (see personas.ts) and what comes with it. */
+  persona?: string
+  fx?: Fx[]
+  companion?: Companion
+  /** The glow around them: amber for a Legend, their own colour for a Mythic. */
+  aura?: string
+  /** A cape's colour, when the coat is a cape. */
+  capeColor?: string
 }
 
 /** Hat and hair shapes in figure space: a 56 × 100 standing figure, head centred at (28, 40). */
@@ -49,6 +68,18 @@ export const HAT_PATHS: Record<HatKind, string> = {
   bun: 'M16 34 C 14 22, 22 20, 28 20 C 34 20, 42 22, 40 34 C 36 28, 20 28, 16 34 Z M23 17 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0 Z',
   bare: 'M16 34 C 14 22, 22 22, 28 22 C 34 22, 42 22, 40 34 C 36 29, 20 29, 16 34 Z',
   tricorn: 'M4 30 C 10 24, 18 30, 28 18 C 38 30, 46 24, 52 30 C 44 36, 12 36, 4 30 Z',
+  lamphat: 'M15 31 h26 v3 h-26 Z M19.5 31 L 20.5 13 h 15 L 36.5 31 Z',
+  bicorne: 'M1 30 C 9 21, 19 16, 28 15 C 37 16, 47 21, 55 30 C 44 34, 12 34, 1 30 Z',
+  hood: 'M12.5 52 C 9 36, 13 21, 28 19 C 43 21, 47 36, 43.5 52 C 41 44, 40 33, 28 28 C 16 33, 15 44, 12.5 52 Z',
+  straw: 'M1 31 C 10 27.4, 46 27.4, 55 31 C 46 34.6, 10 34.6, 1 31 Z M17 30 C 17 21, 39 21, 39 30 Z',
+  plumed: 'M5 32 C 13 27, 43 27, 51 32 C 43 35.4, 13 35.4, 5 32 Z M17.5 30 C 17 19, 39 19, 38.5 30 Z',
+  beacon: 'M14 31 h28 v3 h-28 Z M17 31 L 18.5 21 h 19 L 39 31 Z',
+  helmet: 'M28 14 C 42 14, 48 26, 48 40 C 48 52, 42 58, 28 58 C 14 58, 8 52, 8 40 C 8 26, 14 14, 28 14 Z M28 27 C 21 27, 18.5 32, 18.5 39 C 18.5 46, 21 51, 28 51 C 35 51, 37.5 46, 37.5 39 C 37.5 32, 35 27, 28 27 Z',
+  kelp: 'M15 30 h26 v3.6 h-26 Z',
+  coral: 'M15 30 h26 v3.4 h-26 Z',
+  crown: 'M15 30 h26 v3.6 h-26 Z M15.5 30.4 l 2.4 -8 l 2.4 8 Z M21 30.4 l 2.8 -11 l 2.8 11 Z M27 30.4 l 1.6 -7 l 1.6 7 Z M30.6 30.4 l 2.6 -10 l 2.6 10 Z M36.4 30.4 l 2.2 -7 l 2.2 7 Z',
+  bandana: 'M16.2 33.5 C 15.8 24, 21.5 21.6, 28 21.6 C 34.5 21.6, 40.2 24, 39.8 33.5 C 34 30.4, 22 30.4, 16.2 33.5 Z M38.6 30 l 6 2.6 l -1.4 4.4 l -4.4 -3.6 Z M38.6 30 l 4 -3.4 l 2.4 3.8 Z',
+  none: 'M0 0',
 }
 
 const HATS: HatKind[] = ['cap', 'souwester', 'beanie', 'brim', 'bun', 'bare']
@@ -59,9 +90,13 @@ const SKIN = ['#f0c9a0', '#e0b48a', '#c98a5b', '#b5764c', '#8a5a3a', '#6b4430']
 const HAIR = ['#3a2630', '#5a3a2a', '#8a5a3a', '#c9a27a', '#2e1c19', '#a8452e']
 const GREY = '#b9aea6'
 
-/** A captain's look. Rare tavern finds keep their face but dress like no one else on the coast. */
-export function lookFor(id: string, rare = false, region: RegionId = 'bay'): Look {
+/**
+ * A captain's look. Rare tavern finds keep their face but dress like no one else on the coast;
+ * Legends and Mythics keep their face too, and become their persona.
+ */
+export function lookFor(id: string, rare = false, region: RegionId = 'bay', persona?: string | null): Look {
   const look = regional(baseLook(id), id, region)
+  if (persona && PERSONA_LOOKS[persona]) return { ...look, ...PERSONA_LOOKS[persona], persona, rare: true }
   if (!rare) return look
   return {
     ...look,

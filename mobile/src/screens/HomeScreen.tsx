@@ -98,7 +98,7 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
         const b = boatOfCaptain(game, c.id)
         return !b || b.state === 'idle'
       })
-      .map((c) => ({ id: c.id, rare: !!c.rare, region: c.region ?? 'bay' })),
+      .map((c) => ({ id: c.id, rare: !!c.rare, region: c.region ?? 'bay', persona: c.persona })),
   }
   const scene = <Measure>{(w, h) => <HomeScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={look} />}</Measure>
   const back = (title: string) => (

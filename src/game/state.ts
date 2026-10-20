@@ -44,6 +44,7 @@ import {
   voyagePayout,
 } from './economy'
 import { LEGEND_ABILITIES, MYTHIC_ABILITIES } from './data/captains'
+import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS } from './data/personas'
 import { leadingRival, leaning, rivalName, termsFee } from './courting'
 import { KEEN_DECIDES_MS, KEEN_RIVAL_FINISH, KEEN_YOURS, MANAGER_RIVAL_MAX } from './data/courting'
 import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick } from './rolls'
@@ -60,6 +61,7 @@ import {
   generateBondedCaptain,
   generateCaptain,
   migrateCaptain,
+  pickPersona,
   newRecruit,
   getTrait,
   proveTrait,
@@ -478,6 +480,10 @@ export function settleAway(state: GameState, now: number): { state: GameState; r
   const awayMs = Math.max(0, now - s.player.lastSeenAt)
   migrateHands(s)
   for (const p of [...s.player.roster, ...seekers(s).map((x) => x.person)]) if ('reputation' in p) migrateCaptain(s.rng, p)
+  // Legends from before personas take one on now.
+  for (const c of s.player.roster) {
+    if (c.rank && !c.persona) c.persona = pickPersona(s.rng, c.rank === 'mythic' ? MYTHIC_PERSONAS : LEGEND_PERSONAS, s.player.roster.flatMap((x) => (x.persona ? [x.persona] : [])))
+  }
   ensureRoutes(s)
   const outcome = settleInPlace(s, now)
   for (const b of s.player.ownedBoats) accrueDocked(s, b, now)
@@ -987,7 +993,8 @@ function manageCrew(s: GameState, boat: Boat, manager: Captain, at: number) {
 function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number) {
   const revealEvery = hooksOf(boat).traitRevealEvery
   for (const c of captainsAboard(s, boat)) {
-    const news = recordVoyage(s.rng, c, { track: ctx.cls.track, weather: ctx.weather, t: ctx.t, hands: handCount(s, boat.id) }, revealEvery)
+    const taken = s.player.roster.flatMap((x) => (x.persona ? [x.persona] : []))
+    const news = recordVoyage(s.rng, c, { track: ctx.cls.track, weather: ctx.weather, t: ctx.t, hands: handCount(s, boat.id) }, revealEvery, taken)
     for (const id of news.proven) log(s, at, 'captain', `${c.name} showed what they're made of: ${getTrait(id).name}`)
     for (const id of news.disproven) log(s, at, 'captain', `Turns out ${c.name} isn't ${getTrait(id).name.toLowerCase()} after all`)
     if (news.developmentRevealed) log(s, at, 'captain', `You're getting the measure of ${c.name}`)
@@ -996,7 +1003,8 @@ function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number) 
     if (news.potentialRevealed) log(s, at, 'captain', `${c.name} has the makings of ${c.potential === 'mythic' ? 'something the sea has rarely seen' : 'a Legend'}`)
     if (news.rankUp) {
       const a = [...LEGEND_ABILITIES, ...MYTHIC_ABILITIES].find((x) => x.id === news.rankUp!.ability)!
-      log(s, at, 'captain', `${c.name} is ${news.rankUp.rank === 'mythic' ? 'Mythic' : 'a Legend'} now. ${a.name}: ${a.description.toLowerCase()}`)
+      const who = PERSONAS.find((p) => p.id === c.persona)
+      log(s, at, 'captain', `${c.name} is ${news.rankUp.rank === 'mythic' ? 'Mythic' : 'a Legend'} now${who ? `: ${who.name}` : ''}. ${a.name}: ${a.description.toLowerCase()}`)
     }
   }
 }

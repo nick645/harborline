@@ -131,6 +131,10 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   doing; Legend (overall 90) and Mythic (96) are ranks above five anchors with signature
   abilities. Numbers are Claude's picks. Sim (wide, 6 h): tier 2 4.8 → 4.96 h, first purchase
   58 → 60 min (both at the edge of their targets).
+- Legend and Mythic looks (user-approved 2026-10-20): 20 Legend and 10 Mythic personas
+  (`src/game/data/personas.ts` names them; `mobile/src/art/personas.ts` + `Flourish.tsx` draw
+  them). A persona keeps the captain's face and replaces outfit, props, companions and effects.
+  The dev tools' gallery shows them ten at a time (thirty animated figures at once blanks Skia).
 
 ## Originality
 

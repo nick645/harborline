@@ -20,6 +20,7 @@ export function devMakeLegend(g: GameState): GameState {
   c.potentialKnown = true
   c.rank = 'legend'
   c.rankAbilities = ['storm-rider']
+  c.persona = 'lamplighter'
   c.reputation = 5
   return s
 }

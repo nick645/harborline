@@ -163,6 +163,8 @@ export interface Captain {
   rank?: import('./data/captains').Rank
   /** Signature abilities that came with the rank (a Legend's, then a Mythic's). */
   rankAbilities?: string[]
+  /** Who they became with their rank: a look and a name of their own (data/personas.ts). */
+  persona?: string
   /** HIDDEN until developmentKnown. */
   development: DevelopmentStyle
   developmentKnown: boolean

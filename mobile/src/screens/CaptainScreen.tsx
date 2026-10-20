@@ -47,7 +47,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
 
   return (
     <View style={{ flex: 1, gap: 8 }}>
-      <Measure>{(w, h) => <CaptainScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={lookFor(c.id, c.rare, c.region)} place={atSea ? 'helm' : 'port'} />}</Measure>
+      <Measure>{(w, h) => <CaptainScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={lookFor(c.id, c.rare, c.region, c.persona?.id)} place={atSea ? 'helm' : 'port'} />}</Measure>
 
       <Card>
         <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
@@ -60,7 +60,8 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
         <Row>
           {c.verdict && <Tag label={VERDICT[c.verdict]} color={c.verdict === 'sleeper' ? t.good : c.verdict === 'all-talk' ? t.bad : t.muted} dark />}
           <Muted>
-            {where} · {c.voyageCount} voyage{c.voyageCount === 1 ? '' : 's'}
+            {c.persona ? `${c.persona.name} · ` : ''}
+          {where} · {c.voyageCount} voyage{c.voyageCount === 1 ? '' : 's'}
           </Muted>
         </Row>
         <Muted>
@@ -110,6 +111,11 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
 
       {panel === 'skills' && (
         <View style={[styles.logbook, { backgroundColor: t.paper }]}>
+          {c.persona && (
+            <Text style={{ fontFamily: fonts.titleItalic, fontSize: 17, color: t.ink }}>
+              <Text style={{ fontFamily: fonts.title, color: c.rank === 'mythic' ? t.mythic : '#a8702a' }}>{c.persona.name}.</Text> {c.persona.blurb}.
+            </Text>
+          )}
           <SkillSheet c={c} paper />
           <RankAbilities c={c} paper />
           {c.potential && (!c.rank || (c.rank === 'legend' && c.potential === 'mythic')) && (

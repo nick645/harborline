@@ -24,6 +24,7 @@ import { getBoatClass } from './economy'
 import { HIRE_FEE, LEGEND_AT, SCOUT_ACCURACY, SCOUT_BAND_WIDTH, SKILL_IDS, skillToAnchors, WATCHES_BASE } from './data/captains'
 import { WEATHER_SLOT_MS } from './data/weather'
 import { ROUTES } from './data/routes'
+import { LEGEND_PERSONAS, MYTHIC_PERSONAS } from './data/personas'
 
 const T0 = 1_000_000_000_000
 
@@ -476,11 +477,14 @@ describe('five skills, potential and the ranks above five anchors', () => {
     let i = 0
     while (!c.rank && i++ < 500) recordVoyage(rng, c, { track: 'cargo', weather: 'storm', t: T0, hands: 3 })
     expect(c.rank).toBe('legend')
+    expect(LEGEND_PERSONAS.some((p) => p.id === c.persona)).toBe(true)
     expect(c.reputation).toBe(5)
     expect(c.rankAbilities).toHaveLength(1)
     expect(captainView(c).potential).toBe('mythic')
     while (c.rank !== 'mythic' && i++ < 2000) recordVoyage(rng, c, { track: 'cargo', weather: 'storm', t: T0, hands: 3 })
     expect(c.rank).toBe('mythic')
+    expect(MYTHIC_PERSONAS.some((p) => p.id === c.persona)).toBe(true)
+    expect(captainView(c).persona?.name).toBeTruthy()
     expect(c.rankAbilities).toHaveLength(2)
     expect(captainView(c).rankAbilities.map((a) => a.name)).toHaveLength(2)
   })

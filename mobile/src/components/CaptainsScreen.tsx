@@ -364,7 +364,7 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
               accessibilityLabel={`Open Captain ${c.name}`}
               style={({ pressed }) => ({ width: 132, padding: 8, gap: 4, borderRadius: 14, borderWidth: 1, borderColor: c.rare ? t.legendary : t.border, backgroundColor: t.surface, opacity: pressed ? 0.8 : 1 })}
             >
-              <Portrait id={c.id} rare={c.rare} region={c.region} />
+              <Portrait id={c.id} rare={c.rare} region={c.region} persona={c.persona?.id} />
               <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 17 }}>
                 {c.name}
               </Text>
@@ -384,13 +384,13 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
 }
 
 /** A small head-and-shoulders portrait under lamplight. */
-function Portrait({ id, rare, region }: { id: string; rare: boolean; region: RegionId }) {
+function Portrait({ id, rare, region, persona }: { id: string; rare: boolean; region: RegionId; persona?: string }) {
   const clock = useSceneClock()
   return (
     <Canvas style={{ width: 56, height: 64 }}>
       <Group clip={rrect(rect(0, 0, 56, 64), 10, 10)}>
         <Rect x={0} y={0} width={56} height={64} color="#433145" />
-        <Figure look={lookFor(id, rare, region)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
+        <Figure look={lookFor(id, rare, region, persona)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
       </Group>
     </Canvas>
   )
