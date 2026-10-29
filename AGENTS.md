@@ -40,6 +40,13 @@ lists the user's iPhone and the simulators):
 - `ios/` is generated and git-ignored; native fixes live as config plugins in `mobile/plugins/`
   (scene life cycle for iOS 27; no push entitlement, which the free Apple team can't sign).
 - Free-team builds expire after 7 days: rebuild to the phone when the user says it stopped opening.
+  If Expo's run fails with "No profiles for 'com.nick645.harborline'", build with Xcode so it can
+  renew the profile: `xcodebuild -workspace ios/Harborline.xcworkspace -scheme Harborline
+  -destination id=<UDID> -derivedDataPath ios/build -allowProvisioningUpdates build`, then
+  `xcrun devicectl device install app --device <UDID> ios/build/Build/Products/Debug-iphoneos/Harborline.app`.
+- Expo's native modules build from source (`plugins/withSourceBuiltModules`), so Xcode updates
+  don't break the build. After an Xcode update, if ExpoModulesJSI fails with a Swift version
+  mismatch, clear its stale cache: `bash node_modules/expo-modules-jsi/apple/scripts/clear-caches.sh`.
 
 Before calling work done: tests, both typechecks and lint pass. After changing pacing, economy or
 captains, re-run `npm run sim` and report the numbers against the targets below.

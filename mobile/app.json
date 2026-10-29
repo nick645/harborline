@@ -28,7 +28,8 @@
       "expo-dev-client",
       "./plugins/withoutPushEntitlement",
       "expo-notifications",
-      "./plugins/withSceneLifecycle"
+      "./plugins/withSceneLifecycle",
+      "./plugins/withSourceBuiltModules"
     ]
   }
 }
