@@ -8,6 +8,7 @@ import type { Boat, GameState } from '../src/game/types'
 import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, moveHome, sellBoat, settle } from '../src/game/state'
 import { assignCaptain, boatToShowTo, buyUpgrade, captainViewById, court, courtingOf, hireHand, moveHand, recruitViewById, tavernHandView, UPGRADES, upgradeQuote, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName, slotName } from '../src/game/parts'
+import { getKeepsake, KEEPSAKES } from '../src/game/data/keepsakes'
 import { getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../src/game/economy'
 import { quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
 import { MELT_COST, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE } from '../src/game/data/economy'
@@ -232,6 +233,7 @@ function Harbor() {
                 <Text style={{ fontFamily: fonts.bold }}>Welcome back.</Text> While you were away ({duration(report.awayMs)}), your fleet finished{' '}
                 {report.tripsCompleted} trip{report.tripsCompleted === 1 ? '' : 's'} for {coins(report.coinsEarned)}c.
                 {finds.length ? ` Found: ${finds.map(partName).join(', ')}.` : ''}
+                {report.keepsakes.length ? ` Brought home for the house: ${report.keepsakes.map((id) => getKeepsake(id)?.name).join(', ')}.` : ''}
                 {report.lost.length ? ` Cargo lost: ${report.lost.join(', ')}.` : ''}
                 {report.sunk.length ? ` Sunk: ${report.sunk.join(', ')}.` : ''}
                 {report.captainsLost.length ? ` Lost at sea: ${report.captainsLost.join(', ')}.` : ''}
@@ -462,6 +464,12 @@ function Harbor() {
                         onPress={() =>
                           act(devMakeLegend)
                         }
+                      />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Find every keepsake / lose them"
+                        onPress={() => act((g) => ({ ...g, player: { ...g.player, keepsakes: g.player.keepsakes?.length ? [] : KEEPSAKES.map((k) => k.id) } }))}
                       />
                       <Button small kind="secondary" label={gallery ? 'Hide galleries' : 'Boat and Legend galleries'} onPress={() => setGallery(!gallery)} />
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />

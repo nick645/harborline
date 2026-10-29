@@ -120,6 +120,7 @@ type RunResult = {
   sinkings: number
   lostTrips: number
   rareParts: number
+  keepsakes: number
   legendaryParts: number
   mythicParts: number
   crafted: number
@@ -269,6 +270,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     sinkings: 0,
     lostTrips: 0,
     rareParts: 0,
+    keepsakes: 0,
     legendaryParts: 0,
     mythicParts: 0,
     crafted: 0,
@@ -283,6 +285,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     s = step.state
     res.sinkings += step.report.sunk.length
     res.lostTrips += step.report.lost.length
+    res.keepsakes += step.report.keepsakes.length
     for (const id of step.report.parts) {
       const r = getPart(id).rarity
       if (r === 'rare') res.rareParts++
@@ -377,6 +380,7 @@ if (MODE === 'storms') {
     row('legendary parts found', results.map((r) => r.legendaryParts), '  ')
     row('mythic parts found', results.map((r) => r.mythicParts), '  ')
     row('legendaries crafted', results.map((r) => r.crafted), '  ')
+    row('keepsakes found', results.map((r) => r.keepsakes), '  ')
     console.log()
   }
 }

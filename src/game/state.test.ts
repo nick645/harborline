@@ -30,6 +30,12 @@ import { naturalWeather, seasonAt, stormAlerts } from './weather'
 import { upcomingAlerts } from './alerts'
 import { chartingNext, homeOf, regionOpen } from './regions'
 import { decorUnlocked, placeDecor, styleHome } from './home'
+import { lookOpen, rollKeepsake } from './keepsakes'
+import { KEEPSAKES, lookKey, STARTING_LOOKS, type KeepsakeGroup } from './data/keepsakes'
+import {
+  DOOR_STYLES, HANGINGS, HOME_BUNTING, HOME_DOORS, HOME_ROOFS, HOME_SHUTTERS, HOME_SIGNS, HOME_TRIMS, HOME_WALLS,
+  HOUSE_BUILDS, HOUSE_EXTRAS, ROOF_STYLES, SIDINGS, TAVERN_CLOTHS, TAVERN_FLOORS, TAVERN_WALLS, TOPPERS, WINDOW_STYLES,
+} from './data/home'
 import { assignCaptain, buyDrink, handView, hireHand, moveHand } from './crew'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
@@ -745,8 +751,11 @@ describe('moving home', () => {
 })
 
 describe('customizing home', () => {
+  /** A harbour that has found every keepsake there is. */
+  const foundAll = (s: GameState): GameState => ({ ...s, player: { ...s.player, keepsakes: KEEPSAKES.map((x) => x.id) } })
+
   it('names and colours the harbour; checks the choices', () => {
-    let s = newGame(4, T0)
+    let s = foundAll(newGame(4, T0))
     s = styleHome(s, { name: '  Lamplight Wharf ', wall: '#2f5d62', bunting: 2 })
     expect(s.player.homeStyle).toMatchObject({ name: 'Lamplight Wharf', wall: '#2f5d62', bunting: 2 })
     expect(() => styleHome(s, { wall: '#ff00ff' })).toThrow(GameError)
@@ -757,7 +766,7 @@ describe('customizing home', () => {
   })
 
   it('builds the house your way: shape, roof, walls, windows, door, touches', () => {
-    let s = newGame(4, T0)
+    let s = foundAll(newGame(4, T0))
     s = styleHome(s, { build: 'tower', roofStyle: 'thatch', siding: 'stone', windows: 'round', doorStyle: 'double', door: '#b8423a', trim: '#e9b23c', shutters: '', topper: 'gull' })
     expect(s.player.homeStyle).toMatchObject({ build: 'tower', roofStyle: 'thatch', siding: 'stone', windows: 'round', doorStyle: 'double', door: '#b8423a', trim: '#e9b23c', shutters: '', topper: 'gull' })
     s = styleHome(s, { extras: ['lights', 'porch', 'lights'] })
@@ -765,6 +774,56 @@ describe('customizing home', () => {
     expect(() => styleHome(s, { build: 'castle' as never })).toThrow(GameError)
     expect(() => styleHome(s, { door: '#000000' })).toThrow(GameError)
     expect(() => styleHome(s, { extras: ['fountain' as never] })).toThrow(GameError)
+  })
+
+  it('starts as a bare cottage; every other look is a keepsake found in its own waters', () => {
+    let s = newGame(4, T0)
+    expect(lookOpen(s, 'build', 'cottage')).toBe(true)
+    expect(() => styleHome(s, { build: 'tall' })).toThrow(/still out at sea/)
+    expect(() => styleHome(s, { wall: '#2f5d62' })).toThrow(GameError)
+    expect(() => styleHome(s, { extras: ['smoke', 'lights'] })).toThrow(GameError)
+    s = styleHome(s, { wall: '#efe3d2', extras: [] }) // the starting set is free to use
+    // A storm in the bay brings up its storm-only find first; calm water never does.
+    const bay = KEEPSAKES.filter((x) => x.region === 'bay')
+    const first = (() => {
+      for (;;) {
+        const k = rollKeepsake(s, 'bay', 'storm')
+        if (k) return k
+      }
+    })()
+    expect(first.storm).toBe(true)
+    for (let i = 0; i < 5000; i++) rollKeepsake(s, 'bay', 'calm')
+    expect(s.player.keepsakes!.sort()).toEqual(bay.map((x) => x.id).sort())
+    expect(rollKeepsake(s, 'bay', 'storm')).toBeNull() // nothing left in those waters
+    expect(lookOpen(s, 'build', 'tall')).toBe(false) // that's in the Fogbanks
+    s = styleHome(s, { siding: 'shingles', topper: 'gull', wall: '#2f5d62' })
+    expect(s.player.homeStyle).toMatchObject({ siding: 'shingles', topper: 'gull' })
+  })
+
+  it('every look is either there from the start or a keepsake, exactly once', () => {
+    const named = (xs: readonly { id: string }[]) => xs.map((x) => x.id)
+    const lists: [KeepsakeGroup, readonly (string | number)[]][] = [
+      ['build', named(HOUSE_BUILDS)], ['roofStyle', named(ROOF_STYLES)], ['siding', named(SIDINGS)],
+      ['windows', named(WINDOW_STYLES)], ['doorStyle', named(DOOR_STYLES)], ['topper', named(TOPPERS)],
+      ['extra', named(HOUSE_EXTRAS)], ['wall', HOME_WALLS], ['roof', HOME_ROOFS], ['sign', HOME_SIGNS],
+      ['trim', HOME_TRIMS], ['door', HOME_DOORS], ['shutters', HOME_SHUTTERS], ['bunting', HOME_BUNTING.map((_, i) => i)],
+      ['tavernWall', TAVERN_WALLS.map((_, i) => i)], ['tavernFloor', TAVERN_FLOORS.map((_, i) => i)],
+      ['cloth', TAVERN_CLOTHS], ['hanging', named(HANGINGS)],
+    ]
+    const every = lists.flatMap(([g, vs]) => vs.map((v) => lookKey(g, v)))
+    const sources = [...STARTING_LOOKS, ...KEEPSAKES.map((x) => x.id)]
+    expect(new Set(sources).size).toBe(sources.length)
+    expect(sources.sort()).toEqual(every.sort())
+  })
+
+  it('an older harbour keeps the looks it already wore', () => {
+    let s = newGame(4, T0)
+    delete s.player.keepsakes
+    s.player.homeStyle = { build: 'tower', wall: '#4a3346', extras: ['lights'] }
+    expect(lookOpen(s, 'build', 'tower')).toBe(true)
+    s = settle(s, T0 + 1000)
+    expect(s.player.keepsakes!.sort()).toEqual(['build:tower', 'extra:lights', 'wall:#4a3346'])
+    expect(lookOpen(s, 'roofStyle', 'thatch')).toBe(false)
   })
 
   it('places earned decorations, one of each, and keeps the rest locked', () => {

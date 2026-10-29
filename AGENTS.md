@@ -143,6 +143,11 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   them). A persona keeps the captain's face and replaces outfit, props, companions and effects.
   The dev tools' gallery shows them ten at a time (thirty animated figures at once blanks Skia).
 
+- Keepsakes (user-approved 2026-10-29): a new harbour is a bare cottage and plain tavern; every
+  other look is a keepsake hand-run boats bring home, each from one region's waters, rarest in
+  storms (`data/keepsakes.ts`; odds, names and which waters are Claude's picks). Quay
+  decorations keep their milestones. Sim (wide): ~15 found by 6 h, ~55 of 66 by 40 h.
+
 ## Originality
 
 The user does not want this to read as a copy of Pocket Planes or of EA's college football

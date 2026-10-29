@@ -51,6 +51,7 @@ import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, r
 import { hooksOf, type TripContext } from './abilities'
 import { routeWeather, weatherSlot } from './weather'
 import { handBerths, handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
+import { migrateKeepsakes, rollKeepsake } from './keepsakes'
 import { chartTrip, getPortDef, homeOf, portOpen, refreshPortPools } from './regions'
 import { getRegion, HOME_PRICE } from './data/ports'
 import type { Milestone } from './data/home'
@@ -103,6 +104,7 @@ export function newGame(seed: number, now: number): GameState {
       deckhands: [],
       portUpgrades: {},
       maxTierReached: 1,
+      keepsakes: [],
       lastSeenAt: now,
     },
     routes,
@@ -479,6 +481,7 @@ export function settleAway(state: GameState, now: number): { state: GameState; r
   const coinsBefore = s.player.coins
   const awayMs = Math.max(0, now - s.player.lastSeenAt)
   migrateHands(s)
+  migrateKeepsakes(s)
   for (const p of [...s.player.roster, ...seekers(s).map((x) => x.person)]) if ('reputation' in p) migrateCaptain(s.rng, p)
   // Legends from before personas take one on now.
   for (const c of s.player.roster) {
@@ -778,6 +781,7 @@ function settleInPlace(s: GameState, now: number) {
   const sunk: string[] = []
   const lost: string[] = []
   const parts: string[] = []
+  const keepsakes: string[] = []
   // Each trip has at most two events, runs are capped by the fuel tank, and managed boats
   // depart at most once per trip, so this is bounded by the voyages that fit before `now`.
   for (let ev = nextEvent(s, now); ev; ev = nextEvent(s, now)) {
@@ -865,6 +869,12 @@ function settleInPlace(s: GameState, now: number) {
           markMilestone(s, 'storm-trip')
           ;(s.player.record ??= { stormTrips: 0 }).stormTrips++
         }
+        // Hand-run boats sometimes bring home a keepsake from those waters: a new look for home.
+        const keepsake = isAutomated(s, boat) ? null : rollKeepsake(s, getPortDef(getRoute(s, v.routeId).portB).region, ctx.weather)
+        if (keepsake) {
+          keepsakes.push(keepsake.id)
+          log(s, ev.at, 'part', `${boat.nickname} brought home ${keepsake.name}: something new for home`)
+        }
         const opened = chartTrip(s, getRoute(s, v.routeId).portB, ctx.weather)
         if (opened) {
           ensureRoutes(s)
@@ -883,7 +893,7 @@ function settleInPlace(s: GameState, now: number) {
     }
   }
   const captainsLost = loseAdrift(s, now)
-  return { tripsCompleted, sunk, lost, parts, captainsLost }
+  return { tripsCompleted, sunk, lost, parts, keepsakes, captainsLost }
 }
 
 /** When a sunk boat's captain will be lost unless she's raised first, or null if no one's at risk. */

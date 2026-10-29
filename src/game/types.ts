@@ -292,6 +292,9 @@ export interface Player {
   }
   /** Things you've done that unlock decorations. */
   milestones?: string[]
+  /** Keepsakes brought home (ids from data/keepsakes.ts), each opening a look for the home.
+   * Absent in older saves: whatever that harbour already used counts as found. */
+  keepsakes?: string[]
   /** Where the fleet sails from. Absent in older saves: Saltmarsh Quay. */
   home?: string
   /** Harbour offices bought; moving back to one is free. Saltmarsh is always yours. */
@@ -346,6 +349,8 @@ export interface AwayReport {
   lost: string[]
   /** Part ids found. */
   parts: string[]
+  /** Keepsake ids brought home. */
+  keepsakes: string[]
   /** Names of captains lost at sea waiting for their boat to be raised. */
   captainsLost: string[]
 }

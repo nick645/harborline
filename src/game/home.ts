@@ -1,5 +1,6 @@
 // Customizing your home harbour: its name, colours and the decorations on its quay. All
-// cosmetic. Decorations unlock from things you've done.
+// cosmetic. Decorations unlock from things you've done; looks beyond the bare cottage are
+// keepsakes brought home from sea (keepsakes.ts).
 
 import type { GameState } from './types'
 import {
@@ -34,7 +35,9 @@ import {
   type Topper,
   type WindowStyle,
 } from './data/home'
+import { lookKey, type KeepsakeGroup } from './data/keepsakes'
 import { getBoatClass } from './economy'
+import { looksOpen } from './keepsakes'
 import { regionOpen } from './regions'
 import { GameError } from './state'
 
@@ -108,6 +111,14 @@ export function styleHome(state: GameState, patch: StylePatch): GameState {
   oneOf(patch.shutters, HOME_SHUTTERS, 'shutter colour')
   oneOf(patch.topper, TOPPERS, 'roof topper')
   for (const x of patch.extras ?? []) oneOf(x, HOUSE_EXTRAS, 'touch')
+  // Beyond the bare cottage, every look is a keepsake brought home from sea.
+  const open = looksOpen(state)
+  const found = (group: KeepsakeGroup, v: string | number | undefined) => {
+    if (v !== undefined && !open.has(lookKey(group, v))) throw new GameError('Not found yet: that one is still out at sea')
+  }
+  const groups: KeepsakeGroup[] = ['build', 'roofStyle', 'siding', 'windows', 'doorStyle', 'topper', 'wall', 'roof', 'sign', 'trim', 'door', 'shutters', 'bunting', 'tavernWall', 'tavernFloor', 'cloth', 'hanging']
+  for (const g of groups) found(g, patch[g as keyof StylePatch] as string | number | undefined)
+  for (const x of patch.extras ?? []) found('extra', x)
   const s = structuredClone(state)
   const style = (s.player.homeStyle ??= {})
   if (patch.name !== undefined) style.name = patch.name.trim() || undefined
