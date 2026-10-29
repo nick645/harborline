@@ -272,6 +272,17 @@ export interface Player {
     sign?: string
     bunting?: number
     decor?: (string | null)[]
+    /** The house: shape, roof, walls, windows, door, colours and the little touches. */
+    build?: import('./data/home').HouseBuild
+    roofStyle?: import('./data/home').RoofStyle
+    siding?: import('./data/home').Siding
+    windows?: import('./data/home').WindowStyle
+    door?: string
+    doorStyle?: import('./data/home').DoorStyle
+    trim?: string
+    shutters?: string
+    topper?: import('./data/home').Topper
+    extras?: import('./data/home').HouseExtra[]
     /** The home tavern: its name, panelling, floor, tablecloth and what hangs on the wall. */
     tavernName?: string
     tavernWall?: number

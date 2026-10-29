@@ -756,6 +756,17 @@ describe('customizing home', () => {
     expect(() => styleHome(s, { hanging: 'kraken' })).toThrow(GameError)
   })
 
+  it('builds the house your way: shape, roof, walls, windows, door, touches', () => {
+    let s = newGame(4, T0)
+    s = styleHome(s, { build: 'tower', roofStyle: 'thatch', siding: 'stone', windows: 'round', doorStyle: 'double', door: '#b8423a', trim: '#e9b23c', shutters: '', topper: 'gull' })
+    expect(s.player.homeStyle).toMatchObject({ build: 'tower', roofStyle: 'thatch', siding: 'stone', windows: 'round', doorStyle: 'double', door: '#b8423a', trim: '#e9b23c', shutters: '', topper: 'gull' })
+    s = styleHome(s, { extras: ['lights', 'porch', 'lights'] })
+    expect(s.player.homeStyle!.extras).toEqual(['lights', 'porch'])
+    expect(() => styleHome(s, { build: 'castle' as never })).toThrow(GameError)
+    expect(() => styleHome(s, { door: '#000000' })).toThrow(GameError)
+    expect(() => styleHome(s, { extras: ['fountain' as never] })).toThrow(GameError)
+  })
+
   it('places earned decorations, one of each, and keeps the rest locked', () => {
     let s = newGame(4, T0)
     expect(decorUnlocked(s, 'flowerboxes')).toBe(true)

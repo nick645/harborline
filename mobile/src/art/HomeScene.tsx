@@ -1,23 +1,28 @@
 // Your home harbour as you've made it: the tavern in your colours with your name over the quay,
 // your bunting, the decorations you've placed, the port upgrades you've built standing where
-// they work, and your captains ashore wandering about. Design space is 358 × 270.
+// they work, and your captains ashore wandering about. Design space is 358 × 270, with headroom
+// above it (HEAD) for tall houses and what stands on their roofs.
 
 import type { ReactNode } from 'react'
-import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, Text as SkText, matchFont, vec } from '@shopify/react-native-skia'
+import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, matchFont, vec } from '@shopify/react-native-skia'
 import { Platform } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { RegionId } from '../../../src/game/data/ports'
-import { HOME_BUNTING, type DecorId } from '../../../src/game/data/home'
+import { HOME_BUNTING, type DecorId, type DoorStyle, type HouseBuild, type HouseExtra, type RoofStyle, type Siding, type Topper, type WindowStyle } from '../../../src/game/data/home'
+import { House, type HouseLook } from './HouseArt'
+import { houseFrame, roofPeak } from './houseGeometry'
 import type { Light } from './light'
 import { lookFor } from './looks'
 import { REGION_STYLE } from './regionStyle'
 import { Walker } from './Walker'
 import { useSceneClock } from './clock'
 import { Stage } from './Stage'
-import { mix, shade, tint } from './paint'
+import { mix, tint } from './paint'
 
 const W = 358
-const H = 270
+/** Headroom above the design space, for tall houses, steep roofs and what stands on them. */
+const HEAD = 44
+const H = 270 + HEAD
 const WATER = 120
 const QUAY = 196
 const FOOT_Y = 262
@@ -36,6 +41,16 @@ export interface HomeLookProps {
   region: RegionId
   /** Your captains ashore. */
   captains: { id: string; rare: boolean; region: RegionId; persona?: string }[]
+  build: HouseBuild
+  roofStyle: RoofStyle
+  siding: Siding
+  windows: WindowStyle
+  door: string
+  doorStyle: DoorStyle
+  trim: string
+  shutters: string
+  topper: Topper
+  extras: HouseExtra[]
 }
 
 const font = matchFont({ fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }), fontSize: 12, fontStyle: 'italic', fontWeight: 'bold' })
@@ -136,7 +151,7 @@ function Decoration({ id, x, lit, clock }: { id: DecorId; x: number; lit: (c: st
 }
 
 /** Port upgrades, drawn where they'd stand. Level 0 draws nothing. */
-function Upgrades({ up, lit, clock, wall, roof }: { up: Record<string, number>; lit: (c: string) => string; clock: SharedValue<number>; wall: string; roof: string }) {
+function Upgrades({ up, lit, clock, wall, roof, mast }: { up: Record<string, number>; lit: (c: string) => string; clock: SharedValue<number>; wall: string; roof: string; mast: { x: number; base: number; top: number } }) {
   const dish = useDerivedValue(() => [{ scaleX: Math.cos(clock.value / 900) }])
   const blink = useDerivedValue(() => ((clock.value % 1400) < 700 ? 1 : 0.25))
   const lv = (id: string) => up[id] ?? 0
@@ -186,11 +201,11 @@ function Upgrades({ up, lit, clock, wall, roof }: { up: Record<string, number>; 
       {/* Weather radar: a mast on the tavern roof with a turning dish and a blinking light */}
       {lv('weather-radar') > 0 && (
         <Group>
-          <Path path={`M228 ${WATER - 50} V ${WATER - 82 - lv('weather-radar') * 6}`} color={lit('#4a4f58')} style="stroke" strokeWidth={2} />
-          <Group transform={dish} origin={vec(228, WATER - 86 - lv('weather-radar') * 6)}>
-            <Path path={`M218 ${WATER - 86 - lv('weather-radar') * 6} q 10 -8 20 0 Z`} color={lit('#c9ccd0')} />
+          <Path path={`M${mast.x} ${mast.base} V ${mast.top - lv('weather-radar') * 6}`} color={lit('#4a4f58')} style="stroke" strokeWidth={2} />
+          <Group transform={dish} origin={vec(mast.x, mast.top - 4 - lv('weather-radar') * 6)}>
+            <Path path={`M${mast.x - 10} ${mast.top - 4 - lv('weather-radar') * 6} q 10 -8 20 0 Z`} color={lit('#c9ccd0')} />
           </Group>
-          <Circle cx={228} cy={WATER - 82 - lv('weather-radar') * 6} r={2} color="#ff5c5c" opacity={blink} />
+          <Circle cx={mast.x} cy={mast.top - lv('weather-radar') * 6} r={2} color="#ff5c5c" opacity={blink} />
         </Group>
       )}
     </Group>
@@ -201,20 +216,23 @@ export function HomeScene({ width, height, light, look }: { width: number; heigh
   const clock = useSceneClock()
   const st = REGION_STYLE[look.region]
   const lit = (c: string) => mix(c, light.silhouette, light.dim * 0.8)
-  const flicker = useDerivedValue(() => 0.85 + 0.15 * Math.sin(clock.value / 300))
   const waves = useDerivedValue(() => [{ translateX: -((clock.value / 80) % 36) }])
   const sky = mix(light.sky, st.tint, st.tintAmount)
   const skyLow = mix(light.skyLow, st.tint, st.tintAmount)
   const sea = mix(light.sea, st.tint, st.tintAmount * 0.7)
   const bunting = HOME_BUNTING[look.bunting] ?? HOME_BUNTING[0]
-  const wall = lit(look.wall)
   const shown = look.captains.slice(0, 5)
+  const house: HouseLook = { ...look, flag: bunting[0] }
+  // The radar mast stands on the roof, a little left of the peak.
+  const frame = houseFrame(look.build, WATER)
+  const peak = roofPeak(look.build, look.roofStyle, WATER)
+  const mast = { x: frame.x + frame.w * 0.32, base: frame.top - (frame.top - peak) * 0.55, top: peak - 6 }
 
   return (
     <Stage width={width} height={height} W={W} H={H} night={light.stars > 0} sky={[mix(sky, '#000000', 0.12), sky]} ground={'#4a2e22'}>
-      <Group>
-        <Rect x={0} y={0} width={W} height={WATER}>
-          <LinearGradient start={vec(0, 0)} end={vec(0, WATER)} colors={[sky, skyLow]} />
+      <Group transform={[{ translateY: HEAD }]}>
+        <Rect x={0} y={-HEAD} width={W} height={WATER + HEAD}>
+          <LinearGradient start={vec(0, -HEAD)} end={vec(0, WATER)} colors={[mix(sky, '#000000', 0.12), skyLow]} />
         </Rect>
         <Circle cx={light.sunX} cy={Math.min(46, light.sunY)} r={14} color={light.sun} />
         <Group opacity={light.stars}>
@@ -230,29 +248,10 @@ export function HomeScene({ width, height, light, look }: { width: number; heigh
           <Path path={`M0 ${WATER + 16} ${'q 9 -3 18 0 t 18 0 '.repeat(12)}`} color={light.seaLine} style="stroke" strokeWidth={1.4} opacity={0.7} />
         </Group>
 
-        {/* Your tavern, in your colours */}
-        <Group>
-          <Rect x={168} y={WATER - 50} width={110} height={QUAY - WATER + 50} color={wall} />
-          {Array.from({ length: 10 }, (_, i) => (
-            <Path key={i} path={`M168 ${WATER - 42 + i * 11} h 110`} color={shade(wall, 0.25)} style="stroke" strokeWidth={0.7} />
-          ))}
-          <Path path={`M160 ${WATER - 48} L 223 ${WATER - 82} L 286 ${WATER - 48} Z`} color={lit(look.roof)} />
-          <Rect x={244} y={WATER - 86} width={11} height={22} color={lit(look.roof)} />
-          {[184, 236].map((wx) => (
-            <Group key={wx}>
-              <Rect x={wx} y={WATER - 30} width={26} height={28} color={light.window} />
-              <Rect x={wx} y={WATER - 30} width={26} height={28} color={light.lamp} opacity={flicker} />
-              <Path path={`M${wx + 13} ${WATER - 30} v 28 M${wx} ${WATER - 16} h 26`} color={lit(look.roof)} style="stroke" strokeWidth={2} />
-            </Group>
-          ))}
-          <Rect x={208} y={WATER + 16} width={30} height={QUAY - WATER - 16} color={lit(shade(look.wall, 0.55))} />
-          {/* The name board over the door */}
-          <RoundedRect x={176} y={WATER + 2} width={94} height={13} r={3} color={lit(look.sign)} />
-          <RoundedRect x={176} y={WATER + 2} width={94} height={13} r={3} color="#d9a441" style="stroke" strokeWidth={1} />
-          {font && <SkText x={223 - font.measureText(look.name).width / 2} y={WATER + 12} text={look.name} font={font} color="#f3e7d8" />}
-        </Group>
+        {/* Your house, built your way */}
+        <House look={house} lit={lit} light={light} clock={clock} water={WATER} quay={QUAY} font={font} />
 
-        <Upgrades up={look.upgrades} lit={lit} clock={clock} wall={look.wall} roof={look.roof} />
+        <Upgrades up={look.upgrades} lit={lit} clock={clock} wall={look.wall} roof={look.roof} mast={mast} />
 
         {/* Bunting across the quay */}
         <Path path={`M6 ${QUAY - 46} Q 90 ${QUAY - 26} 168 ${QUAY - 50}`} color={lit('#2e1c19')} style="stroke" strokeWidth={0.7} />

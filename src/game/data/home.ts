@@ -14,6 +14,62 @@ export const HOME_BUNTING = [
   ['#b07be6', '#e6a53a', '#1d1218'],
 ] as const
 
+// ---------- the house itself ----------
+
+export type HouseBuild = 'cottage' | 'tall' | 'boathouse' | 'tower'
+export const HOUSE_BUILDS: { id: HouseBuild; name: string }[] = [
+  { id: 'cottage', name: 'Cottage' },
+  { id: 'tall', name: 'Tall house' },
+  { id: 'boathouse', name: 'Boathouse' },
+  { id: 'tower', name: 'Lookout tower' },
+]
+export type RoofStyle = 'gable' | 'hip' | 'steep' | 'thatch'
+export const ROOF_STYLES: { id: RoofStyle; name: string }[] = [
+  { id: 'gable', name: 'Gable' },
+  { id: 'hip', name: 'Hipped' },
+  { id: 'steep', name: 'Steep' },
+  { id: 'thatch', name: 'Thatch' },
+]
+export type Siding = 'boards' | 'shingles' | 'stone' | 'plaster'
+export const SIDINGS: { id: Siding; name: string }[] = [
+  { id: 'boards', name: 'Boards' },
+  { id: 'shingles', name: 'Shingles' },
+  { id: 'stone', name: 'Stone' },
+  { id: 'plaster', name: 'Plaster' },
+]
+export type WindowStyle = 'square' | 'round' | 'arched'
+export const WINDOW_STYLES: { id: WindowStyle; name: string }[] = [
+  { id: 'square', name: 'Square' },
+  { id: 'round', name: 'Portholes' },
+  { id: 'arched', name: 'Arched' },
+]
+export type DoorStyle = 'plain' | 'arched' | 'double'
+export const DOOR_STYLES: { id: DoorStyle; name: string }[] = [
+  { id: 'plain', name: 'Plain' },
+  { id: 'arched', name: 'Arched' },
+  { id: 'double', name: 'Double' },
+]
+export type Topper = 'none' | 'gull' | 'ship' | 'anchor' | 'flag'
+export const TOPPERS: { id: Topper; name: string }[] = [
+  { id: 'none', name: 'Nothing' },
+  { id: 'gull', name: 'Gull vane' },
+  { id: 'ship', name: 'Ship vane' },
+  { id: 'anchor', name: 'Anchor' },
+  { id: 'flag', name: 'Flagpole' },
+]
+export const HOME_TRIMS = ['#f3e7d8', '#e9b23c', '#2e1c19', '#9ec0cf', '#c2452a'] as const
+export const HOME_DOORS = ['#3a2420', '#b8423a', '#2f5d62', '#e9b23c', '#23395b', '#f3e7d8'] as const
+/** Shutter colours; the empty string is no shutters. */
+export const HOME_SHUTTERS = ['', '#2f5d62', '#b8423a', '#23395b', '#e9b23c', '#f3e7d8'] as const
+/** Little touches that are simply on or off. */
+export type HouseExtra = 'smoke' | 'lights' | 'boxes' | 'porch'
+export const HOUSE_EXTRAS: { id: HouseExtra; name: string }[] = [
+  { id: 'smoke', name: 'Chimney smoke' },
+  { id: 'lights', name: 'String lights' },
+  { id: 'boxes', name: 'Window boxes' },
+  { id: 'porch', name: 'Porch lamp' },
+]
+
 /** Places on the home quay where a decoration can stand. */
 export const DECOR_SLOTS = 3
 

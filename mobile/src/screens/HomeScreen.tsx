@@ -4,7 +4,32 @@
 import { useState, type ReactNode } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
 import type { GameState } from '../../../src/game/types'
-import { DECOR, DECOR_SLOTS, HANGINGS, HOME_BUNTING, HOME_NAME_MAX, HOME_ROOFS, HOME_SIGNS, HOME_WALLS, TAVERN_CLOTHS, TAVERN_FLOORS, TAVERN_NAME_MAX, TAVERN_WALLS, type DecorId } from '../../../src/game/data/home'
+import {
+  DECOR,
+  DECOR_SLOTS,
+  DOOR_STYLES,
+  HANGINGS,
+  HOME_BUNTING,
+  HOME_DOORS,
+  HOME_NAME_MAX,
+  HOME_ROOFS,
+  HOME_SHUTTERS,
+  HOME_SIGNS,
+  HOME_TRIMS,
+  HOME_WALLS,
+  HOUSE_BUILDS,
+  HOUSE_EXTRAS,
+  ROOF_STYLES,
+  SIDINGS,
+  TAVERN_CLOTHS,
+  TAVERN_FLOORS,
+  TAVERN_NAME_MAX,
+  TAVERN_WALLS,
+  TOPPERS,
+  WINDOW_STYLES,
+  type DecorId,
+  type HouseExtra,
+} from '../../../src/game/data/home'
 import { decorUnlocked, type styleHome } from '../../../src/game/home'
 import { portPeople, UPGRADES } from '../../../src/game/crew'
 import { getPart } from '../../../src/game/parts'
@@ -17,7 +42,7 @@ import { lightAt } from '../art/light'
 import { REGION_STYLE } from '../art/regionStyle'
 import { fonts, useTheme } from '../theme'
 import { duration } from '../../../src/format'
-import { Body, Button, Card, Measure, Muted, Row, Strip, Tile, Title } from '../components/ui'
+import { Body, Button, Card, Measure, Muted, Row, Segments, Strip, Tile, Title } from '../components/ui'
 
 type Props = {
   game: GameState
@@ -32,22 +57,53 @@ type Props = {
   dev?: ReactNode
 }
 
+type LookTab = 'house' | 'colours' | 'openings' | 'touches'
+
+/** A row of named choices, one picked: house shapes, roof styles and the like. */
+function Choices<T extends string>({ label, items, value, onPick }: { label: string; items: readonly { id: T; name: string }[]; value: T; onPick: (id: T) => void }) {
+  const t = useTheme()
+  return (
+    <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
+      <Muted style={{ width: 52 }}>{label}</Muted>
+      <Strip gap={6}>
+        {items.map((it) => {
+          const on = it.id === value
+          return (
+            <Pressable
+              key={it.id}
+              onPress={() => onPick(it.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: on ? 2 : 1, borderColor: on ? t.accent : t.border, backgroundColor: on ? t.surface2 : 'transparent' }}
+            >
+              <Text style={{ color: on ? t.text : t.muted, fontFamily: fonts.semibold, fontSize: 13 }}>{it.name}</Text>
+            </Pressable>
+          )
+        })}
+      </Strip>
+    </Row>
+  )
+}
+
 type Page = 'menu' | 'look' | 'tavern' | 'decor' | 'upgrades' | 'workshop' | 'log' | 'dev'
 
 function Swatches({ colors, value, onPick, label }: { colors: readonly string[]; value: string; onPick: (c: string) => void; label: string }) {
   const t = useTheme()
   return (
-    <Row style={{ gap: 6 }}>
-      <Muted style={{ width: 44 }}>{label}</Muted>
+    <Row style={{ gap: 6, flexWrap: 'nowrap' }}>
+      <Muted style={{ width: 52 }}>{label}</Muted>
       {colors.map((c) => (
         <Pressable
-          key={c}
+          key={c || 'none'}
           onPress={() => onPick(c)}
           accessibilityRole="button"
-          accessibilityLabel={`${label} colour`}
+          accessibilityLabel={c ? `${label} colour` : `No ${label.toLowerCase()}`}
           accessibilityState={{ selected: c === value }}
-          style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: c, borderWidth: c === value ? 3 : 1, borderColor: c === value ? t.accent : t.border }}
-        />
+          style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: c || 'transparent', borderWidth: c === value ? 3 : 1, borderColor: c === value ? t.accent : t.border, alignItems: 'center', justifyContent: 'center' }}
+        >
+          {/* No colour: none at all (no shutters) */}
+          {!c && <View style={{ width: 18, height: 1.5, backgroundColor: t.muted, transform: [{ rotate: '-45deg' }] }} />}
+        </Pressable>
       ))}
     </Row>
   )
@@ -62,6 +118,7 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
   const name = style.name ?? home.name
   const [draft, setDraft] = useState(name)
   const [slot, setSlot] = useState(0)
+  const [lookTab, setLookTab] = useState<LookTab>('house')
   const tavern = homeTavern(game)
   const [tavernDraft, setTavernDraft] = useState(tavern.name)
   const people = portPeople(game, homeOf(game))
@@ -93,6 +150,16 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
     decor,
     upgrades: game.player.portUpgrades,
     region: home.region,
+    build: style.build ?? 'cottage',
+    roofStyle: style.roofStyle ?? 'gable',
+    siding: style.siding ?? 'boards',
+    windows: style.windows ?? 'square',
+    door: style.door ?? HOME_DOORS[0],
+    doorStyle: style.doorStyle ?? 'plain',
+    trim: style.trim ?? HOME_TRIMS[0],
+    shutters: style.shutters ?? '',
+    topper: style.topper ?? 'none',
+    extras: style.extras ?? (['smoke'] as HouseExtra[]),
     captains: game.player.roster
       .filter((c) => {
         const b = boatOfCaptain(game, c.id)
@@ -113,9 +180,9 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
       <View style={{ flex: 1, gap: 10 }}>
         {back('Its look')}
         {scene}
-        <Card>
+        <Card style={{ gap: 7 }}>
           <Row style={{ flexWrap: 'nowrap' }}>
-            <Muted style={{ width: 44 }}>Name</Muted>
+            <Muted style={{ width: 52 }}>Name</Muted>
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -125,29 +192,83 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
               placeholderTextColor={t.muted}
               returnKeyType="done"
               accessibilityLabel="Harbour name"
-              style={{ flex: 1, color: t.text, fontFamily: fonts.semibold, fontSize: 16, borderBottomWidth: 1, borderBottomColor: t.border, paddingVertical: 6 }}
+              style={{ flex: 1, color: t.text, fontFamily: fonts.semibold, fontSize: 16, borderBottomWidth: 1, borderBottomColor: t.border, paddingVertical: 4 }}
             />
           </Row>
-          <Swatches label="Walls" colors={HOME_WALLS} value={look.wall} onPick={(c) => onStyle({ wall: c })} />
-          <Swatches label="Roof" colors={HOME_ROOFS} value={look.roof} onPick={(c) => onStyle({ roof: c })} />
-          <Swatches label="Sign" colors={HOME_SIGNS} value={look.sign} onPick={(c) => onStyle({ sign: c })} />
-          <Row style={{ gap: 8 }}>
-            <Muted style={{ width: 44 }}>Flags</Muted>
-            {HOME_BUNTING.map((set, i) => (
-              <Pressable
-                key={i}
-                onPress={() => onStyle({ bunting: i })}
-                accessibilityRole="button"
-                accessibilityLabel={`Bunting ${i + 1}`}
-                accessibilityState={{ selected: look.bunting === i }}
-                style={{ flexDirection: 'row', gap: 2, padding: 4, borderRadius: 8, borderWidth: look.bunting === i ? 2 : 1, borderColor: look.bunting === i ? t.accent : t.border }}
-              >
-                {set.slice(0, 3).map((c, j) => (
-                  <View key={j} style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: c }} />
+          <Segments
+            items={[
+              { id: 'house', label: 'House' },
+              { id: 'colours', label: 'Colours' },
+              { id: 'openings', label: 'Windows' },
+              { id: 'touches', label: 'Touches' },
+            ]}
+            value={lookTab}
+            onChange={setLookTab}
+          />
+          {lookTab === 'house' && (
+            <>
+              <Choices label="Shape" items={HOUSE_BUILDS} value={look.build} onPick={(build) => onStyle({ build })} />
+              <Choices label="Roof" items={ROOF_STYLES} value={look.roofStyle} onPick={(roofStyle) => onStyle({ roofStyle })} />
+              <Choices label="Walls" items={SIDINGS} value={look.siding} onPick={(siding) => onStyle({ siding })} />
+              <Choices label="On top" items={TOPPERS} value={look.topper} onPick={(topper) => onStyle({ topper })} />
+            </>
+          )}
+          {lookTab === 'colours' && (
+            <>
+              <Swatches label="Walls" colors={HOME_WALLS} value={look.wall} onPick={(c) => onStyle({ wall: c })} />
+              <Swatches label="Roof" colors={HOME_ROOFS} value={look.roof} onPick={(c) => onStyle({ roof: c })} />
+              <Swatches label="Trim" colors={HOME_TRIMS} value={look.trim} onPick={(c) => onStyle({ trim: c })} />
+              <Swatches label="Sign" colors={HOME_SIGNS} value={look.sign} onPick={(c) => onStyle({ sign: c })} />
+            </>
+          )}
+          {lookTab === 'openings' && (
+            <>
+              <Choices label="Windows" items={WINDOW_STYLES} value={look.windows} onPick={(windows) => onStyle({ windows })} />
+              <Swatches label="Shutters" colors={HOME_SHUTTERS} value={look.shutters} onPick={(c) => onStyle({ shutters: c })} />
+              <Choices label="Door" items={DOOR_STYLES} value={look.doorStyle} onPick={(doorStyle) => onStyle({ doorStyle })} />
+              <Swatches label="Paint" colors={HOME_DOORS} value={look.door} onPick={(c) => onStyle({ door: c })} />
+            </>
+          )}
+          {lookTab === 'touches' && (
+            <>
+              <Row style={{ gap: 6 }}>
+                {HOUSE_EXTRAS.map((x) => {
+                  const on = look.extras.includes(x.id)
+                  return (
+                    <Pressable
+                      key={x.id}
+                      onPress={() => onStyle({ extras: on ? look.extras.filter((e) => e !== x.id) : [...look.extras, x.id] })}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: on }}
+                      style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: on ? 2 : 1, borderColor: on ? t.accent : t.border, backgroundColor: on ? t.surface2 : 'transparent' }}
+                    >
+                      <Text style={{ color: on ? t.text : t.muted, fontFamily: fonts.semibold, fontSize: 13 }}>
+                        {on ? '✓ ' : ''}
+                        {x.name}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </Row>
+              <Row style={{ gap: 8 }}>
+                <Muted style={{ width: 52 }}>Flags</Muted>
+                {HOME_BUNTING.map((set, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={() => onStyle({ bunting: i })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Bunting ${i + 1}`}
+                    accessibilityState={{ selected: look.bunting === i }}
+                    style={{ flexDirection: 'row', gap: 2, padding: 4, borderRadius: 8, borderWidth: look.bunting === i ? 2 : 1, borderColor: look.bunting === i ? t.accent : t.border }}
+                  >
+                    {set.slice(0, 3).map((c, j) => (
+                      <View key={j} style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: c }} />
+                    ))}
+                  </Pressable>
                 ))}
-              </Pressable>
-            ))}
-          </Row>
+              </Row>
+            </>
+          )}
         </Card>
       </View>
     )
@@ -291,7 +412,7 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
       </View>
       {scene}
       <Row style={{ gap: 8 }}>
-        <Tile label="Its look" sub="Name, colours, flags" onPress={() => setPage('look')} />
+        <Tile label="Its look" sub="Shape, roof, windows, colours" onPress={() => setPage('look')} />
         <Tile label={tavern.name} sub={`Your tavern · ${people.hands.length} hands in`} onPress={() => setPage('tavern')} />
         <Tile label="Decorations" sub={`${placed} of ${DECOR_SLOTS} spots filled`} onPress={() => setPage('decor')} />
         <Tile label="Port upgrades" sub={`${built} of ${3 * UPGRADES.length} levels built`} onPress={() => setPage('upgrades')} />

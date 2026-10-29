@@ -2,7 +2,38 @@
 // cosmetic. Decorations unlock from things you've done.
 
 import type { GameState } from './types'
-import { DECOR, DECOR_SLOTS, HANGINGS, HOME_BUNTING, HOME_NAME_MAX, HOME_ROOFS, HOME_SIGNS, HOME_WALLS, TAVERN_CLOTHS, TAVERN_FLOORS, TAVERN_NAME_MAX, TAVERN_WALLS, type DecorId } from './data/home'
+import {
+  DECOR,
+  DECOR_SLOTS,
+  DOOR_STYLES,
+  HANGINGS,
+  HOME_BUNTING,
+  HOME_DOORS,
+  HOME_NAME_MAX,
+  HOME_ROOFS,
+  HOME_SHUTTERS,
+  HOME_SIGNS,
+  HOME_TRIMS,
+  HOME_WALLS,
+  HOUSE_BUILDS,
+  HOUSE_EXTRAS,
+  ROOF_STYLES,
+  SIDINGS,
+  TAVERN_CLOTHS,
+  TAVERN_FLOORS,
+  TAVERN_NAME_MAX,
+  TAVERN_WALLS,
+  TOPPERS,
+  WINDOW_STYLES,
+  type DecorId,
+  type DoorStyle,
+  type HouseBuild,
+  type HouseExtra,
+  type RoofStyle,
+  type Siding,
+  type Topper,
+  type WindowStyle,
+} from './data/home'
 import { getBoatClass } from './economy'
 import { regionOpen } from './regions'
 import { GameError } from './state'
@@ -38,6 +69,16 @@ type StylePatch = {
   tavernFloor?: number
   cloth?: string
   hanging?: string
+  build?: HouseBuild
+  roofStyle?: RoofStyle
+  siding?: Siding
+  windows?: WindowStyle
+  door?: string
+  doorStyle?: DoorStyle
+  trim?: string
+  shutters?: string
+  topper?: Topper
+  extras?: HouseExtra[]
 }
 
 export function styleHome(state: GameState, patch: StylePatch): GameState {
@@ -54,6 +95,19 @@ export function styleHome(state: GameState, patch: StylePatch): GameState {
   if (patch.tavernFloor !== undefined && !(patch.tavernFloor >= 0 && patch.tavernFloor < TAVERN_FLOORS.length)) throw new GameError('Not a floor')
   if (patch.cloth && !(TAVERN_CLOTHS as readonly string[]).includes(patch.cloth)) throw new GameError('Not a tablecloth')
   if (patch.hanging && !HANGINGS.some((h) => h.id === patch.hanging)) throw new GameError('Not something to hang')
+  const oneOf = (v: string | undefined, list: readonly (string | { id: string })[], what: string) => {
+    if (v !== undefined && !list.some((x) => (typeof x === 'string' ? x : x.id) === v)) throw new GameError(`Not a ${what}`)
+  }
+  oneOf(patch.build, HOUSE_BUILDS, 'house')
+  oneOf(patch.roofStyle, ROOF_STYLES, 'roof')
+  oneOf(patch.siding, SIDINGS, 'wall finish')
+  oneOf(patch.windows, WINDOW_STYLES, 'window')
+  oneOf(patch.door, HOME_DOORS, 'door colour')
+  oneOf(patch.doorStyle, DOOR_STYLES, 'door')
+  oneOf(patch.trim, HOME_TRIMS, 'trim colour')
+  oneOf(patch.shutters, HOME_SHUTTERS, 'shutter colour')
+  oneOf(patch.topper, TOPPERS, 'roof topper')
+  for (const x of patch.extras ?? []) oneOf(x, HOUSE_EXTRAS, 'touch')
   const s = structuredClone(state)
   const style = (s.player.homeStyle ??= {})
   if (patch.name !== undefined) style.name = patch.name.trim() || undefined
@@ -66,6 +120,10 @@ export function styleHome(state: GameState, patch: StylePatch): GameState {
   if (patch.tavernFloor !== undefined) style.tavernFloor = patch.tavernFloor
   if (patch.cloth) style.cloth = patch.cloth
   if (patch.hanging) style.hanging = patch.hanging
+  for (const k of ['build', 'roofStyle', 'siding', 'windows', 'door', 'doorStyle', 'trim', 'shutters', 'topper'] as const) {
+    if (patch[k] !== undefined) (style as Record<string, unknown>)[k] = patch[k]
+  }
+  if (patch.extras) style.extras = [...new Set(patch.extras)]
   return s
 }
 
