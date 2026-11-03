@@ -30,7 +30,8 @@
       "expo-notifications",
       "./plugins/withSceneLifecycle",
       "./plugins/withSourceBuiltModules",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ]
   }
 }
