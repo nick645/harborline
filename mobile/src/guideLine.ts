@@ -30,7 +30,7 @@ export function guideLine(game: GameState, step: GuideStep, where: GuideWhere, n
           target: 'shipyard',
         }
       return {
-        text: 'Two to choose from. The Dinghy Hauler carries cargo, the Water Taxi carries passengers; both pay much the same. Swipe to see the other, then buy one.',
+        text: 'Two to choose from. The Dinghy Hauler carries cargo, the Water Taxi carries passengers; both pay much the same. Tap one to look her over, then buy her.',
         target: null,
       }
     }

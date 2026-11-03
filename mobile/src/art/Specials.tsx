@@ -12,7 +12,7 @@ import { DeckFigure } from './DeckFigure'
 import { shade, tint } from './paint'
 
 /** Everything a part of a boat drawing needs. */
-export type Ctx = { L: BoatLayout; tier: number; lit: (c: string) => string; light: Light; seed: number; condition: number; hands: number }
+export type Ctx = { L: BoatLayout; tier: number; lit: (c: string) => string; light: Light; seed: number; condition: number; hands: number; clock: SharedValue<number> }
 
 export type SP = { ctx: Ctx; clock: SharedValue<number>; captain: Look | null; people: boolean }
 

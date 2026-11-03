@@ -60,7 +60,7 @@ export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captain = n
 
   const { W, H } = L
   const lit = (c: string) => mix(c, light.silhouette, light.dim)
-  const ctx: Ctx = { L, tier: cls.sizeTier, lit, light, seed: hash(cls.id), condition, hands: hands ?? handsFor(cls.sizeTier) }
+  const ctx: Ctx = { L, tier: cls.sizeTier, lit, light, seed: hash(cls.id), condition, hands: hands ?? handsFor(cls.sizeTier), clock: clk }
   const trim = TRIM[cls.rarity]
   const Special = SPECIALS[cls.id]
   const paint = lit(L.paint)
@@ -427,12 +427,57 @@ function FreighterWorks({ ctx }: { ctx: Ctx }) {
   )
 }
 
-function Passenger({ x, y, ctx, i }: { x: number; y: number; ctx: Ctx; i: number }) {
-  const colors = ['#7a4e5e', '#2f5d62', '#c2452a', '#3d5a73', '#e9b23c']
+/** Passengers dress for the trip, not the work: no sou'westers or oilskins. */
+function passengerLook(ctx: Ctx, i: number): Look {
+  const look = lookFor(`pax-${ctx.seed}-${i}`)
+  const hats: Look['hat'][] = ['brim', 'bare', 'bun', 'cap', 'bare']
+  const coats = ['#7a4e5e', '#2f5d62', '#c2452a', '#3d5a73', '#e9b23c', '#efe3d2', '#4a3346']
+  return { ...look, hat: hats[(ctx.seed + i * 7) % hats.length], coat: coats[(ctx.seed + i * 3) % coats.length], prop: 'none' }
+}
+
+/** A passenger on a bench, shifting, looking about, now and then pointing or waving. */
+function Sitter({ x, y, size, ctx, i, aft }: { x: number; y: number; size: number; ctx: Ctx; i: number; aft?: boolean }) {
+  return <DeckFigure look={passengerLook(ctx, i)} pose="sit" aft={aft} x={x} y={y} size={size} clock={ctx.clock} offset={i * 2300} lit={ctx.lit} />
+}
+
+/** A passenger walking the deck from one end of `x0..x1` to the other and back, pausing at each end. */
+function Stroller({ x0, x1, y, size, ctx, i, speed = 7 }: { x0: number; x1: number; y: (x: number) => number; size: number; ctx: Ctx; i: number; speed?: number }) {
+  const y0 = y(x0)
+  const y1 = y(x1)
+  const span = Math.max(1, x1 - x0)
+  const pause = 1.8
+  const walk = span / speed
+  const where = useDerivedValue(() => {
+    const t = ((ctx.clock.value + i * 4100) / 1000) % (2 * (walk + pause))
+    const leg = walk + pause
+    const back = t >= leg
+    const u = Math.min(1, (back ? t - leg : t) / walk)
+    const x = back ? x1 - u * span : x0 + u * span
+    return [{ translateX: x }, { translateY: y0 + ((y1 - y0) * (x - x0)) / span }, { scaleX: back ? -1 : 1 }]
+  })
   return (
-    <Group>
-      <Path path={`M${x - 4} ${y} C ${x - 4} ${y - 5}, ${x + 4} ${y - 5}, ${x + 4} ${y} Z`} color={ctx.lit(colors[(ctx.seed + i) % colors.length])} />
-      <Circle cx={x} cy={y - 7} r={2.8} color={ctx.lit(['#e0b48a', '#b5764c', '#f0c9a0', '#8a5a3a'][(ctx.seed >>> i) % 4])} />
+    <Group transform={where}>
+      <DeckFigure look={passengerLook(ctx, i)} pose="stroll" x={0} y={0} size={size} clock={ctx.clock} offset={i * 1700} lit={ctx.lit} />
+    </Group>
+  )
+}
+
+/** Heads at the windows of a cabin, one in a few, bobbing with the boat. */
+function WindowHeads({ xs, y, h, ctx, from }: { xs: number[]; y: number; h: number; ctx: Ctx; from: number }) {
+  const bob = useDerivedValue(() => [{ translateY: Math.sin(ctx.clock.value / 700 + from) * 0.4 }])
+  const r = Math.min(2.6, h * 0.28)
+  return (
+    <Group transform={bob}>
+      {xs.map((x, k) => {
+        if ((ctx.seed >>> ((k + from) % 24)) % 3 !== 0) return null
+        const look = passengerLook(ctx, from + k)
+        return (
+          <Group key={k}>
+            <Path path={`M${x - r * 1.4} ${y + h} C ${x - r * 1.4} ${y + h - r * 1.6}, ${x + r * 1.4} ${y + h - r * 1.6}, ${x + r * 1.4} ${y + h} Z`} color={ctx.lit(look.coat)} />
+            <Circle cx={x} cy={y + h - r * 1.9} r={r} color={ctx.lit(look.skin)} />
+          </Group>
+        )
+      })}
     </Group>
   )
 }
@@ -447,9 +492,11 @@ function TaxiWorks({ ctx }: { ctx: Ctx }) {
   const canopyY = L.deckY(c0) - 26
   return (
     <Group>
-      {[0, 1, 2, 3].map((i) => (
-        <Passenger key={i} x={c0 + 10 + i * ((c1 - c0 - 16) / 3)} y={L.deckY(c0) - 2} ctx={ctx} i={i} />
-      ))}
+      {[0, 1, 2].map((i) => {
+        const px = c0 + 6 + i * ((c1 - c0 - 18) / 2)
+        return <Sitter key={i} x={px} y={L.deckY(px)} size={20} ctx={ctx} i={i} aft={i === 2} />
+      })}
+      <Path path={`M${c0 + 2} ${L.deckY(c0) - 5} H ${c1 - 2}`} color={lit('#5a3a2a')} style="stroke" strokeWidth={1.6} />
       <Path path={`M${c0 + 2} ${L.deckY(c0)} V ${canopyY} M${c1 - 2} ${L.deckY(c1)} V ${canopyY}`} color={lit('#5a3a2a')} style="stroke" strokeWidth={1.4} />
       {Array.from({ length: stripes }, (_, i) => (
         <Rect key={i} x={c0 + i * 8} y={canopyY - 5} width={8} height={5} color={lit(i % 2 ? '#f3e7d8' : awning)} />
@@ -476,9 +523,10 @@ function FerryWorks({ ctx }: { ctx: Ctx }) {
       {Array.from({ length: n }, (_, i) => (
         <RoundedRect key={i} x={x0 + 5 + i * 11} y={top + 5} width={8} height={7} r={1.5} color={light.window} />
       ))}
-      {[0, 1, 2].map((i) => (
-        <Passenger key={i} x={rail0 + 8 + i * 16} y={top} ctx={ctx} i={i + 4} />
-      ))}
+      <WindowHeads xs={Array.from({ length: n }, (_, i) => x0 + 9 + i * 11)} y={top + 5} h={7} ctx={ctx} from={10} />
+      <Stroller x0={x0 + 4} x1={rail1 + 6} y={() => top} size={18} ctx={ctx} i={4} />
+      <Stroller x0={rail0} x1={x1 - 22} y={() => top} size={18} ctx={ctx} i={5} speed={5} />
+      <Sitter x={x1 - 18} y={top} size={18} ctx={ctx} i={6} aft />
       <Path path={`M${rail0} ${top - 6} H ${rail1} ${Array.from({ length: 7 }, (_, i) => `M${rail0 + i * ((rail1 - rail0) / 6)} ${top} v -6`).join(' ')}`} color={lit('#f3e7d8')} style="stroke" strokeWidth={0.9} />
     </Group>
   )
@@ -506,7 +554,10 @@ function LinerWorks({ ctx }: { ctx: Ctx }) {
             {fast ? (
               <Path path={`M${x0 + 6} ${top + step * 0.65} L ${x0 + 10} ${top + 3} H ${x1 - 6} L ${x1 - 10} ${top + step * 0.65} Z`} color={light.window} />
             ) : (
-              Array.from({ length: n }, (_, i) => <RoundedRect key={i} x={x0 + 4 + i * 10} y={top + 3} width={7} height={step - 7} r={1.5} color={light.window} />)
+              <>
+                {Array.from({ length: n }, (_, i) => <RoundedRect key={i} x={x0 + 4 + i * 10} y={top + 3} width={7} height={step - 7} r={1.5} color={light.window} />)}
+                <WindowHeads xs={Array.from({ length: n }, (_, i) => x0 + 7.5 + i * 10)} y={top + 3} h={step - 7} ctx={ctx} from={20 + d * 9} />
+              </>
             )}
           </Group>
         )
@@ -520,6 +571,20 @@ function LinerWorks({ ctx }: { ctx: Ctx }) {
           </Group>
         )
       })}
+      {(() => {
+        // The top deck's promenade: people walking it end to end, someone at the stern rail.
+        const tx0 = W * (0.1 + (decks - 1) * 0.06) + 6
+        const tx1 = W * (0.8 - (decks - 1) * 0.05) - 6
+        const size = 18 + tier
+        return (
+          <>
+            <Stroller x0={tx0} x1={tx1} y={() => topY} size={size} ctx={ctx} i={30} speed={6} />
+            <Stroller x0={tx0 + (tx1 - tx0) * 0.3} x1={tx1} y={() => topY} size={size} ctx={ctx} i={31} speed={4.5} />
+            {tier >= 5 && <Stroller x0={tx0} x1={tx0 + (tx1 - tx0) * 0.6} y={() => topY} size={size} ctx={ctx} i={32} speed={5} />}
+            <Sitter x={tx0 + 4} y={topY} size={size} ctx={ctx} i={33} aft />
+          </>
+        )
+      })()}
       <Path path={`M${W * 0.88} ${L.deckY(W * 0.88)} V ${L.wheelhouse.y - 30}`} color={lit('#4a5a66')} style="stroke" strokeWidth={1.6} />
       <Path path={bunting} color={lit('#c9b6ae')} style="stroke" strokeWidth={0.6} />
       {[0.12, 0.2, 0.28, 0.6, 0.68, 0.76].map((t, i) => (

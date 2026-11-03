@@ -1,6 +1,6 @@
-// Someone at work on deck, small and full length: the captain hauling a line or a deckhand on
-// lookout. Drawn in boat space with the feet at (x, y); `size` is their height. Arms move with
-// what they're doing.
+// Someone on deck, small and full length: the captain hauling a line, a deckhand on lookout, a
+// passenger sitting or strolling. Drawn in boat space with the feet at (x, y); `size` is their
+// height. Arms (and a stroller's legs) move with what they're doing.
 
 import { Circle, Group, Path, RadialGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
@@ -85,8 +85,37 @@ export function DeckFigure({ look, pose, x, y, size, aft = false, clock, offset 
         l = [-4, -11]
         r = [7 + s * 3, -31]
         break
+      case 'sit': {
+        // Hands in the lap; now and then one comes up to point something out, or to wave.
+        const gesture = Math.max(0, Math.sin(t * 0.45)) ** 6
+        l = [4, -11]
+        r = [4.5 + gesture * 3, -11 - gesture * 18]
+        break
+      }
+      case 'stroll': {
+        const swing = Math.sin(t * 5.2) * 3
+        l = [-swing, -11]
+        r = [swing, -11]
+        break
+      }
     }
     return `M-3.2 -19.5 L ${l[0]} ${l[1]} M3.2 -19.5 L ${r[0]} ${r[1]}`
+  })
+  // Legs: still for most; a stroller steps, a sitter's knees come forward off the bench.
+  const legs = useDerivedValue(() => {
+    if (pose === 'stroll') {
+      const step = Math.sin(((clock.value + offset) / 1000) * 5.2) * 3
+      return `M-1.6 -11 L ${-step} 0 M1.6 -11 L ${step} 0`
+    }
+    if (pose === 'sit') return 'M-2 -6 L 4 -6 L 4 0 M2 -6 L 7 -6 L 7 0'
+    return 'M-2.4 -11 L -3 0 M2.4 -11 L 3.2 0'
+  })
+  // A sitter sinks onto the bench; a stroller bobs with each step; a sitter's head turns a little.
+  const body = useDerivedValue(() => {
+    const t = (clock.value + offset) / 1000
+    if (pose === 'sit') return [{ translateY: 5 + Math.sin(t * 1.1) * 0.3 }]
+    if (pose === 'stroll') return [{ translateY: -Math.abs(Math.sin(t * 5.2)) * 0.8 }]
+    return [{ translateY: 0 }]
   })
   const lean = pose === 'coil' ? 0.35 : pose === 'haul' ? -0.08 : 0
   const trousers = lit('#2e2a33')
@@ -99,7 +128,8 @@ export function DeckFigure({ look, pose, x, y, size, aft = false, clock, offset 
           <RadialGradient c={vec(0, -18)} r={16} colors={[`${look.aura}77`, `${look.aura}00`]} />
         </Circle>
       )}
-      <Path path="M-2.4 -11 L -3 0 M2.4 -11 L 3.2 0" color={trousers} style="stroke" strokeWidth={2.8} strokeCap="round" />
+      <Path path={legs} color={trousers} style="stroke" strokeWidth={2.8} strokeCap="round" strokeJoin="round" />
+      <Group transform={body}>
       <Group transform={[{ rotate: lean }]} origin={{ x: 0, y: -11 }}>
         {pose === 'haul' && lineTo && <Path path={`M3.5 -29 L ${lineTo.x / k} ${lineTo.y / k}`} color={lit('#c9b6ae')} style="stroke" strokeWidth={0.6} />}
         <RoundedRect x={-4.4} y={-21.5} width={8.8} height={11.5} r={2.6} color={coat} />
@@ -117,6 +147,7 @@ export function DeckFigure({ look, pose, x, y, size, aft = false, clock, offset 
         <Path path={HATS[look.hat]} color={lit(look.hatColor)} />
         {look.hat === 'helmet' && <Circle cx={0} cy={-25.4} r={2.4} color="#9ec0cf" opacity={0.7} />}
         {pose === 'wheel' && <Circle cx={7.5} cy={-16.5} r={3.6} color={lit('#8a5a3a')} style="stroke" strokeWidth={1} />}
+      </Group>
       </Group>
     </Group>
   )

@@ -17,7 +17,7 @@ export interface Box {
   h: number
 }
 
-export type Pose = 'haul' | 'tiller' | 'wheel' | 'lookout' | 'coil' | 'wave'
+export type Pose = 'haul' | 'tiller' | 'wheel' | 'lookout' | 'coil' | 'wave' | 'sit' | 'stroll'
 
 /** A place on deck for someone to stand and what they're doing there. */
 export interface Station {
