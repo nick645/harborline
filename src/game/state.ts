@@ -53,6 +53,7 @@ import { routeWeather, weatherSlot } from './weather'
 import { handBerths, handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
 import { migrateKeepsakes, rollKeepsake } from './keepsakes'
 import { chartTrip, getPortDef, homeOf, portOpen, refreshPortPools } from './regions'
+import { portDemandMult } from './portLife'
 import { getRegion, HOME_PRICE } from './data/ports'
 import type { Milestone } from './data/home'
 import { countParts, dropChances, getPart, hasParts, partName, pickPart, takeParts } from './parts'
@@ -236,7 +237,8 @@ export function quoteVoyage(state: GameState, boatId: string, routeId: string, t
     (h.demandLock ?? Math.max(raw, h.demandFloor ?? 0)) *
     (h.demandMult?.(ctx) ?? 1) *
     fleetDemandMult(state) *
-    mods.demandMult
+    mods.demandMult *
+    portDemandMult(route.portB, ctx.cls.track, t)
   const grossMult =
     weather.payoutMult *
     getRegion(getPortDef(route.portB).region).payout *

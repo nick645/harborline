@@ -26,6 +26,8 @@ import {
   buyHome,
 } from './state'
 import { chartHidden, endGuide, guideStep, homeLocked } from './guide'
+import { marketDay, nextMarketDay, portDemandMult } from './portLife'
+import { DAY_MS, LEAN_UP, MARKET_DAY_MULT } from './data/portLife'
 import { termsFee } from './courting'
 import { KEEN_DECIDES_MS, KEEN_YOURS } from './data/courting'
 import { createRng, rollConditionLoss } from './rolls'
@@ -411,7 +413,26 @@ describe('abilities', () => {
     const taxi = s.player.ownedBoats[1].id
     expect(quoteVoyage(s, errand, ROUTES[1].id, T0).durationMs).toBeLessThan(quoteVoyage(s, taxi, ROUTES[1].id, T0).durationMs * 0.6)
     const mirabel = give(s, 'the-mirabel')
-    expect(quoteVoyage(s, mirabel, ROUTES[1].id, T0).demand).toBe(1.5)
+    // Her 1.5, then the port's own trade and market day on top.
+    expect(quoteVoyage(s, mirabel, ROUTES[1].id, T0).demand).toBeCloseTo(1.5 * portDemandMult(ROUTES[1].portB, getBoatClass('the-mirabel').track, T0))
+  })
+
+  it('ports pay more for their own trade, and on market day', () => {
+    // Gullwick is a fishing port: cargo pays more there than passengers.
+    expect(portDemandMult('gullwick', 'cargo', T0)).toBeGreaterThan(portDemandMult('gullwick', 'passenger', T0))
+    expect(portDemandMult('farhaven', 'passenger', T0)).toBeGreaterThan(portDemandMult('farhaven', 'cargo', T0))
+    // Its market comes round once a week, and lifts both.
+    const market = nextMarketDay('gullwick', T0)
+    expect(marketDay('gullwick', market)).toBe(true)
+    expect(marketDay('gullwick', market + DAY_MS)).toBe(false)
+    expect(nextMarketDay('gullwick', market + DAY_MS) - market).toBe(7 * DAY_MS)
+    expect(portDemandMult('gullwick', 'cargo', market)).toBeCloseTo(LEAN_UP * MARKET_DAY_MULT)
+    // Home is even-handed, and the lift shows in what a trip pays.
+    expect(portDemandMult('saltmarsh', 'cargo', T0 + DAY_MS * 2)).toBe(marketDay('saltmarsh', T0 + DAY_MS * 2) ? MARKET_DAY_MULT : 1)
+    const s = harbourGame(4, T0)
+    const route = s.routes.find((r) => r.portB === 'gullwick')!
+    const quiet = market + DAY_MS
+    expect(quoteVoyage(s, s.player.ownedBoats[0].id, route.id, market).demand).toBeCloseTo(quoteVoyage(s, s.player.ownedBoats[0].id, route.id, quiet).demand * MARKET_DAY_MULT)
   })
 
   it('Tin Pail repairs at half cost', () => {
