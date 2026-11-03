@@ -7,6 +7,7 @@ import { captainViewById, courtingOf, recruitViewById } from '../../src/game/cre
 import { getPortDef, homeOf } from '../../src/game/regions'
 import { getBoatClass } from '../../src/game/economy'
 import { BOAT_CLASSES } from '../../src/game/data/boats'
+import { HOME_START_PRICE } from '../../src/game/data/economy'
 import { coins, duration } from '../../src/format'
 
 export type GuideTab = 'fleet' | 'captains' | 'ports' | 'shipyard' | 'home'
@@ -76,13 +77,19 @@ export function guideLine(game: GameState, step: GuideStep, where: GuideWhere, n
         }
       return { text: `Time ${boat?.nickname ?? 'she'} earned her keep. Open her in the Fleet and send her out.`, target: 'fleet' }
     }
+    case 'home':
+      if (where.tab !== 'home')
+        return {
+          text: `She's away, and the chart's clearing. Now, a line needs a home. There's a cottage on the quay going for ${coins(HOME_START_PRICE)}: bare boards, but yours. Home's down there.`,
+          target: 'home',
+        }
+      return { text: "Bare, I'll grant you. But a home is what your boats bring things back to: paint, flags, finds from far waters. Buy it.", target: null }
     case 'farewell': {
       const gift = game.player.ownedBoats.find((b) => getBoatClass(b.classId).starter && !b.captainId)
       return {
         text: [
-          "She's away. Pay lands when she's home.",
-          'Watch the weather: storms pay best and wear a hull hard, and a boat at nought goes down. The rarest hulls only come out of bad weather.',
-          gift ? `And I'm too old for my ${getBoatClass(gift.classId).name}. ${gift.nickname} is yours. There's someone else keen on the quay to captain her.` : '',
+          "It's yours. Pay lands when she's home. Mind the weather: storms pay best and wear hulls hard, and the rarest boats only come out of them.",
+          gift ? `And take my old ${getBoatClass(gift.classId).name}, ${gift.nickname}; someone keen on the quay will captain her.` : '',
         ]
           .filter(Boolean)
           .join(' '),

@@ -18,6 +18,7 @@ import {
   craftBoat,
   GameError,
   newGame,
+  buyHome,
   quoteVoyage,
   recallBoat,
   repairBoat,
@@ -33,7 +34,7 @@ import { fleetCap } from '../src/game/upgrades'
 import { assignCaptain, boatsNeedingHands, court, courtingOf, hireCaptain } from '../src/game/crew'
 import type { CourtAction } from '../src/game/data/courting'
 import { willSail } from '../src/game/captains'
-import { LOW_CONDITION_THRESHOLD, STARTING_COINS, WEAR_MULTIPLIERS } from '../src/game/data/economy'
+import { HOME_START_PRICE, LOW_CONDITION_THRESHOLD, STARTING_COINS, WEAR_MULTIPLIERS } from '../src/game/data/economy'
 import { WEATHER, WEATHER_SLOT_MS } from '../src/game/data/weather'
 import { routeWeather } from '../src/game/weather'
 import { regionOpen } from '../src/game/regions'
@@ -169,6 +170,8 @@ function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPo
   for (const cls of craftableClasses()) {
     if (hasParts(s.player.partInventory, cls.requiredParts) && s.player.ownedBoats.length < fleetCap(s, cls.sizeTier)) s = craftBoat(s, cls.id, t)
   }
+  // A new harbour buys its cottage once the first boat has sailed (the walk-through's last step).
+  if (s.player.homeDue && s.player.roster.some((c) => c.voyageCount > 0 || s.voyages.length) && s.player.coins >= HOME_START_PRICE) s = buyHome(s, t)
   // Buy first so a new boat can sail this turn.
   for (let id = strat.pickPurchase(s); id; id = strat.pickPurchase(s)) s = buyBoat(s, id, t)
 

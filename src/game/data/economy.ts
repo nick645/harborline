@@ -2,6 +2,8 @@
 
 /** A new harbour has no boats: enough for a starter boat and a first captain's fee, little more. */
 export const STARTING_COINS = 750
+/** The cottage on the quay, bought once your first boat has sailed (user-approved 2026-11-03). */
+export const HOME_START_PRICE = 150
 /** The starter boats' price (Claude's pick, approved 2026-11-03). */
 export const STARTER_PRICE = 400
 

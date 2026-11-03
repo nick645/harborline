@@ -1,7 +1,7 @@
 // Wick, the harbourmaster: walks a new player through their first boat, first captain and first
 // trip, in a card under the screen. What he says is in guideLine.ts.
 
-import { Pressable, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import { Canvas, Group, Rect, rect, rrect } from '@shopify/react-native-skia'
 import { Figure } from '../art/Figure'
 import type { Look } from '../art/looks'
@@ -47,11 +47,6 @@ export function Harbourmaster({ line, onEnd }: { line: GuideLine; onEnd: () => v
         <View style={{ flex: 1, gap: 3 }}>
           <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
             <Text style={{ color: t.accent, fontFamily: fonts.titleItalic, fontSize: 17 }}>Wick, harbourmaster</Text>
-            {!line.done && (
-              <Pressable onPress={onEnd} accessibilityRole="button" accessibilityLabel="Skip the walk-through" hitSlop={10}>
-                <Text style={{ color: t.muted, fontFamily: fonts.medium, fontSize: 12 }}>Skip</Text>
-              </Pressable>
-            )}
           </Row>
           <Text style={{ color: t.text, fontFamily: fonts.body, fontSize: 14, lineHeight: 19 }}>{line.text}</Text>
         </View>

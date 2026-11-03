@@ -15,6 +15,7 @@ import {
   SALVAGE_CONDITION,
   STANDARD_SCRAP_VALUE,
   STARTING_COINS,
+  HOME_START_PRICE,
   WEAR_MULTIPLIERS,
   WEATHER_DAMAGE_SPREAD,
 } from './data/economy'
@@ -96,6 +97,7 @@ export function newGame(seed: number, now: number): GameState {
       coins: STARTING_COINS,
       guide: true,
       oldBoatDue: true,
+      homeDue: true,
       scoutingLevel: 1,
       ownedBoats: [],
       partInventory: [],
@@ -353,6 +355,18 @@ function giveOldBoat(s: GameState, now: number) {
   const boat = addBoat(s, cls.id, now)
   log(s, now, 'info', `The harbourmaster gave you his old ${cls.name}, "${boat.nickname}". She needs a captain`)
   refreshRecruitPool(s, now, scoutLevel(s))
+}
+
+/** A new harbour buys its cottage on the quay: the walk-through's last step, once a boat has sailed. */
+export function buyHome(state: GameState, now: number): GameState {
+  if (!state.player.homeDue) throw new GameError('This harbour already has its home')
+  if (!state.voyages.length && !state.player.roster.some((c) => c.voyageCount > 0)) throw new GameError('Send your first boat out first')
+  if (state.player.coins < HOME_START_PRICE) throw new GameError('Not enough coins')
+  const s = structuredClone(state)
+  delete s.player.homeDue
+  s.player.coins -= HOME_START_PRICE
+  log(s, now, 'info', `Bought the cottage on the quay at ${getPortDef(homeOf(s)).name}`)
+  return s
 }
 
 /** Let the current trip finish, then bring the boat home instead of running the rest. */

@@ -5,13 +5,13 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
-import { assignRoute, buyBoat, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, moveHome, sellBoat, settle } from '../src/game/state'
+import { assignRoute, buyBoat, buyHome, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, moveHome, sellBoat, settle } from '../src/game/state'
 import { assignCaptain, boatToShowTo, buyUpgrade, captainViewById, court, courtingOf, hireHand, moveHand, recruitViewById, tavernHandView, UPGRADES, upgradeQuote, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName, slotName } from '../src/game/parts'
 import { getKeepsake, KEEPSAKES } from '../src/game/data/keepsakes'
 import { getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../src/game/economy'
 import { quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
-import { MELT_COST, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE } from '../src/game/data/economy'
+import { HOME_START_PRICE, MELT_COST, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE } from '../src/game/data/economy'
 import { SCOUT_ACTIONS } from '../src/game/data/captains'
 import { COURT_ACTIONS, type CourtAction } from '../src/game/data/courting'
 import { termsFee } from '../src/game/courting'
@@ -47,7 +47,8 @@ import { CaptainScreen } from './src/screens/CaptainScreen'
 import { PortsScreen } from './src/screens/PortsScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { placeDecor, styleHome } from '../src/game/home'
-import { endGuide, guideStep } from '../src/game/guide'
+import { chartHidden, endGuide, guideStep, homeLocked } from '../src/game/guide'
+import { ChartFog } from './src/art/ChartFog'
 import { Harbourmaster } from './src/components/Harbourmaster'
 import { guideLine } from './src/guideLine'
 import { Body, Button, Card, Measure, Muted, Row, Strip, Title } from './src/components/ui'
@@ -130,6 +131,10 @@ function Harbor() {
   const season = seasonAt(now)
   const step = guideStep(game, now)
   const guide = step && guideLine(game, step, { tab, boatOpen: detail?.kind === 'boat', portPage: (portsSel ?? homeOf(game)) === homeOf(game) ? portsPage : 'away' }, now)
+  const fogged = chartHidden(game, now)
+  const homeShut = homeLocked(game, now)
+  // Home is shut until the walk-through reaches it (a new game can start with Home open).
+  if (homeShut && tab === 'home') setTab('fleet')
   const finds = report?.parts.filter((id) => getPart(id).rarity !== 'standard') ?? []
 
   /** Ask first, then act. Resolves to whether the action went ahead. */
@@ -280,7 +285,14 @@ function Harbor() {
           <>
             {tab === 'fleet' && (
               <>
-                <Measure>{(w, h) => <HarborMap game={game} now={now} onOpenPort={(id) => goToPort(id)} box={{ w, h }} />}</Measure>
+                <Measure>
+                  {(w, h) => (
+                    <View style={{ width: w, height: h, borderRadius: 16, overflow: 'hidden' }}>
+                      <HarborMap game={game} now={now} onOpenPort={(id) => goToPort(id)} box={{ w, h }} />
+                      {game.player.guide && <ChartFog width={w} height={h} light={lightAt(now)} hidden={fogged} />}
+                    </View>
+                  )}
+                </Measure>
                 <Strip>
                   {boats.map((b) => (
                     <BoatChip key={b.id} game={game} boat={b} now={now} onOpen={() => open({ kind: 'boat', id: b.id })} />
@@ -370,8 +382,9 @@ function Harbor() {
               />
             )}
 
-            {tab === 'home' && (
+            {tab === 'home' && !homeShut && (
               <HomeScreen
+                deed={step?.id === 'home' ? { price: HOME_START_PRICE, onBuy: () => void ask({ title: 'Buy the cottage on the quay?', body: 'Your home in the harbour, and your own tavern with it.', label: `Buy it · ${coins(HOME_START_PRICE)}c` }, (g, at) => buyHome(g, at)) } : undefined}
                 game={game}
                 now={now}
                 onStyle={(patch) => act((g) => styleHome(g, patch))}
@@ -503,19 +516,22 @@ function Harbor() {
           {TABS.map((x) => {
             // The tab the harbourmaster is pointing at.
             const lit = guide?.target === x.id && tab !== x.id
+            // Home opens when the walk-through reaches it.
+            const shut = x.id === 'home' && homeShut
             return (
               <Pressable
                 key={x.id}
+                disabled={shut}
                 onPress={() => {
                   if (x.id !== tab) play('tap')
                   setTab(x.id)
                 }}
                 style={[styles.tab, lit && { backgroundColor: t.surface2, borderTopWidth: 2, borderTopColor: t.accent, marginTop: -1 }]}
                 accessibilityRole="tab"
-                accessibilityState={{ selected: tab === x.id }}
+                accessibilityState={{ selected: tab === x.id, disabled: shut }}
                 accessibilityHint={lit ? 'The harbourmaster suggests going here' : undefined}
               >
-                <Text style={{ color: tab === x.id || lit ? t.accent : t.muted, fontFamily: tab === x.id || lit ? fonts.bold : fonts.medium, fontSize: 14 }}>
+                <Text style={{ color: tab === x.id || lit ? t.accent : t.muted, fontFamily: tab === x.id || lit ? fonts.bold : fonts.medium, fontSize: 14, opacity: shut ? 0.35 : 1 }}>
                   {lit ? `› ${x.label}` : x.label}
                 </Text>
               </Pressable>

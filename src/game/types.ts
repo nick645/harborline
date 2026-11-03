@@ -259,6 +259,8 @@ export interface Player {
   coins: number
   /** The harbourmaster is still walking a new player through their first boat and captain. */
   guide?: boolean
+  /** A new harbour hasn't bought its cottage on the quay yet (the walk-through's last step). */
+  homeDue?: boolean
   /** The harbourmaster's old boat, given when your first boat sails. Set while it's still to come. */
   oldBoatDue?: boolean
   scoutingLevel: number

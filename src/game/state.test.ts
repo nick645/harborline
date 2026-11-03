@@ -23,8 +23,9 @@ import {
   moveHome,
   newGame,
   shopClasses,
+  buyHome,
 } from './state'
-import { endGuide, guideStep } from './guide'
+import { chartHidden, endGuide, guideStep, homeLocked } from './guide'
 import { termsFee } from './courting'
 import { KEEN_DECIDES_MS, KEEN_YOURS } from './data/courting'
 import { createRng, rollConditionLoss } from './rolls'
@@ -46,7 +47,7 @@ import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
 import { PARTS } from './data/parts'
 import { ROUTES } from './data/routes'
-import { CAPTAIN_ADRIFT_MS, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE, STARTER_PRICE, STARTING_COINS } from './data/economy'
+import { CAPTAIN_ADRIFT_MS, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE, STARTER_PRICE, STARTING_COINS, HOME_START_PRICE } from './data/economy'
 import { SEASON_LENGTH_MS, WEATHER_SLOT_MS } from './data/weather'
 import { deserialize, serialize } from './save'
 
@@ -514,7 +515,19 @@ describe('fleet actions', () => {
     expect(guideStep(s, T0)).toEqual({ id: 'aboard', captainId: id, boatId: boat })
     s = assignCaptain(s, id, boat)
     expect(guideStep(s, T0)).toEqual({ id: 'send', boatId: boat })
+    expect(chartHidden(s, T0)).toBe(true)
+    expect(homeLocked(s, T0)).toBe(true)
+    expect(() => buyHome(s, T0)).toThrow(/first boat/)
     s = assignRoute(s, boat, s.routes[0].id, T0, 1)
+    // She's away: the chart clears, and Wick takes you home to buy the cottage.
+    expect(guideStep(s, T0)).toEqual({ id: 'home' })
+    expect(chartHidden(s, T0)).toBe(false)
+    expect(homeLocked(s, T0)).toBe(false)
+    expect(() => endGuide(s)).toThrow(/home/)
+    const before = s.player.coins
+    s = buyHome(s, T0)
+    expect(s.player.coins).toBe(before - HOME_START_PRICE)
+    expect(() => buyHome(s, T0)).toThrow()
     expect(guideStep(s, T0)).toEqual({ id: 'farewell' })
     // Home again, she stays done.
     s = settle(s, T0 + 3 * 3600_000)

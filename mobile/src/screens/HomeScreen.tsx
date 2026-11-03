@@ -43,7 +43,7 @@ import { HomeScene } from '../art/HomeScene'
 import { lightAt } from '../art/light'
 import { REGION_STYLE } from '../art/regionStyle'
 import { fonts, useTheme } from '../theme'
-import { duration } from '../../../src/format'
+import { coins, duration } from '../../../src/format'
 import { Body, Button, Card, Measure, Muted, Row, Segments, Strip, Tile, Title } from '../components/ui'
 
 type Props = {
@@ -57,6 +57,8 @@ type Props = {
   alerts: ReactNode
   /** Play-test tools (development builds only). */
   dev?: ReactNode
+  /** A new harbour's cottage, still to buy: shown instead of everything else until it's yours. */
+  deed?: { price: number; onBuy: () => void }
 }
 
 type LookTab = 'house' | 'colours' | 'openings' | 'touches'
@@ -159,7 +161,7 @@ function Swatches({
   )
 }
 
-export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, alerts, dev }: Props) {
+export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, alerts, dev, deed }: Props) {
   const t = useTheme()
   const [page, setPage] = useState<Page>('menu')
   const home = getPortDef(homeOf(game))
@@ -247,6 +249,20 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
       <Title size={22}>{title}</Title>
     </Row>
   )
+
+  if (deed)
+    return (
+      <View style={{ flex: 1, gap: 10 }}>
+        <Title size={28}>The cottage on the quay</Title>
+        <Muted>{home.name} · bare boards and a plain door, for now</Muted>
+        {scene}
+        <Card style={{ gap: 6, padding: 12 }}>
+          <Body>Yours to name, paint and fill with what your boats bring home. Your own tavern comes with it.</Body>
+          <Button label={`Buy it · ${coins(deed.price)}c`} disabled={game.player.coins < deed.price} onPress={deed.onBuy} />
+          {game.player.coins < deed.price && <Muted>Not quite enough yet: your boat's pay lands when she's home.</Muted>}
+        </Card>
+      </View>
+    )
 
   if (page === 'look')
     return (
