@@ -21,6 +21,8 @@ import { Chatter, Walker } from './Walker'
 import { useSceneClock } from './clock'
 import { Stage } from './Stage'
 import { stageFrame } from './stageFrame'
+import { useEffect } from 'react'
+import { enterTavern } from '../sound/sound'
 
 const W = 358
 const H = 290
@@ -146,6 +148,7 @@ export function TavernScene({
   custom?: TavernLook
 }) {
   const clock = useSceneClock()
+  useEffect(enterTavern, [])
   // Where the drawing sits in the frame (see Stage), so tap targets land on it.
   const frame = stageFrame(width, height, W, H)
   const s = frame.s

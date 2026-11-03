@@ -23,6 +23,8 @@ import { fleetCap } from '../src/game/upgrades'
 import { coins, duration } from '../src/format'
 import { PROMOTION_VOYAGES, QUAY_REPUTATION } from '../src/game/data/captains'
 import { devMakeLegend } from './src/devTools'
+import { getPrefs, onPrefs, play, setPrefs } from './src/sound/sound'
+import { useSoundscape } from './src/sound/useSoundscape'
 import { TAVERN_RARE_BOOST } from '../src/game/data/hands'
 import { generateCaptain } from '../src/game/captains'
 import { chartingNext, homeOf } from '../src/game/regions'
@@ -86,6 +88,7 @@ export default function App() {
 function Harbor() {
   const t = useTheme()
   const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset } = useGame()
+  useSoundscape(game, now, alerts.length)
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
   const [gallery, setGallery] = useState(false)
@@ -394,7 +397,12 @@ function Harbor() {
                     }
                   />
                 }
-                alerts={<StormAlertsToggle />}
+                alerts={
+                  <>
+                    <SoundToggles />
+                    <StormAlertsToggle />
+                  </>
+                }
                 dev={__DEV__ ? <View style={{ flex: 1, gap: 8 }}>
                   <Card>
                     <Muted>Play-test tools (development builds only)</Muted>
@@ -487,7 +495,12 @@ function Harbor() {
       {!detail && (
         <SafeAreaView edges={['bottom']} style={[styles.tabBar, { backgroundColor: t.surface, borderTopColor: t.border }]}>
           {TABS.map((x) => (
-            <Pressable key={x.id} onPress={() => setTab(x.id)} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: tab === x.id }}>
+            <Pressable
+              key={x.id}
+              onPress={() => {
+                if (x.id !== tab) play('tap')
+                setTab(x.id)
+              }} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: tab === x.id }}>
               <Text style={{ color: tab === x.id ? t.accent : t.muted, fontFamily: tab === x.id ? fonts.bold : fonts.medium, fontSize: 14 }}>{x.label}</Text>
             </Pressable>
           ))}
@@ -498,6 +511,27 @@ function Harbor() {
 }
 
 /** Storm alerts: notifications for routes you have trips queued on, sent while you're away. */
+/** Music and sounds, each on its own switch. */
+function SoundToggles() {
+  const t = useTheme()
+  const [p, setP] = useState(getPrefs)
+  useEffect(() => onPrefs(() => setP(getPrefs())), [])
+  const row = (label: string, on: boolean, flip: () => void) => (
+    <Pressable onPress={flip} accessibilityRole="switch" accessibilityState={{ checked: on }} style={[styles.toggleRow, { flex: 1 }]}>
+      <Body style={{ fontWeight: '700', flex: 1 }}>{label}</Body>
+      <Switch value={on} onValueChange={flip} trackColor={{ true: t.accent, false: t.muted }} ios_backgroundColor={t.muted} importantForAccessibility="no" />
+    </Pressable>
+  )
+  return (
+    <Card>
+      <Row style={{ flexWrap: 'nowrap', gap: 16 }}>
+        {row('Music', p.music, () => setPrefs({ music: !p.music }))}
+        {row('Sounds', p.effects, () => setPrefs({ effects: !p.effects }))}
+      </Row>
+    </Card>
+  )
+}
+
 function StormAlertsToggle() {
   const t = useTheme()
   const [on, setOn] = useState<boolean | null>(null)

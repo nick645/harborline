@@ -147,6 +147,10 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   other look is a keepsake hand-run boats bring home, each from one region's waters, rarest in
   storms (`data/keepsakes.ts`; odds, names and which waters are Claude's picks). Quay
   decorations keep their milestones. Sim (wide): ~15 found by 6 h, ~55 of 66 by 40 h.
+- Sound (user-approved 2026-11-03): everything synthesized in code by `scripts/audio.ts` (committed
+  WAVs in `mobile/assets/audio/`), music by time and weather (day / night / storm), ambience by
+  place, effects from log entries and actions (`mobile/src/sound/`). On by default, silent switch
+  mutes, mixes with other apps. Needs `expo-audio` (native: rebuild after adding it).
 
 ## Originality
 

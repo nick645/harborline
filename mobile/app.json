@@ -29,7 +29,8 @@
       "./plugins/withoutPushEntitlement",
       "expo-notifications",
       "./plugins/withSceneLifecycle",
-      "./plugins/withSourceBuiltModules"
+      "./plugins/withSourceBuiltModules",
+      "expo-audio"
     ]
   }
 }

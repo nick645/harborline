@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
+import { play } from '../sound/sound'
 import { bodyFont, fonts, useTheme } from '../theme'
 
 /** Text in Barlow; a fontWeight in `style` picks the matching family. */
@@ -47,6 +48,7 @@ export function Button({
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={() => play('tap')}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ disabled: !!disabled }}
@@ -149,6 +151,7 @@ export function Segments<T extends string>({ items, value, onChange }: { items: 
           <Pressable
             key={it.id}
             onPress={() => onChange(it.id)}
+            onPressIn={() => it.id !== value && play('tap')}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
             style={[styles.segment, on && { backgroundColor: t.accent }]}

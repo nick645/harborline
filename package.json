@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "sim": "tsx scripts/sim.ts"
+    "sim": "tsx scripts/sim.ts",
+    "audio": "tsx scripts/audio.ts"
   },
   "dependencies": {
     "react": "^19.2.8",

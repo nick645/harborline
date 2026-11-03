@@ -109,6 +109,25 @@ scripts/sim.ts       balance harness
 - **Your tavern** too: give it a name (on the quay and over the window), pick its wall panelling, floor and tablecloth, and what hangs on the wall (a ship's wheel, a mounted fish, crossed oars, a painting, an old flag). Other ports keep their region's tavern.
 - Port upgrades show in the scene (slipway, mooring posts, fuel tanks, salvage crane, scout hut, radar mast), and your captains ashore wander the quay.
 
+## Sound
+
+Every note and noise is synthesized by `scripts/audio.ts` (`npm run audio` rebuilds
+`mobile/assets/audio/`; the files are committed). Nothing is sampled or licensed.
+
+- **Music** follows the clock and the weather: *The Harbour Waltz* (D major, mandolin-ish pluck and
+  squeezebox) by day, *Lamplight* (harp, music box, pad) at night, *Squall* (D minor, ostinato and
+  timpani) whenever one of your boats is out in a storm. Beds crossfade.
+- **Ambience** follows the place: waves, gulls and rope creak in the harbour; a softer sea and a
+  bell buoy at night; wind, rain and heavy sea in a storm, with thunder now and then; fire, glasses
+  and a murmuring crowd whenever a tavern is on screen.
+- **Effects**: a wooden tap for buttons and tabs, a chime for a choice made, coins for a trip paid,
+  a pour of coins and a bell for a purchase, a horn for casting off, two bells for new waters, a
+  music-box run for a find (rare part or keepsake), a chord when someone signs on, a fanfare for a
+  Legend, Mythic or crafted hull, a groan and bubbles for a sinking, thunder for a storm alert.
+- Music and Sounds have their own switches on the Log page; both start on. The silent switch
+  mutes everything, other apps' audio keeps playing underneath, and the game is quiet in the
+  background.
+
 ## Deckhands and the tavern
 
 - A boat of tier *t* needs *t − 1* deckhands (none on tier 1, five on a tier-6). They're found at the tavern (4 at home; someone new comes in whenever one signs) and courted like captains (see Courting crew). Signing one onto a boat is a one-off fee of 5% of the boat's tier price; there are no wages.

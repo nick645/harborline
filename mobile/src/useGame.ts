@@ -10,6 +10,7 @@ import { randomSeed } from '../../src/game/rolls'
 import { clearSave, loadGame, saveGame } from './storage'
 import { upcomingAlerts, type UpcomingAlert } from '../../src/game/alerts'
 import { cancelAlerts, scheduleAlerts } from './notify'
+import { markAct, play } from './sound/sound'
 
 // Once a second: countdowns show seconds, and scenes animate on their own clock.
 const TICK_MS = 1000
@@ -111,6 +112,7 @@ export function useGame() {
       try {
         const t = Date.now()
         const next = fn(settle(ref.current, t), t)
+        markAct()
         commit(next)
         setError(null)
         void saveGame(next)
@@ -123,6 +125,7 @@ export function useGame() {
           void saveGame(e.state)
         }
         setError(e.message)
+        play('error')
         return false
       }
     },
