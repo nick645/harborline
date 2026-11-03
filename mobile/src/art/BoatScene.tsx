@@ -318,7 +318,7 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
           </Group>
         ) : (
           <Group transform={bob} origin={{ x: SCENE_W / 2, y: DECK_Y }}>
-            <BoatArt cls={cls} light={light} x={boatX} y={DECK_Y} scale={scale} flip={flip} captain={captain} people hands={hands} condition={condition} clock={clock} />
+            <BoatArt cls={cls} light={light} x={boatX} y={DECK_Y} scale={scale} flip={flip} captain={captain} people laden hands={hands} condition={condition} clock={clock} />
           </Group>
         )}
 

@@ -34,7 +34,7 @@ export function BoatGallery() {
           return (
             <View key={cls.id} style={{ width: CELL_W, gap: 2 }}>
               <Canvas style={{ width: CELL_W, height: CELL_H, backgroundColor: LIGHT[phase].sky, borderRadius: 8 }}>
-                <BoatArt cls={cls} light={LIGHT[phase]} x={20} y={CELL_H - 28} scale={scale} condition={worn ? 25 : 100} captain={lookFor(cls.id)} people clock={clock} />
+                <BoatArt cls={cls} light={LIGHT[phase]} x={20} y={CELL_H - 28} scale={scale} condition={worn ? 25 : 100} captain={lookFor(cls.id)} people laden clock={clock} />
               </Canvas>
               <Muted>
                 {cls.name} · T{cls.sizeTier} {cls.rarity !== 'common' ? cls.rarity : ''}

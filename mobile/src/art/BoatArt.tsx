@@ -42,6 +42,8 @@ type Props = {
   captain?: Look | null
   /** Show the people aboard (captain and deckhands). Off for small thumbnails. */
   people?: boolean
+  /** On a trip: passengers aboard, cargo on deck. Docked and for sale, the decks are clear. */
+  laden?: boolean
   /** Deckhands aboard; defaults to a full complement. */
   hands?: number
   /** Hull condition 0–100: rust shows below 60, patches below 35. */
@@ -50,7 +52,7 @@ type Props = {
   clock?: SharedValue<number>
 }
 
-export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captain = null, people = false, hands, condition = 100, clock }: Props) {
+export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captain = null, people = false, laden = false, hands, condition = 100, clock }: Props) {
   const L = useMemo(() => boatLayout(cls), [cls])
   const hullClip = useMemo(() => Skia.Path.MakeFromSVGString(L.hullPath)!, [L])
   const still = useSharedValue(0)
@@ -60,7 +62,7 @@ export function BoatArt({ cls, light, x, y, scale = 1, flip = false, captain = n
 
   const { W, H } = L
   const lit = (c: string) => mix(c, light.silhouette, light.dim)
-  const ctx: Ctx = { L, tier: cls.sizeTier, lit, light, seed: hash(cls.id), condition, hands: hands ?? handsFor(cls.sizeTier), clock: clk }
+  const ctx: Ctx = { L, tier: cls.sizeTier, lit, light, seed: hash(cls.id), condition, hands: hands ?? handsFor(cls.sizeTier), clock: clk, laden }
   const trim = TRIM[cls.rarity]
   const Special = SPECIALS[cls.id]
   const paint = lit(L.paint)
@@ -326,9 +328,13 @@ function SailWorks({ ctx }: { ctx: Ctx }) {
   const jib = `M${mx + 2} -72 L ${W - 6} ${L.deckY(W - 6) - 1} L ${mx + 5} -12 Z`
   return (
     <Group>
-      <Crate x={W * 0.12} y={L.deckY(W * 0.12)} ctx={ctx} />
-      <Crate x={W * 0.24} y={L.deckY(W * 0.24)} w={16} h={11} ctx={ctx} i={1} />
-      <Oval x={W * 0.34} y={L.deckY(W * 0.34) - 9} width={14} height={9} color={lit('#c9b08a')} />
+      {ctx.laden && (
+        <>
+          <Crate x={W * 0.12} y={L.deckY(W * 0.12)} ctx={ctx} />
+          <Crate x={W * 0.24} y={L.deckY(W * 0.24)} w={16} h={11} ctx={ctx} i={1} />
+          <Oval x={W * 0.34} y={L.deckY(W * 0.34) - 9} width={14} height={9} color={lit('#c9b08a')} />
+        </>
+      )}
       <Path path={`M${mx} ${L.deckY(mx)} V -78`} color={lit('#5a3a2a')} style="stroke" strokeWidth={2.4} />
       <Path path={jib} color={lit(tint(cloth, 0.2))} opacity={0.95} />
       <Path path={sail} color={lit(cloth)} />
@@ -346,13 +352,13 @@ function DerrickWorks({ ctx }: { ctx: Ctx }) {
   const mx = W * 0.5
   return (
     <Group>
-      {[0, 1, 2, 3, 4].map((i) => {
+      {ctx.laden && [0, 1, 2, 3, 4].map((i) => {
         const col = i % 3
         const row = Math.floor(i / 3)
         const cx = W * 0.1 + col * 19
         return <Crate key={i} x={cx} y={L.deckY(cx) - row * 14} ctx={ctx} i={i} />
       })}
-      {[0, 1].map((i) => (
+      {ctx.laden && [0, 1].map((i) => (
         <RoundedRect key={i} x={W * 0.4 + i * 10} y={L.deckY(W * 0.4) - 14} width={9} height={14} r={2} color={lit(i ? '#6e4733' : '#7a5236')} />
       ))}
       <Path path={`M${mx} ${L.deckY(mx)} V -72`} color={lit('#4a3346')} style="stroke" strokeWidth={2.6} />
@@ -403,7 +409,7 @@ function FreighterWorks({ ctx }: { ctx: Ctx }) {
   const craneXs = [x0 + cw * Math.floor(cols / 3), x0 + cw * Math.floor((2 * cols) / 3)]
   return (
     <Group>
-      {Array.from({ length: cols * rows }, (_, i) => {
+      {ctx.laden && Array.from({ length: cols * rows }, (_, i) => {
         const col = i % cols
         const row = Math.floor(i / cols)
         const cx = x0 + col * cw
@@ -492,7 +498,7 @@ function TaxiWorks({ ctx }: { ctx: Ctx }) {
   const canopyY = L.deckY(c0) - 26
   return (
     <Group>
-      {[0, 1, 2].map((i) => {
+      {ctx.laden && [0, 1, 2].map((i) => {
         const px = c0 + 6 + i * ((c1 - c0 - 18) / 2)
         return <Sitter key={i} x={px} y={L.deckY(px)} size={20} ctx={ctx} i={i} aft={i === 2} />
       })}
@@ -523,10 +529,14 @@ function FerryWorks({ ctx }: { ctx: Ctx }) {
       {Array.from({ length: n }, (_, i) => (
         <RoundedRect key={i} x={x0 + 5 + i * 11} y={top + 5} width={8} height={7} r={1.5} color={light.window} />
       ))}
-      <WindowHeads xs={Array.from({ length: n }, (_, i) => x0 + 9 + i * 11)} y={top + 5} h={7} ctx={ctx} from={10} />
-      <Stroller x0={x0 + 4} x1={rail1 + 6} y={() => top} size={18} ctx={ctx} i={4} />
-      <Stroller x0={rail0} x1={x1 - 22} y={() => top} size={18} ctx={ctx} i={5} speed={5} />
-      <Sitter x={x1 - 18} y={top} size={18} ctx={ctx} i={6} aft />
+      {ctx.laden && (
+        <>
+          <WindowHeads xs={Array.from({ length: n }, (_, i) => x0 + 9 + i * 11)} y={top + 5} h={7} ctx={ctx} from={10} />
+          <Stroller x0={x0 + 4} x1={rail1 + 6} y={() => top} size={18} ctx={ctx} i={4} />
+          <Stroller x0={rail0} x1={x1 - 22} y={() => top} size={18} ctx={ctx} i={5} speed={5} />
+          <Sitter x={x1 - 18} y={top} size={18} ctx={ctx} i={6} aft />
+        </>
+      )}
       <Path path={`M${rail0} ${top - 6} H ${rail1} ${Array.from({ length: 7 }, (_, i) => `M${rail0 + i * ((rail1 - rail0) / 6)} ${top} v -6`).join(' ')}`} color={lit('#f3e7d8')} style="stroke" strokeWidth={0.9} />
     </Group>
   )
@@ -556,7 +566,7 @@ function LinerWorks({ ctx }: { ctx: Ctx }) {
             ) : (
               <>
                 {Array.from({ length: n }, (_, i) => <RoundedRect key={i} x={x0 + 4 + i * 10} y={top + 3} width={7} height={step - 7} r={1.5} color={light.window} />)}
-                <WindowHeads xs={Array.from({ length: n }, (_, i) => x0 + 7.5 + i * 10)} y={top + 3} h={step - 7} ctx={ctx} from={20 + d * 9} />
+                {ctx.laden && <WindowHeads xs={Array.from({ length: n }, (_, i) => x0 + 7.5 + i * 10)} y={top + 3} h={step - 7} ctx={ctx} from={20 + d * 9} />}
               </>
             )}
           </Group>
@@ -571,7 +581,7 @@ function LinerWorks({ ctx }: { ctx: Ctx }) {
           </Group>
         )
       })}
-      {(() => {
+      {ctx.laden && (() => {
         // The top deck's promenade: people walking it end to end, someone at the stern rail.
         const tx0 = W * (0.1 + (decks - 1) * 0.06) + 6
         const tx1 = W * (0.8 - (decks - 1) * 0.05) - 6

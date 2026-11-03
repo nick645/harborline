@@ -38,12 +38,12 @@ export type Props = {
 }
 
 /** A small drawing of the boat for her card. */
-function BoatThumb({ cls, condition }: { cls: ReturnType<typeof getBoatClass>; condition: number }) {
+function BoatThumb({ cls, condition, laden }: { cls: ReturnType<typeof getBoatClass>; condition: number; laden: boolean }) {
   const W = boatWidth(cls)
   const scale = 60 / W
   return (
     <Canvas style={{ width: 64, height: 44 }}>
-      <BoatArt cls={cls} light={LIGHT.day} x={2} y={32} scale={scale} condition={condition} />
+      <BoatArt cls={cls} light={LIGHT.day} x={2} y={32} scale={scale} condition={condition} laden={laden} />
     </Canvas>
   )
 }
@@ -74,7 +74,7 @@ export function BoatChip({ game, boat, now, onOpen }: { game: GameState; boat: B
       accessibilityLabel={`${boat.nickname}, ${status}`}
       style={({ pressed }) => [styles.chip, { backgroundColor: t.surface, borderColor: boat.state === 'sunk' ? t.bad : attention ? t.accent : t.border, opacity: pressed ? 0.8 : 1 }]}
     >
-      <BoatThumb cls={cls} condition={boat.condition} />
+      <BoatThumb cls={cls} condition={boat.condition} laden={boat.state === 'sailing' || boat.state === 'returning'} />
       <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 17 }}>
         {boat.nickname}
       </Text>

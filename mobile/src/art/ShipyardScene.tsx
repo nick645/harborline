@@ -68,13 +68,27 @@ export function ShipyardScene({ width, height, light, classes, coins: purse, foc
   const night = light.stars > 0
   const lit = (c: string) => mix(c, light.silhouette, light.dim * 0.8)
 
-  // The camera: centre (in scene units) and zoom. The whole yard, or one boat filling the view.
-  const whole = { cx: YARD_W / 2, cy: YARD_H / 2, z: Math.min(width / YARD_W, height / YARD_H) }
+  // The camera: centre (in scene units) and zoom. The whole yard is framed round the boats (the
+  // shed and crane at its edges), standing on the bottom of the view with any spare height
+  // going to sky; or one boat fills the view.
+  const bx0 = Math.min(...list.map((b) => b.x))
+  const bx1 = Math.max(...list.map((b) => b.x + b.w))
+  // With few boats the yard draws in: the shed and crane stand just past the outermost berths.
+  const shedShift = Math.max(0, bx0 - 150)
+  const craneShift = Math.min(0, bx1 + 50 - 650)
+  const whole = (() => {
+    const x0 = Math.max(0, bx0 - 70)
+    const x1 = Math.min(YARD_W, bx1 + 70)
+    const z = Math.min(width / (x1 - x0), height / (YARD_H - 40))
+    return { cx: (x0 + x1) / 2, cy: YARD_H - 6 - height / (2 * z), z }
+  })()
   const target = (() => {
     const b = list.find((x) => x.cls.id === focused)
     if (!b) return whole
     const f = focusBox(b)
-    return { cx: f.x + f.w / 2, cy: f.y + f.h / 2, z: Math.min(width / f.w, height / f.h) }
+    const z = Math.min(width / f.w, height / f.h)
+    // Her keel low in the frame, sky and the yard behind her above.
+    return { cx: f.x + f.w / 2, cy: Math.min(f.y + f.h / 2, f.y + f.h - height / (2 * z)), z }
   })()
   const cx = useSharedValue(target.cx)
   const cy = useSharedValue(target.cy)
@@ -103,16 +117,32 @@ export function ShipyardScene({ width, height, light, classes, coins: purse, foc
     return `M-7 ${f * 0.3} Q -3.5 ${-f} 0 0 Q 3.5 ${-f} 7 ${f * 0.3}`
   })
 
+  // Clouds drift across the high sky (a tall screen shows plenty of it), wrapping round.
+  const clouds = useDerivedValue(() => -((clock.value / 260) % 1100))
+  const c1 = useDerivedValue(() => [{ translateX: ((clouds.value + 1100) % 1100) - 250 }])
+  const c2 = useDerivedValue(() => [{ translateX: ((380 + clouds.value + 1100) % 1100) - 250 }])
+  const c3 = useDerivedValue(() => [{ translateX: ((760 + clouds.value + 1100) % 1100) - 250 }])
+  const cloud = (y: number, s: number) =>
+    `M${-40 * s} ${y} C ${-44 * s} ${y - 14 * s}, ${-20 * s} ${y - 20 * s}, ${-8 * s} ${y - 12 * s} C ${0} ${y - 30 * s}, ${30 * s} ${y - 28 * s}, ${34 * s} ${y - 12 * s} C ${50 * s} ${y - 16 * s}, ${60 * s} ${y - 4 * s}, ${52 * s} ${y} Z`
   const waveRow = (y: number, o: number) => <Path key={y} path={`M-400 ${y} ${'q 9 -3 18 0 t 18 0 '.repeat(44)}`} color={light.seaLine} style="stroke" strokeWidth={1.3} opacity={o} />
-  const pier = (y: number, depth: number) => (
-    <Group>
-      <Rect x={-400} y={y} width={YARD_W + 800} height={14 * depth} color={lit('#8a5a3a')} />
-      <Rect x={-400} y={y + 14 * depth} width={YARD_W + 800} height={4 * depth} color={lit('#4a2e22')} />
-      {Array.from({ length: 22 }, (_, i) => (
-        <Rect key={i} x={-380 + i * 70} y={y - 6 * depth} width={7 * depth} height={30 * depth} color={lit('#4a2e22')} />
-      ))}
-    </Group>
-  )
+  // A pier with its piles between the berths (never in front of a boat), and on out past them.
+  const pier = (y: number, depth: number) => {
+    const row = list.filter((b) => b.depth === depth)
+    const edges = row.length ? [...row.map((b) => b.x), row[row.length - 1].x + row[row.length - 1].w] : []
+    const gap = row[0]?.w ?? CELL * depth
+    const posts = [...edges]
+    for (let x = (edges[0] ?? YARD_W / 2) - gap; x > -400; x -= gap) posts.push(x)
+    for (let x = (edges[edges.length - 1] ?? YARD_W / 2) + gap; x < YARD_W + 400; x += gap) posts.push(x)
+    return (
+      <Group>
+        <Rect x={-400} y={y} width={YARD_W + 800} height={14 * depth} color={lit('#8a5a3a')} />
+        <Rect x={-400} y={y + 14 * depth} width={YARD_W + 800} height={4 * depth} color={lit('#4a2e22')} />
+        {posts.map((x, i) => (
+          <Rect key={i} x={x - 3.5 * depth} y={y - 6 * depth} width={7 * depth} height={30 * depth} color={lit('#4a2e22')} />
+        ))}
+      </Group>
+    )
+  }
 
   return (
     <View style={{ width, height }}>
@@ -123,6 +153,15 @@ export function ShipyardScene({ width, height, light, classes, coins: purse, foc
             <LinearGradient start={vec(0, -100)} end={vec(0, WATER)} colors={[light.sky, light.skyLow]} />
           </Rect>
           <Circle cx={light.sunX * 2} cy={Math.min(90, light.sunY)} r={20} color={light.sun} />
+          {[
+            [c1, -40, 1.3],
+            [c2, 30, 0.9],
+            [c3, -130, 1.6],
+          ].map(([t, y, s], i) => (
+            <Group key={i} transform={t as typeof c1}>
+              <Path path={cloud(y as number, s as number)} color={night ? '#4a3a5a' : '#fff6e8'} opacity={night ? 0.5 : 0.75} />
+            </Group>
+          ))}
           <Group opacity={light.stars}>
             {[[40, 30], [140, 16], [250, 50], [380, 24], [470, 60], [690, 34], [-60, 40], [780, 20]].map(([x, y], i) => (
               <Circle key={i} cx={x} cy={y} r={1.2} color="#fff3dc" />
@@ -131,7 +170,7 @@ export function ShipyardScene({ width, height, light, classes, coins: purse, foc
           <Path path={`M-800 ${WATER} L -800 168 L 120 172 L 170 160 L 260 166 L 330 150 L 420 158 L 520 152 L 760 168 L 1520 166 L 1520 ${WATER} Z`} color={light.land} />
 
           {/* The slipway shed: a hull going up on the stocks under a big gable */}
-          <Group>
+          <Group transform={[{ translateX: shedShift }]}>
             <Path path={`M18 ${WATER} L 18 96 L 110 50 L 202 96 L 202 ${WATER} Z`} color={lit('#6e4733')} />
             <Path path="M10 100 L 110 46 L 210 100" color={lit('#3a2420')} style="stroke" strokeWidth={8} strokeJoin="round" />
             <Rect x={42} y={110} width={136} height={WATER - 110} color={lit('#2e1c19')} />
@@ -144,7 +183,7 @@ export function ShipyardScene({ width, height, light, classes, coins: purse, foc
           </Group>
 
           {/* The crane */}
-          <Group>
+          <Group transform={[{ translateX: craneShift }]}>
             <Path path={`M630 ${WATER} L 640 52 L 650 ${WATER}`} color={lit('#2e1c19')} style="stroke" strokeWidth={4} />
             <Path path={`M632 ${WATER - 30} L 648 ${WATER - 70} M648 ${WATER - 30} L 632 ${WATER - 70} M634 100 L 646 70 M646 100 L 634 70`} color={lit('#2e1c19')} style="stroke" strokeWidth={1.5} />
             <Rect x={540} y={48} width={170} height={6} color={lit('#c2452a')} />
@@ -240,7 +279,7 @@ function Moored({ b, i, light, clock, afford, lit }: { b: Berth; i: number; ligh
   return (
     <Group>
       <Group transform={ride} origin={{ x: b.x + bw / 2, y: b.line }}>
-        <BoatArt cls={b.cls} light={light} x={b.x + 4} y={b.line} scale={b.scale} clock={clock} people />
+        <BoatArt cls={b.cls} light={light} x={b.x + 4} y={b.line} scale={b.scale} clock={clock} />
       </Group>
       {/* FOR SALE */}
       <Group transform={[{ translateX: signX }, { translateY: boardY }, { scale: d }]}>
