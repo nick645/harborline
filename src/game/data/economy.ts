@@ -1,7 +1,9 @@
 // First-pass economy values from the build spec. All of these are meant to be tuned.
 
-export const STARTING_COINS = 500
-export const STARTING_BOAT_CLASSES = ['dinghy-hauler', 'water-taxi']
+/** A new harbour has no boats: enough for a starter boat and a first captain's fee, little more. */
+export const STARTING_COINS = 750
+/** The starter boats' price (Claude's pick, approved 2026-11-03). */
+export const STARTER_PRICE = 400
 
 /** payout = capacity × demand × distance × PAYOUT_FACTOR − fuelPerLeg × 2 */
 export const PAYOUT_FACTOR = 0.8

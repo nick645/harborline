@@ -67,6 +67,7 @@ import {
 import { nextFloat, nextInt, rollChance, rollNormal, rollPick, rollWeighted } from './rolls'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS, type PersonaDef } from './data/personas'
 import { newCourting, termsFee } from './courting'
+import { KEEN_DECIDES_MS, KEEN_FEE_SHARE, KEEN_RIVAL_FINISH, KEEN_UNTIL_CAPTAINS, KEEN_YOURS } from './data/courting'
 
 const traitsById = new Map(TRAITS.map((t) => [t.id, t]))
 
@@ -288,6 +289,17 @@ export function newRecruit(rng: RngState, id: string, repRange: [number, number]
 }
 
 /**
+ * A green captain already leaning your way and barely known to the rival lines: a drink and a
+ * walk round the harbour win them over, and they'll sail for less. Mutates the RNG.
+ */
+export function keenRecruit(s: GameState, t: number): Captain {
+  const c = newRecruit(s.rng, `c${s.nextCaptainSeq++}`, [1, 1], t)
+  c.fee = Math.round((c.fee * KEEN_FEE_SHARE) / 10) * 10
+  c.courting = { ...c.courting!, yours: KEEN_YOURS, decidesAt: t + KEEN_DECIDES_MS, rivals: c.courting!.rivals.map((r) => ({ ...r, start: 10, finish: KEEN_RIVAL_FINISH })) }
+  return c
+}
+
+/**
  * Keep the home quay going: fresh watches each 6-hour slot, and new faces for anyone who has
  * signed (with you or a rival). People stay until they decide. Mutates.
  */
@@ -301,6 +313,10 @@ export function refreshRecruitPool(s: GameState, t: number, level: number) {
   // An empty quay means a new game or a long time away: these people have been here a while.
   const settled = s.recruitPool.recruits.length === 0
   for (const c of s.recruitPool.recruits) c.courting ??= newCourting(s.rng, t, c, true)
+  // No boat sails without a captain: in a new harbour, until you have two, someone keen waits at the front of the
+  // quay (a new game's first courtships, for your boat and the harbourmaster's, and never a dead end).
+  const keen = s.recruitPool.recruits.some((c) => (c.courting?.yours ?? 0) >= KEEN_YOURS)
+  if (s.player.roster.length < KEEN_UNTIL_CAPTAINS && s.player.maxTierReached === 1 && !keen && s.recruitPool.recruits.length < RECRUIT_POOL_SIZE) s.recruitPool.recruits.unshift(keenRecruit(s, t))
   while (s.recruitPool.recruits.length < RECRUIT_POOL_SIZE) s.recruitPool.recruits.push(newRecruit(s.rng, `c${s.nextCaptainSeq++}`, range, t, settled))
 }
 

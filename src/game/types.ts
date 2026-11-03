@@ -50,8 +50,10 @@ export interface BoatClass {
   track: Track
   sizeTier: SizeTier
   rarity: Rarity
-  /** Coin price. 0 means starter-only, not sold in the shop. */
+  /** Coin price. 0 means never sold (crafted boats). */
   price: number
+  /** A small first boat: sold only to a harbour with no boats yet. */
+  starter?: boolean
   capacity: number
   /** Distance units per minute. */
   speed: number
@@ -255,6 +257,10 @@ export interface RecruitPool {
 
 export interface Player {
   coins: number
+  /** The harbourmaster is still walking a new player through their first boat and captain. */
+  guide?: boolean
+  /** The harbourmaster's old boat, given when your first boat sails. Set while it's still to come. */
+  oldBoatDue?: boolean
   scoutingLevel: number
   ownedBoats: Boat[]
   partInventory: string[]

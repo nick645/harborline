@@ -64,7 +64,7 @@ scripts/sim.ts       balance harness
 
 ## Rules as built
 
-- You start with 500 coins, one small cargo boat (Dinghy Hauler), one small passenger boat (Water Taxi), and one green 1-anchor captain. **Every boat needs a captain to sail**, managed boats included, so the second boat waits for your first hire.
+- You start with 750 coins and nothing else. Wick, the harbourmaster, walks you through buying a starter boat (a Dinghy Hauler for cargo or a Water Taxi for passengers, 400c, sold only as your first boat), courting and signing your first captain, putting them aboard and sending her out. When your first boat sails, Wick gives you his old one (the other starter). **Every boat needs a captain to sail**, managed boats included. The walk-through can be skipped; the gift still comes.
 - 5 ports. Every route is a round trip out of the home port, Saltmarsh Quay (distances 6, 10.1, 14.1, 20.2).
 - `payout = capacity × demand × distance × 0.8 − fuelPerLeg × 2`. Cargo boats use the route's cargo demand and passenger boats its passenger demand; both are 0.5–1.5 and reroll when a boat arrives. The payout is locked in at departure and credited when the boat reaches the far port.
 - **Queued trips:** send a docked boat on 1–N back-to-back round trips on one route. N is its fuel tank (4 for starters, rising with size). Each trip re-quotes at departure against current demand. When the queue is done the boat docks and waits; there is no auto-pilot. "Return after this trip" cuts a run short.
@@ -84,7 +84,7 @@ scripts/sim.ts       balance harness
 - **Sinking:** a boat that reaches 0 sinks on the outbound leg. That trip pays nothing, the rest of the queue is cancelled, and the wreck stays on the map until salvaged for 25% of its price (minimum 100c). It comes back at 10 condition. If nothing else is afloat, salvage never costs more than you have.
 - **Catalog:** 6 tiers × 2 tracks × 4 rarities. Common boats cost coins; rare boats cost coins plus their own rare part; legendary boats are built from their own 3-piece set; mythic boats come from mythic sets that only drop in storms, and are never sold for any amount. Abilities whose system doesn't exist yet are shown as not active.
 - **Parts:** one roll per completed trip, rarest first: mythic 0.05% (storm), legendary 0.5% (rough) / 2% (storm), rare 8% (rough, storm, or tier-4+ boats), standard 25%. Legendary finds favour sets you've started. Standard fittings scrap for 10c; 3 spare copies of a rare-or-better slot melt into a fresh roll of that slot. Building a set is instant and free.
-- Sell common and rare boats for 50%; crafted boats can't be sold. The two starter boats aren't in the shop, and you can't sell your last boat.
+- Sell common and rare boats for 50%; crafted boats can't be sold. The starter boats are only sold as a first boat, and you can't sell your last boat.
 - All timers are absolute timestamps. Settling is one event-ordered pass with no tick loop.
 - **Away time** earns exactly like present time, at full rate, but only for trips already queued. Coming back shows what finished and what sank.
 - The RNG seed and state are stored in the save, so a session can be replayed.
@@ -143,7 +143,7 @@ Nobody joins on the spot. Everyone looking for work, captains and hands, is also
 - **What they want.** Captains want two or three things (hands one): good pay, a fine ship, a line that comes home, storm work, staying close to home, a proper harbour, good company. The quay says what one of them is (right 70% of the time).
 - **Winning them over.** *Stand them a drink* (1 watch; once per watch period; they tell you one thing they want, and a hand shows what they're really like). *Walk them round your harbour* (free): counts for anyone who wants a line that comes home (no boat lost in 3 days, or it counts against you), storm work (storm trips you've completed), close to home (your home port is in their region), or a proper harbour (upgrade levels and decorations). *Show them a boat* (free): your best docked boat they'd sail on, which counts with anyone who wants a fine ship (more for bigger and rarer). *Better terms* (twice at most): +25% on their fee each time, which counts for a lot with anyone who wants good pay. Aimed at what they want, an effort moves them a long way; otherwise only a little.
 - **Hands who choose you** join your biggest boat short of hands; if she's at sea they wait at home and come aboard when she docks.
-- **A new game** starts with one keen 1-anchor captain on the quay who already leans your way: a drink and a walk round the harbour win them over.
+- **A new harbour** always has one keen 1-anchor captain on the quay until it has two captains: they already lean your way, ask half the usual fee, and a drink and a walk round the harbour win them over.
 - **Managers don't court:** they sign only people the rival lines haven't got a hold on yet.
 
 ## Captains

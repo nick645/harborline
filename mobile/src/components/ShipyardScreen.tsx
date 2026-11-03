@@ -24,11 +24,13 @@ const INFO_H = 190
 export function ShipyardScreen({ game, now, onBuy }: { game: GameState; now: number; onBuy: (classId: string) => void }) {
   const t = useTheme()
   const top = topTier(game)
-  const tiers = [top, top + 1].filter((x) => x <= 6)
+  // A new harbour's first boat is a starter; the tiers open up after that.
+  const first = game.player.ownedBoats.length === 0
+  const tiers = first ? [1] : [top, top + 1].filter((x) => x <= 6)
   const [tier, setTier] = useState(tiers[0])
   const [page, setPage] = useState(0)
   const full = game.player.ownedBoats.length >= fleetCap(game)
-  const classes = shopClasses().filter((c) => c.sizeTier === tier)
+  const classes = shopClasses(game).filter((c) => c.sizeTier === tier)
   const light = lightAt(now)
   const clock = useSceneClock()
 

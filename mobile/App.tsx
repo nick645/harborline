@@ -47,6 +47,9 @@ import { CaptainScreen } from './src/screens/CaptainScreen'
 import { PortsScreen } from './src/screens/PortsScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { placeDecor, styleHome } from '../src/game/home'
+import { endGuide, guideStep } from '../src/game/guide'
+import { Harbourmaster } from './src/components/Harbourmaster'
+import { guideLine } from './src/guideLine'
 import { Body, Button, Card, Measure, Muted, Row, Strip, Title } from './src/components/ui'
 
 type Tab = 'fleet' | 'captains' | 'ports' | 'shipyard' | 'home'
@@ -125,6 +128,8 @@ function Harbor() {
 
   const boats = game.player.ownedBoats
   const season = seasonAt(now)
+  const step = guideStep(game, now)
+  const guide = step && guideLine(game, step, { tab, boatOpen: detail?.kind === 'boat', portPage: (portsSel ?? homeOf(game)) === homeOf(game) ? portsPage : 'away' }, now)
   const finds = report?.parts.filter((id) => getPart(id).rarity !== 'standard') ?? []
 
   /** Ask first, then act. Resolves to whether the action went ahead. */
@@ -490,20 +495,32 @@ function Harbor() {
             )}
           </>
         )}
+        {guide && <Harbourmaster line={guide} onEnd={() => act(endGuide)} />}
       </View>
 
       {!detail && (
         <SafeAreaView edges={['bottom']} style={[styles.tabBar, { backgroundColor: t.surface, borderTopColor: t.border }]}>
-          {TABS.map((x) => (
-            <Pressable
-              key={x.id}
-              onPress={() => {
-                if (x.id !== tab) play('tap')
-                setTab(x.id)
-              }} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: tab === x.id }}>
-              <Text style={{ color: tab === x.id ? t.accent : t.muted, fontFamily: tab === x.id ? fonts.bold : fonts.medium, fontSize: 14 }}>{x.label}</Text>
-            </Pressable>
-          ))}
+          {TABS.map((x) => {
+            // The tab the harbourmaster is pointing at.
+            const lit = guide?.target === x.id && tab !== x.id
+            return (
+              <Pressable
+                key={x.id}
+                onPress={() => {
+                  if (x.id !== tab) play('tap')
+                  setTab(x.id)
+                }}
+                style={[styles.tab, lit && { backgroundColor: t.surface2, borderTopWidth: 2, borderTopColor: t.accent, marginTop: -1 }]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: tab === x.id }}
+                accessibilityHint={lit ? 'The harbourmaster suggests going here' : undefined}
+              >
+                <Text style={{ color: tab === x.id || lit ? t.accent : t.muted, fontFamily: tab === x.id || lit ? fonts.bold : fonts.medium, fontSize: 14 }}>
+                  {lit ? `› ${x.label}` : x.label}
+                </Text>
+              </Pressable>
+            )
+          })}
         </SafeAreaView>
       )}
     </SafeAreaView>

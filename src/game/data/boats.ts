@@ -1,4 +1,5 @@
 import type { BoatClass, PartType, SizeTier, Track } from '../types'
+import { STARTER_PRICE } from './economy'
 
 // The full catalog. Names are placeholders to be replaced before launch.
 //
@@ -97,9 +98,10 @@ const mythic = (id: string, name: string, track: Track, tier: SizeTier, o: Overr
 
 export const BOAT_CLASSES: BoatClass[] = [
   // ---------- Tier 1: smallest hulls ----------
-  // Starters (price 0) are given at the start and never sold in the shipyard.
-  common('dinghy-hauler', 'Dinghy Hauler', 'cargo', 1, 'base', { price: 0, capacity: 4, speed: 10 / (45 / 60), fuelPerLeg: 6, fuelTankTrips: 4 }),
-  common('water-taxi', 'Water Taxi', 'passenger', 1, 'base', { price: 0, capacity: 4, speed: 10 / (45 / 60), fuelPerLeg: 6, fuelTankTrips: 4 }),
+  // Starters: a new harbour's first boat, and only its first; never sold after that. The
+  // harbourmaster gives you the other when she first sails. Capacity 5 is tuned with the sim.
+  common('dinghy-hauler', 'Dinghy Hauler', 'cargo', 1, 'base', { price: STARTER_PRICE, starter: true, capacity: 5, speed: 10 / (45 / 60), fuelPerLeg: 6, fuelTankTrips: 4 }),
+  common('water-taxi', 'Water Taxi', 'passenger', 1, 'base', { price: STARTER_PRICE, starter: true, capacity: 5, speed: 10 / (45 / 60), fuelPerLeg: 6, fuelTankTrips: 4 }),
   common('skiff', 'Skiff', 'cargo', 1),
   common('launch', 'Launch', 'passenger', 1),
   rare('bootlegger', 'Bootlegger', 'cargo', 1, 'engine'),

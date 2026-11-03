@@ -1,3 +1,4 @@
+import { harbourGame } from './testing'
 import { describe, expect, it } from 'vitest'
 import type { GameState, Weather } from './types'
 import { SKILL_IDS } from './data/captains'
@@ -7,7 +8,6 @@ import {
   craftBoat,
   meltGroups,
   meltSpares,
-  newGame,
   quoteVoyage,
   recallBoat,
   repairBoat,
@@ -21,7 +21,12 @@ import {
   adriftDeadline,
   GameError,
   moveHome,
+  newGame,
+  shopClasses,
 } from './state'
+import { endGuide, guideStep } from './guide'
+import { termsFee } from './courting'
+import { KEEN_DECIDES_MS, KEEN_YOURS } from './data/courting'
 import { createRng, rollConditionLoss } from './rolls'
 import { generateCaptain } from './captains'
 import { getBoatClass, handFee, handsNeeded, repairCostPerPoint, routeDistance, voyagePayout } from './economy'
@@ -36,12 +41,12 @@ import {
   DOOR_STYLES, HANGINGS, HOME_BUNTING, HOME_DOORS, HOME_ROOFS, HOME_SHUTTERS, HOME_SIGNS, HOME_TRIMS, HOME_WALLS,
   HOUSE_BUILDS, HOUSE_EXTRAS, ROOF_STYLES, SIDINGS, TAVERN_CLOTHS, TAVERN_FLOORS, TAVERN_WALLS, TOPPERS, WINDOW_STYLES,
 } from './data/home'
-import { assignCaptain, buyDrink, handView, hireHand, moveHand } from './crew'
+import { assignCaptain, buyDrink, court, handView, hireCaptain, hireHand, moveHand } from './crew'
 import { dropChances, getPart, pickSet } from './parts'
 import { BOAT_CLASSES } from './data/boats'
 import { PARTS } from './data/parts'
 import { ROUTES } from './data/routes'
-import { CAPTAIN_ADRIFT_MS, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE, STARTING_COINS } from './data/economy'
+import { CAPTAIN_ADRIFT_MS, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE, STARTER_PRICE, STARTING_COINS } from './data/economy'
 import { SEASON_LENGTH_MS, WEATHER_SLOT_MS } from './data/weather'
 import { deserialize, serialize } from './save'
 
@@ -95,7 +100,7 @@ describe('catalog', () => {
       expect(c.price).toBe(0)
       expect(c.requiredParts).toHaveLength(3)
     }
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     s.player.coins = 1e12
     expect(() => buyBoat(s, 'the-ghost', T0)).toThrow()
     expect(() => buyBoat(s, 'grand-dame', T0)).toThrow()
@@ -111,10 +116,11 @@ describe('catalog', () => {
 describe('economy', () => {
   it('matches the spec payout formula', () => {
     const dinghy = getBoatClass('dinghy-hauler')
-    expect(voyagePayout(dinghy, 1, 10, 100)).toBe(20)
-    expect(voyagePayout(dinghy, 1, 10, 49)).toBe(Math.round(32 * 0.8 - 12))
+    // 5 aboard × demand 1 × 10 leagues × 0.8, less 6 fuel each way.
+    expect(voyagePayout(dinghy, 1, 10, 100)).toBe(28)
+    expect(voyagePayout(dinghy, 1, 10, 49)).toBe(Math.round(40 * 0.8 - 12))
     // Weather multiplies cargo, never fuel.
-    expect(voyagePayout(dinghy, 1, 10, 100, { grossMult: 1.6 })).toBe(Math.round(32 * 1.6 - 12))
+    expect(voyagePayout(dinghy, 1, 10, 100, { grossMult: 1.6 })).toBe(Math.round(40 * 1.6 - 12))
   })
 
   it('places routes near the intended distances', () => {
@@ -154,7 +160,7 @@ describe('weather', () => {
   })
 
   it('pays more and wears harder in rough weather', () => {
-    const s = newGame(5, T0)
+    const s = harbourGame(5, T0)
     const boat = s.player.ownedBoats[0].id
     const calm = quoteVoyage(s, boat, ROUTES[3].id, timeWith(s, ROUTES[3].id, 'calm'))
     const storm = quoteVoyage(s, boat, ROUTES[3].id, timeWith(s, ROUTES[3].id, 'storm'))
@@ -176,7 +182,7 @@ describe('weather', () => {
 
 describe('storm alerts', () => {
   it('fires when a route with queued trips turns rough, and only then', () => {
-    let s = newGame(5, T0)
+    let s = harbourGame(5, T0)
     const route = ROUTES[3].id
     // Find a slot boundary where this route worsens into rough or storm.
     let at = 0
@@ -197,7 +203,7 @@ describe('storm alerts', () => {
     // Ahead of time, for the phone's notifications: the same alert, due at the turn.
     const ahead = upcomingAlerts(s, at - 60_000, at + 6 * WEATHER_SLOT_MS)
     expect(ahead[0]).toEqual({ ...stormAlerts(s, at)[0], at })
-    expect(upcomingAlerts(newGame(5, T0), at - 60_000, at + 6 * WEATHER_SLOT_MS)).toEqual([])
+    expect(upcomingAlerts(harbourGame(5, T0), at - 60_000, at + 6 * WEATHER_SLOT_MS)).toEqual([])
     // With radar, each storm is told once, a change early.
     const radar = structuredClone(s)
     radar.player.portUpgrades['weather-radar'] = 1
@@ -209,7 +215,7 @@ describe('storm alerts', () => {
 
 describe('voyage lifecycle', () => {
   it('sails, pays on arrival, returns, and goes idle', () => {
-    let s = newGame(42, T0)
+    let s = harbourGame(42, T0)
     const t = timeWith(s, ROUTES[1].id, 'calm')
     const boat = s.player.ownedBoats[0]
     const quote = quoteVoyage(s, boat.id, ROUTES[1].id, t, 'true')
@@ -227,7 +233,7 @@ describe('voyage lifecycle', () => {
   })
 
   it('does not mutate its input', () => {
-    const s = newGame(7, T0)
+    const s = harbourGame(7, T0)
     const before = serialize(s)
     assignRoute(s, s.player.ownedBoats[0].id, ROUTES[0].id, T0)
     expect(serialize(s)).toBe(before)
@@ -235,7 +241,7 @@ describe('voyage lifecycle', () => {
 
   it('is deterministic for a given seed', () => {
     const run = () => {
-      let s = newGame(99, T0)
+      let s = harbourGame(99, T0)
       s = assignRoute(s, s.player.ownedBoats[0].id, ROUTES[2].id, T0, 4)
       return serialize(settle(s, T0 + 3600_000))
     }
@@ -245,7 +251,7 @@ describe('voyage lifecycle', () => {
 
 describe('queued trips', () => {
   it('runs back to back and then docks for the player', () => {
-    let s = newGame(5, T0)
+    let s = harbourGame(5, T0)
     const id = s.player.ownedBoats[0].id
     s = assignRoute(s, id, ROUTES[1].id, T0, 3)
     s = settleAway(s, T0 + 24 * 3600_000).state
@@ -255,14 +261,14 @@ describe('queued trips', () => {
   })
 
   it('caps the run at one tank of fuel', () => {
-    const s = newGame(5, T0)
+    const s = harbourGame(5, T0)
     const id = s.player.ownedBoats[0].id
     expect(() => assignRoute(s, id, ROUTES[0].id, T0, 5)).toThrow()
     expect(() => assignRoute(s, id, ROUTES[0].id, T0, 0)).toThrow()
   })
 
   it('recall finishes the current trip and comes home', () => {
-    let s = newGame(5, T0)
+    let s = harbourGame(5, T0)
     const id = s.player.ownedBoats[0].id
     s = assignRoute(s, id, ROUTES[1].id, T0, 4)
     s = recallBoat(s, id)
@@ -274,7 +280,7 @@ describe('queued trips', () => {
 
 describe('sinking and lost trips', () => {
   it('sinks at 0, pays nothing, and can be salvaged', () => {
-    let s = newGame(5, T0)
+    let s = harbourGame(5, T0)
     const id = s.player.ownedBoats[0].id
     s.player.ownedBoats[0].condition = 1
     const t = timeWith(s, ROUTES[1].id, 'choppy')
@@ -291,7 +297,7 @@ describe('sinking and lost trips', () => {
   })
 
   it('never leaves a fleet stuck on the seabed', () => {
-    const s = newGame(5, T0)
+    const s = harbourGame(5, T0)
     for (const b of s.player.ownedBoats) b.state = 'sunk'
     s.player.coins = 30
     expect(salvageQuote(s, s.player.ownedBoats[0].id)).toBe(30)
@@ -300,7 +306,7 @@ describe('sinking and lost trips', () => {
   it('storms sometimes take the cargo: no pay, no parts, home at low condition', () => {
     let lostSeen = 0
     for (let seed = 1; seed <= 60 && lostSeen === 0; seed++) {
-      let s = newGame(seed, T0)
+      let s = harbourGame(seed, T0)
       const id = give(s, 'kingfisher') // control: never loses a trip
       // Neutral captains: a superstitious one would (rightly) refuse the storm.
       for (const c of s.player.roster) c.hiddenTraits = ['haggler']
@@ -320,7 +326,7 @@ describe('sinking and lost trips', () => {
 
 describe('parts and drops', () => {
   it('follows the drop table by weather and tier', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const ctx = (classId: string, weather: Weather) => ({
       state: s,
       boat: s.player.ownedBoats[0],
@@ -340,7 +346,7 @@ describe('parts and drops', () => {
   })
 
   it('weights legendary drops toward sets already started', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     s.player.partInventory = ['stormchaser-hull', 'stormchaser-engine']
     const rng = createRng(9)
     let hits = 0
@@ -350,14 +356,14 @@ describe('parts and drops', () => {
   })
 
   it('never offers a set the player has finished', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     give(s, 'stormchaser')
     const rng = createRng(2)
     for (let i = 0; i < 500; i++) expect(pickSet(rng, s, 'legendary', 'cargo')).not.toBe('stormchaser')
   })
 
   it('crafts a legendary from its exact set, instantly and free', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     s.player.partInventory = ['stormchaser-hull', 'stormchaser-engine', 'kingfisher-specialty']
     expect(() => craftBoat(s, 'stormchaser', T0)).toThrow()
     s.player.partInventory.push('stormchaser-specialty')
@@ -369,7 +375,7 @@ describe('parts and drops', () => {
   })
 
   it('buys a rare boat with coins plus its own rare part', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     s.player.coins = 5000
     expect(() => buyBoat(s, 'pelican', T0)).toThrow()
     s.player.partInventory = ['pelican-hull']
@@ -379,7 +385,7 @@ describe('parts and drops', () => {
   })
 
   it('scraps standard parts for coins', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     s.player.partInventory = ['std-cargo-hull', 'std-cargo-hull', 'pelican-hull']
     const after = scrapStandardParts(s)
     expect(after.player.coins).toBe(STARTING_COINS + 2 * STANDARD_SCRAP_VALUE)
@@ -387,7 +393,7 @@ describe('parts and drops', () => {
   })
 
   it('melts three spare copies into one re-roll of the same rarity and slot', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     s.player.partInventory = ['pelican-hull', 'pelican-hull', 'pelican-hull', 'tin-pail-hull', 'tin-pail-hull']
     expect(meltGroups(s)).toHaveLength(1)
     const after = meltSpares(s, 'rare', 'hull', 'cargo', T0)
@@ -399,7 +405,7 @@ describe('parts and drops', () => {
 
 describe('abilities', () => {
   it('The Errand halves trip time; Mirabel sells at 1.5 demand', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const errand = give(s, 'the-errand')
     const taxi = s.player.ownedBoats[1].id
     expect(quoteVoyage(s, errand, ROUTES[1].id, T0).durationMs).toBeLessThan(quoteVoyage(s, taxi, ROUTES[1].id, T0).durationMs * 0.6)
@@ -408,7 +414,7 @@ describe('abilities', () => {
   })
 
   it('Tin Pail repairs at half cost', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     s.player.coins = 100_000
     const pail = give(s, 'tin-pail')
     s.player.ownedBoats.find((b) => b.id === pail)!.condition = 50
@@ -427,19 +433,19 @@ describe('abilities', () => {
   })
 
   it('Grand Dame lifts payouts while docked; Pageant lifts fleet demand', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const dinghy = s.player.ownedBoats[0].id
     const before = quoteVoyage(s, dinghy, ROUTES[3].id, T0).payout
     give(s, 'grand-dame')
     expect(quoteVoyage(s, dinghy, ROUTES[3].id, T0).payout).toBeGreaterThan(before)
-    const s2 = newGame(1, T0)
+    const s2 = harbourGame(1, T0)
     const d0 = quoteVoyage(s2, dinghy, ROUTES[3].id, T0).demand
     give(s2, 'pageant')
     expect(quoteVoyage(s2, dinghy, ROUTES[3].id, T0).demand).toBeCloseTo(d0 * 1.1)
   })
 
   it('Saint Elmo turns her route to storm', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     const t = timeWith(s, ROUTES[2].id, 'calm')
     const elmo = give(s, 'saint-elmo')
     s = assignRoute(s, elmo, ROUTES[2].id, t)
@@ -447,7 +453,7 @@ describe('abilities', () => {
   })
 
   it('The Ghost only leaves between midnight and 4am', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const ghost = give(s, 'the-ghost')
     const noon = new Date(2026, 0, 5, 12).getTime()
     const night = new Date(2026, 0, 5, 2).getTime()
@@ -456,7 +462,7 @@ describe('abilities', () => {
   })
 
   it('The Cormorant earns while docked', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     give(s, 'the-cormorant')
     const after = settle(s, T0 + 3600_000)
     expect(after.player.coins).toBeGreaterThan(STARTING_COINS)
@@ -465,7 +471,7 @@ describe('abilities', () => {
 
 describe('fleet actions', () => {
   it('gives every new boat a nickname nobody else in the fleet has', () => {
-    let s = newGame(3, T0)
+    let s = harbourGame(3, T0)
     s.player.coins = 1e6
     s.player.maxTierReached = 6 // a big enough harbour for 30 more boats
     for (let i = 0; i < 30; i++) s = buyBoat(s, 'skiff', T0)
@@ -473,19 +479,89 @@ describe('fleet actions', () => {
     expect(new Set(names).size).toBe(names.length)
   })
 
-  it('starts with one small cargo and one small passenger boat, and one captain', () => {
+  it('starts with coins for a starter boat, no captain, and a keen one on the quay', () => {
     const s = newGame(3, T0)
-    expect(s.player.ownedBoats.map((b) => b.classId)).toEqual(['dinghy-hauler', 'water-taxi'])
-    expect(s.player.roster).toHaveLength(1)
-    expect(s.player.roster[0].reputation).toBe(1)
-    expect(s.player.ownedBoats[0].captainId).toBe(s.player.roster[0].id)
-    // The second boat can't sail until someone is hired.
-    expect(quoteVoyage(s, s.player.ownedBoats[1].id, ROUTES[0].id, T0).blocked).toBe('No captain aboard')
-    expect(() => assignRoute(s, s.player.ownedBoats[1].id, ROUTES[0].id, T0)).toThrow(/captain/)
+    expect(s.player.ownedBoats).toHaveLength(0)
+    expect(s.player.roster).toHaveLength(0)
+    expect(s.player.coins).toBe(STARTING_COINS)
+    // The first boat is a starter, and the starters are all the shipyard offers until then.
+    expect(shopClasses(s).map((c) => c.id)).toEqual(['dinghy-hauler', 'water-taxi'])
+    expect(shopClasses(s).every((c) => c.price <= STARTING_COINS)).toBe(true)
+    const keen = s.recruitPool.recruits[0]
+    expect(keen.reputation).toBe(1)
+    expect(keen.courting!.yours).toBe(KEEN_YOURS)
+    // The boat and the keen captain's fee both fit in what a new harbour has.
+    expect(STARTER_PRICE + termsFee(keen.fee, keen.courting)).toBeLessThanOrEqual(STARTING_COINS)
+    const after = buyBoat(s, 'water-taxi', T0)
+    expect(shopClasses(after).some((c) => c.starter)).toBe(false)
+    expect(() => buyBoat(after, 'dinghy-hauler', T0)).toThrow(/first boat/)
+  })
+
+  it('walks a new player through a first boat, a first captain and a first trip', () => {
+    let s = newGame(5, T0)
+    expect(guideStep(s, T0)).toEqual({ id: 'buy' })
+    s = buyBoat(s, 'dinghy-hauler', T0)
+    const step = guideStep(s, T0)
+    expect(step).toMatchObject({ id: 'court', next: 'drink' })
+    const id = (step as { recruitId: string }).recruitId
+    s = court(s, id, 'drink', T0)
+    expect(guideStep(s, T0)).toMatchObject({ id: 'court', next: 'harbour' })
+    s = court(s, id, 'harbour', T0)
+    expect(guideStep(s, T0)).toMatchObject({ id: 'court', next: 'sign' })
+    s = hireCaptain(s, id, T0)
+    expect(s.player.coins).toBeGreaterThanOrEqual(0)
+    const boat = s.player.ownedBoats[0].id
+    expect(guideStep(s, T0)).toEqual({ id: 'aboard', captainId: id, boatId: boat })
+    s = assignCaptain(s, id, boat)
+    expect(guideStep(s, T0)).toEqual({ id: 'send', boatId: boat })
+    s = assignRoute(s, boat, s.routes[0].id, T0, 1)
+    expect(guideStep(s, T0)).toEqual({ id: 'farewell' })
+    // Home again, she stays done.
+    s = settle(s, T0 + 3 * 3600_000)
+    expect(guideStep(s, T0 + 3 * 3600_000)).toEqual({ id: 'farewell' })
+    expect(guideStep(endGuide(s), T0)).toBeNull()
+  })
+
+  it('keeps someone keen on the quay until a new harbour has two captains', () => {
+    // Nobody courted: the keen captain signs with a rival, and another keen one arrives.
+    let s = newGame(7, T0)
+    const first = s.recruitPool.recruits[0].id
+    let t = T0 + KEEN_DECIDES_MS + 60_000
+    s = settle(s, t)
+    expect(s.recruitPool.recruits.some((c) => c.id === first)).toBe(false)
+    const keen = (g: GameState) => g.recruitPool.recruits.filter((c) => c.courting!.yours >= KEEN_YOURS)
+    expect(keen(s)).toHaveLength(1)
+    expect(s.recruitPool.recruits[0]).toBe(keen(s)[0])
+    // Win two over; then the quay goes back to its usual faces.
+    for (let i = 0; i < 2; i++) {
+      const id = s.recruitPool.recruits[0].id
+      s = hireCaptain(court(court(s, id, 'drink', t), id, 'harbour', t), id, t)
+      t += 60_000
+      s = settle(s, t)
+    }
+    expect(s.player.roster).toHaveLength(2)
+    expect(keen(s)).toHaveLength(0)
+  })
+
+  it('the harbourmaster gives his old boat when your first boat sails', () => {
+    let s = buyBoat(newGame(9, T0), 'water-taxi', T0)
+    s.player.coins += 1000
+    const id = s.recruitPool.recruits[0].id
+    s = hireCaptain(court(court(s, id, 'drink', T0), id, 'harbour', T0), id, T0)
+    s = assignCaptain(s, id, s.player.ownedBoats[0].id)
+    s = assignRoute(s, s.player.ownedBoats[0].id, s.routes[0].id, T0, 1)
+    expect(s.player.ownedBoats.map((b) => b.classId)).toEqual(['water-taxi', 'dinghy-hauler'])
+    expect(s.player.ownedBoats[1].captainId).toBeNull()
+    expect(s.player.oldBoatDue).toBeUndefined()
+    // Once only, and someone keen is waiting for her.
+    expect(s.recruitPool.recruits[0].courting!.yours).toBeGreaterThanOrEqual(KEEN_YOURS)
+    s = settle(s, T0 + 3 * 3600_000)
+    s = assignRoute(s, s.player.ownedBoats[0].id, s.routes[0].id, T0 + 3 * 3600_000, 1)
+    expect(s.player.ownedBoats).toHaveLength(2)
   })
 
   it('buys and sells commons at 50%', () => {
-    let s = newGame(3, T0)
+    let s = harbourGame(3, T0)
     s.player.coins = 2500
     s = buyBoat(s, 'skiff', T0)
     expect(s.player.coins).toBe(500)
@@ -494,16 +570,16 @@ describe('fleet actions', () => {
   })
 
   it('refuses to sell the last boat or buy a starter', () => {
-    let s = newGame(3, T0)
+    let s = harbourGame(3, T0)
     s = sellBoat(s, s.player.ownedBoats[1].id, T0)
     expect(() => sellBoat(s, s.player.ownedBoats[0].id, T0)).toThrow()
-    expect(() => buyBoat(s, 'dinghy-hauler', T0)).toThrow()
+    expect(() => buyBoat(s, 'dinghy-hauler', T0)).toThrow(/first boat/)
   })
 })
 
 describe('save', () => {
   it('round-trips and rejects junk', () => {
-    const s = newGame(11, T0)
+    const s = harbourGame(11, T0)
     expect(deserialize(serialize(s))).toEqual(s)
     expect(deserialize('{nope')).toBeNull()
     expect(deserialize(JSON.stringify({ ...s, version: 999 }))).toBeNull()
@@ -517,7 +593,7 @@ function wonOver(s: GameState) {
 
 describe('deckhands', () => {
   it('bigger boats need hands from the tavern; short-handed trips run longer', () => {
-    let s = newGame(9, T0)
+    let s = harbourGame(9, T0)
     const id = give(s, 'coastal-trawler') // tier 3: needs 2 hands
     average(s)
     const cls = getBoatClass('coastal-trawler')
@@ -551,7 +627,7 @@ describe('deckhands', () => {
   })
 
   it("a hand's trait counts in the true quote, and in the player's only once known", () => {
-    let s = newGame(9, T0)
+    let s = harbourGame(9, T0)
     const id = give(s, 'harbor-skiff')
     s.player.coins = 100_000
     average(s)
@@ -565,7 +641,7 @@ describe('deckhands', () => {
   })
 
   it('crew change ships only with both boats docked at home', () => {
-    let s = newGame(9, T0)
+    let s = harbourGame(9, T0)
     const a = give(s, 'coastal-trawler')
     const b = give(s, 'coastal-trawler')
     s.player.coins = 100_000
@@ -598,7 +674,7 @@ describe('deckhands', () => {
   })
 
   it('hands gain voyages on every completed trip, and show their trait in time', () => {
-    let s = newGame(9, T0)
+    let s = harbourGame(9, T0)
     const id = give(s, 'harbor-skiff')
     s.player.coins = 100_000
     wonOver(s)
@@ -618,7 +694,7 @@ describe('deckhands', () => {
   })
 
   it('a drink reveals a hand; old saves get real hands for their count', () => {
-    let s = newGame(9, T0)
+    let s = harbourGame(9, T0)
     const h = s.tavern!.hands[0]
     const watches = s.recruitPool.watchesLeft
     s = buyDrink(s, h.id, T0)
@@ -626,7 +702,7 @@ describe('deckhands', () => {
     expect(s.recruitPool.watchesLeft).toBe(watches - 1)
     expect(handView(s.tavern!.hands[0]).known).not.toBeNull()
 
-    const old = newGame(9, T0)
+    const old = harbourGame(9, T0)
     const oid = give(old, 'coastal-trawler')
     old.player.ownedBoats.find((b) => b.id === oid)!.hands = 2
     delete old.player.deckhands
@@ -638,7 +714,7 @@ describe('deckhands', () => {
   it('the tavern sometimes has a captain two anchors above the quay', () => {
     let rare = 0
     for (let seed = 1; seed <= 300; seed++) {
-      const c = newGame(seed, T0).tavern!.captain
+      const c = harbourGame(seed, T0).tavern!.captain
       if (c) {
         rare++
         expect(c.rare).toBe(true)
@@ -660,7 +736,7 @@ describe('lost at sea', () => {
   }
 
   it("loses the captain if she isn't raised within the limit; the wreck stays", () => {
-    const s = newGame(3, T0)
+    const s = harbourGame(3, T0)
     const b = sinkFirst(s)
     const captainId = b.captainId!
     expect(adriftDeadline(s, b)).toBe(T0 + CAPTAIN_ADRIFT_MS)
@@ -675,7 +751,7 @@ describe('lost at sea', () => {
   })
 
   it('raising her in time keeps the captain; bonded captains wait with their ship', () => {
-    let s = newGame(3, T0)
+    let s = harbourGame(3, T0)
     const b = sinkFirst(s)
     const captainId = b.captainId!
     s.player.coins = 10_000
@@ -683,7 +759,7 @@ describe('lost at sea', () => {
     s = settle(s, T0 + 2 * CAPTAIN_ADRIFT_MS)
     expect(s.player.roster.some((c) => c.id === captainId)).toBe(true)
 
-    const t = newGame(3, T0)
+    const t = harbourGame(3, T0)
     const w = sinkFirst(t)
     t.player.roster.find((c) => c.id === w.captainId)!.bonded = true
     expect(adriftDeadline(t, w)).toBeNull()
@@ -693,7 +769,7 @@ describe('lost at sea', () => {
 
 describe('charting the map', () => {
   it('starts with the bay; trips to its outer ports chart the Fogbanks open', () => {
-    let s = newGame(4, T0)
+    let s = harbourGame(4, T0)
     expect(s.routes.map((r) => r.portB)).toEqual(['gullwick', 'brindle', 'cobble', 'farhaven'])
     const boat = s.player.ownedBoats[0]
     expect(() => assignRoute(s, boat.id, 'saltmarsh-mistle', T0)).toThrow(GameError)
@@ -730,7 +806,7 @@ describe('charting the map', () => {
 
 describe('moving home', () => {
   it('buys a harbour office in a town or city; routes then run from there', () => {
-    let s = newGame(4, T0)
+    let s = harbourGame(4, T0)
     expect(() => moveHome(s, 'gullwick', T0)).toThrow(GameError) // a village
     expect(() => moveHome(s, 'greyhollow', T0)).toThrow(GameError) // not charted
     s.player.coins = 100_000
@@ -755,7 +831,7 @@ describe('customizing home', () => {
   const foundAll = (s: GameState): GameState => ({ ...s, player: { ...s.player, keepsakes: KEEPSAKES.map((x) => x.id) } })
 
   it('names and colours the harbour; checks the choices', () => {
-    let s = foundAll(newGame(4, T0))
+    let s = foundAll(harbourGame(4, T0))
     s = styleHome(s, { name: '  Lamplight Wharf ', wall: '#2f5d62', bunting: 2 })
     expect(s.player.homeStyle).toMatchObject({ name: 'Lamplight Wharf', wall: '#2f5d62', bunting: 2 })
     expect(() => styleHome(s, { wall: '#ff00ff' })).toThrow(GameError)
@@ -766,7 +842,7 @@ describe('customizing home', () => {
   })
 
   it('builds the house your way: shape, roof, walls, windows, door, touches', () => {
-    let s = foundAll(newGame(4, T0))
+    let s = foundAll(harbourGame(4, T0))
     s = styleHome(s, { build: 'tower', roofStyle: 'thatch', siding: 'stone', windows: 'round', doorStyle: 'double', door: '#b8423a', trim: '#e9b23c', shutters: '', topper: 'gull' })
     expect(s.player.homeStyle).toMatchObject({ build: 'tower', roofStyle: 'thatch', siding: 'stone', windows: 'round', doorStyle: 'double', door: '#b8423a', trim: '#e9b23c', shutters: '', topper: 'gull' })
     s = styleHome(s, { extras: ['lights', 'porch', 'lights'] })
@@ -777,7 +853,7 @@ describe('customizing home', () => {
   })
 
   it('starts as a bare cottage; every other look is a keepsake found in its own waters', () => {
-    let s = newGame(4, T0)
+    let s = harbourGame(4, T0)
     expect(lookOpen(s, 'build', 'cottage')).toBe(true)
     expect(() => styleHome(s, { build: 'tall' })).toThrow(/still out at sea/)
     expect(() => styleHome(s, { wall: '#2f5d62' })).toThrow(GameError)
@@ -817,7 +893,7 @@ describe('customizing home', () => {
   })
 
   it('an older harbour keeps the looks it already wore', () => {
-    let s = newGame(4, T0)
+    let s = harbourGame(4, T0)
     delete s.player.keepsakes
     s.player.homeStyle = { build: 'tower', wall: '#4a3346', extras: ['lights'] }
     expect(lookOpen(s, 'build', 'tower')).toBe(true)
@@ -827,7 +903,7 @@ describe('customizing home', () => {
   })
 
   it('places earned decorations, one of each, and keeps the rest locked', () => {
-    let s = newGame(4, T0)
+    let s = harbourGame(4, T0)
     expect(decorUnlocked(s, 'flowerboxes')).toBe(true)
     expect(decorUnlocked(s, 'figurehead')).toBe(false)
     expect(() => placeDecor(s, 0, 'figurehead')).toThrow(GameError)

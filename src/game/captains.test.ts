@@ -1,8 +1,9 @@
+import { harbourGame } from './testing'
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Captain, GameState, Weather } from './types'
-import { assignRoute, buyBoat, craftBoat, newGame, quoteVoyage, settle, settleAway, getBoat, isAutomated } from './state'
+import { assignRoute, buyBoat, craftBoat, quoteVoyage, settle, settleAway, getBoat, isAutomated } from './state'
 import {
   assignCaptain,
   buyUpgrade,
@@ -67,7 +68,7 @@ describe('generation', () => {
 
 describe('scouting', () => {
   it('spends watches; the logbook gives a range that holds the truth; the run gives a verdict', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     const r = s.recruitPool.recruits[0]
     expect(s.recruitPool.watchesLeft).toBe(WATCHES_BASE)
     s = scoutRecruit(s, r.id, 'logbook')
@@ -102,7 +103,7 @@ describe('scouting', () => {
   })
 
   it('the pool refreshes every 6 hours with a fresh set of watches', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const first = s.recruitPool.recruits.map((c) => c.id)
     const later = settle(s, T0 + 6 * 3600_000)
     expect(later.recruitPool.recruits.map((c) => c.id)).not.toEqual(first)
@@ -112,7 +113,7 @@ describe('scouting', () => {
 
 describe('hiring and firing', () => {
   it('hires for the fee and fires for severance that grows with voyages', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     s.player.coins = 1e6
     const r = s.recruitPool.recruits[0]
     expect(() => hireCaptain(s, r.id, T0)).toThrow(/weighing up/)
@@ -133,7 +134,7 @@ describe('hiring and firing', () => {
 
 describe('captains at sea', () => {
   it('skill and traits change what a trip pays, and the UI quote only knows what has been proven', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const t = timeWith(s, ROUTES[3].id, 'calm')
     const base = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t, 'true').payout
     const top = Object.fromEntries(SKILL_IDS.map((id) => [id, 100])) as Captain['skills']
@@ -181,7 +182,7 @@ describe('captains at sea', () => {
   })
 
   it('a superstitious captain refuses a storm, and that is how you find out', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     const c = crew(s, 0, { hiddenTraits: ['superstitious', 'haggler'], revealedTraits: [] })
     const t = timeWith(s, ROUTES[2].id, 'storm')
     // The UI quote doesn't know yet, so it doesn't warn.
@@ -199,7 +200,7 @@ describe('captains at sea', () => {
   })
 
   it('captains gain voyages when their boat completes trips', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     const c = crew(s, 0)
     s = assignRoute(s, s.player.ownedBoats[0].id, ROUTES[0].id, timeWith(s, ROUTES[0].id, 'calm'), 3)
     s = settle(s, T0 + 30 * 24 * 3600_000)
@@ -209,7 +210,7 @@ describe('captains at sea', () => {
 
 describe('reputation and boat size', () => {
   it('the quay offers captains around your level', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     expect(s.recruitPool.recruits.every((c) => c.reputation <= 2)).toBe(true)
     s.player.maxTierReached = 5
     const later = settle(s, T0 + 6 * 3600_000)
@@ -217,7 +218,7 @@ describe('reputation and boat size', () => {
   })
 
   it("captains only take boats that suit their standing", () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     s.player.ownedBoats.push({ ...s.player.ownedBoats[1], id: 'big', classId: 'cruise-ship', nickname: 'Big', captainId: null })
     const rookie = captain(3, { id: 'rookie', reputation: 1 })
     const star = captain(4, { id: 'star', reputation: 5 })
@@ -264,7 +265,7 @@ describe('the hidden truth never reaches the UI', () => {
 
 describe('port upgrades', () => {
   it('Berths raise the fleet cap; reaching tiers does too', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     expect(fleetCap(s)).toBe(6)
     s.player.coins = 1e6
     s = buyUpgrade(s, 'berths', T0)
@@ -274,7 +275,7 @@ describe('port upgrades', () => {
   })
 
   it('a full harbour can always step up a tier', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     s.player.coins = 1e6
     for (let i = 0; i < 4; i++) s = buyBoat(s, 'skiff', T0)
     expect(s.player.ownedBoats).toHaveLength(6)
@@ -284,7 +285,7 @@ describe('port upgrades', () => {
   })
 
   it('Scout Office and tier milestones raise the scout level, up to 5', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     s.player.coins = 1e7
     expect(scoutLevel(s)).toBe(1)
     s = buyUpgrade(buyUpgrade(buyUpgrade(s, 'scout-office', T0), 'scout-office', T0), 'scout-office', T0)
@@ -295,7 +296,7 @@ describe('port upgrades', () => {
   })
 
   it('Fuel Depot and Dry Dock lower costs', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     s.player.coins = 1e6
     const t = timeWith(s, ROUTES[3].id, 'calm')
     const before = quoteVoyage(s, s.player.ownedBoats[0].id, ROUTES[3].id, t).payout
@@ -306,7 +307,7 @@ describe('port upgrades', () => {
 
 describe('delegation', () => {
   function veteranHarbor() {
-    let s = newGame(2, T0)
+    let s = harbourGame(2, T0)
     s.player.coins = 1e6
     s.player.maxTierReached = 4
     // A tier-4 boat makes the starters "below your top tier".
@@ -317,7 +318,7 @@ describe('delegation', () => {
   }
 
   it('promotion needs 100 voyages and the right tier', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const c = crew(s, 0, { voyageCount: 99 })
     s.player.maxTierReached = 4
     expect(() => promoteCaptain(s, c.id, 'dockhand', T0)).toThrow()
@@ -354,7 +355,7 @@ describe('delegation', () => {
 describe('managers and crew', () => {
   /** A harbormaster running the dinghy, which has sailed once and is now docked. */
   function managedDinghy() {
-    let s = newGame(2, T0)
+    let s = harbourGame(2, T0)
     s.player.coins = 1e6
     s.player.maxTierReached = 4
     s.player.ownedBoats.push({ ...s.player.ownedBoats[0], id: 'big', classId: 'short-sea-freighter', nickname: 'Big', captainId: null })
@@ -421,7 +422,7 @@ describe('managers and crew', () => {
 
 describe('the Derelict Queen', () => {
   it('arrives with a bonded captain who cannot be fired', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     s.player.partInventory = [...getBoatClass('derelict-queen').requiredParts]
     s = craftBoat(s, 'derelict-queen', T0)
     const queen = s.player.ownedBoats.at(-1)!
@@ -490,7 +491,7 @@ describe('five skills, potential and the ranks above five anchors', () => {
   })
 
   it("a Legend's iron keel keeps her afloat", () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const c = crew(s, 0, { rank: 'legend', rankAbilities: ['iron-keel'] })
     expect(captainMods(c, { track: 'cargo', weather: 'storm', t: T0 }, 'known').noSink).toBe(true)
   })

@@ -108,8 +108,14 @@ export const STORMS_PER_TRIP = 6
 export const HARBOUR_PER_LEVEL = 3
 export const HARBOUR_PER_DECOR = 3
 
-/** A new game's quay has one keen captain: deciding soon, barely courted by anyone else. */
-export const KEEN_DECIDES_MS = 5 * 60 * 1000
+/**
+ * Until you have this many captains, the quay has one keen one: barely courted by anyone else,
+ * and deciding in time for a new player to buy a boat first.
+ */
+export const KEEN_UNTIL_CAPTAINS = 2
+export const KEEN_DECIDES_MS = 30 * 60 * 1000
+/** Keen to sail for you: this share of the usual fee. */
+export const KEEN_FEE_SHARE = 0.5
 export const KEEN_RIVAL_FINISH = 24
 /** They already lean your way: a drink and a walk round the harbour win them over outright. */
 export const KEEN_YOURS = 70

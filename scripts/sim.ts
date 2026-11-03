@@ -136,7 +136,7 @@ function worstDamage(weather: keyof typeof WEATHER, condition: number) {
 }
 
 const isCrafted = (classId: string) => ['legendary', 'mythic'].includes(getBoatClass(classId).rarity)
-const isStarter = (classId: string) => getBoatClass(classId).price === 0 && getBoatClass(classId).rarity === 'common'
+const isStarter = (classId: string) => !!getBoatClass(classId).starter
 const roughWater = (w: string) => w === 'rough' || w === 'storm'
 
 /** What a sensible player does for someone they want: drink, harbour, a boat, terms if pay talks. */
@@ -258,7 +258,9 @@ function playOneTurn(s: GameState, strat: Strategy, t: number, policy: WeatherPo
 function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunResult {
   // Spread starts across the 4-week season cycle so winters are represented.
   const T0 = (seed % 28) * DAY_MS
-  let s = newGame(seed, T0)
+  // The opening every new player makes: a starter boat (cargo or passengers), then the keen
+  // captain on the quay (courted in the first turn like anyone else).
+  let s = buyBoat(newGame(seed, T0), seed % 2 ? 'dinghy-hauler' : 'water-taxi', T0)
   const end = T0 + MINUTES * 60_000
   const res: RunResult = {
     firstPurchaseMin: null,
@@ -278,7 +280,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     captainsHired: 0,
     regionOpenMin: { fogbanks: null, sunward: null, ironcliffs: null, lantern: null },
   }
-  let spent = 0
+  let spent = STARTING_COINS - s.player.coins
   let t = T0
   while (t <= end) {
     const step = settleAway(s, t)
@@ -293,7 +295,6 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
       if (r === 'mythic') res.mythicParts++
     }
     const before = s.player.coins
-    const boatsBefore = s.player.ownedBoats.length
     const craftedBefore = s.player.ownedBoats.filter((b) => isCrafted(b.classId)).length
     s = playOneTurn(s, strat, t, policy, res)
     if (res.firstCraftMin === null && s.player.ownedBoats.filter((b) => isCrafted(b.classId)).length > craftedBefore) {
@@ -302,7 +303,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     spent += Math.max(0, before - s.player.coins)
 
     const min = (t - T0) / 60_000
-    if (res.firstPurchaseMin === null && s.player.ownedBoats.length > boatsBefore) res.firstPurchaseMin = min
+    if (res.firstPurchaseMin === null && s.player.ownedBoats.some((b) => !isStarter(b.classId))) res.firstPurchaseMin = min
     const tier = maxTier(s)
     for (let k = 2; k <= tier; k++) res.tierReachedMin[k] ??= min
     for (const r of Object.keys(res.regionOpenMin)) if (regionOpen(s, r as RegionId)) res.regionOpenMin[r] ??= min

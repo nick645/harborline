@@ -66,7 +66,7 @@ const PAINT = {
 }
 
 function buildOf(cls: BoatClass): Build {
-  if (cls.price === 0) return 'base' // the starters are just small
+  if (cls.starter) return 'base' // the starters are just small
   const r = cls.capacity / TIERS[cls.sizeTier].capacity
   return r > 1.1 ? 'big' : r < 0.9 ? 'fast' : 'base'
 }

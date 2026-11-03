@@ -14,7 +14,6 @@ import {
   CAPTAIN_ADRIFT_MS,
   SALVAGE_CONDITION,
   STANDARD_SCRAP_VALUE,
-  STARTING_BOAT_CLASSES,
   STARTING_COINS,
   WEAR_MULTIPLIERS,
   WEATHER_DAMAGE_SPREAD,
@@ -46,7 +45,7 @@ import {
 import { LEGEND_ABILITIES, MYTHIC_ABILITIES } from './data/captains'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS } from './data/personas'
 import { leadingRival, leaning, rivalName, termsFee } from './courting'
-import { KEEN_DECIDES_MS, KEEN_RIVAL_FINISH, KEEN_YOURS, MANAGER_RIVAL_MAX } from './data/courting'
+import { MANAGER_RIVAL_MAX } from './data/courting'
 import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick } from './rolls'
 import { hooksOf, type TripContext } from './abilities'
 import { routeWeather, weatherSlot } from './weather'
@@ -60,10 +59,8 @@ import {
   captainMods,
   combineMods,
   generateBondedCaptain,
-  generateCaptain,
   migrateCaptain,
   pickPersona,
-  newRecruit,
   getTrait,
   proveTrait,
   recordVoyage,
@@ -97,6 +94,8 @@ export function newGame(seed: number, now: number): GameState {
     version: SAVE_VERSION,
     player: {
       coins: STARTING_COINS,
+      guide: true,
+      oldBoatDue: true,
       scoutingLevel: 1,
       ownedBoats: [],
       partInventory: [],
@@ -115,18 +114,9 @@ export function newGame(seed: number, now: number): GameState {
     recruitPool: { slot: -1, recruits: [], watchesLeft: 0 },
     log: [],
   }
-  for (const classId of STARTING_BOAT_CLASSES) addBoat(state, classId, now)
-  // One green captain to start, aboard the first boat; the second boat waits for a hire.
-  const first = generateCaptain(rng, `c${state.nextCaptainSeq++}`, [1, 1])
-  state.player.roster.push(first)
-  state.player.ownedBoats[0].captainId = first.id
+  // No boats and no captains: the coins buy a starter boat, and the quay has someone keen on
+  // you (see refreshRecruitPool). The harbourmaster walks a new player through both.
   refreshRecruitPool(state, now, scoutLevel(state))
-  // One keen young captain on the quay, already leaning your way and barely known to the rival
-  // lines: a drink and a walk round the harbour win them over. The second boat's first hire,
-  // and the first courtship the player learns on.
-  const keen = newRecruit(rng, `c${state.nextCaptainSeq++}`, [1, 1], now)
-  state.recruitPool.recruits[0] = keen
-  keen.courting = { ...keen.courting!, yours: KEEN_YOURS, arrivedAt: now, decidesAt: now + KEEN_DECIDES_MS, rivals: keen.courting!.rivals.map((r) => ({ ...r, start: 10, finish: KEEN_RIVAL_FINISH })) }
   refreshTavern(state, now)
   refreshPortPools(state, now)
   return state
@@ -285,8 +275,10 @@ export function quoteVoyage(state: GameState, boatId: string, routeId: string, t
   }
 }
 
-export function shopClasses() {
-  return BOAT_CLASSES.filter((c) => (c.rarity === 'common' && c.price > 0) || c.rarity === 'rare')
+/** What the shipyard sells: a harbour with no boats yet picks a starter; after that, the lineup. */
+export function shopClasses(state?: GameState) {
+  if (state && !state.player.ownedBoats.length) return BOAT_CLASSES.filter((c) => c.starter)
+  return BOAT_CLASSES.filter((c) => (c.rarity === 'common' && c.price > 0 && !c.starter) || c.rarity === 'rare')
 }
 
 export function craftableClasses() {
@@ -346,7 +338,21 @@ export function assignRoute(state: GameState, boatId: string, routeId: string, n
   }
   accrueDocked(s, boat, now)
   startTrip(s, boat, routeId, now, 1, trips)
+  if (s.player.oldBoatDue) giveOldBoat(s, now)
   return s
+}
+
+/**
+ * Your first boat has sailed: the harbourmaster hands over his old one, the other starter, and it
+ * needs a captain of its own (mutates).
+ */
+function giveOldBoat(s: GameState, now: number) {
+  delete s.player.oldBoatDue
+  const cls = BOAT_CLASSES.find((c) => c.starter && !s.player.ownedBoats.some((b) => b.classId === c.id))
+  if (!cls || s.player.ownedBoats.length >= fleetCap(s, cls.sizeTier)) return
+  const boat = addBoat(s, cls.id, now)
+  log(s, now, 'info', `The harbourmaster gave you his old ${cls.name}, "${boat.nickname}". She needs a captain`)
+  refreshRecruitPool(s, now, scoutLevel(s))
 }
 
 /** Let the current trip finish, then bring the boat home instead of running the rest. */
@@ -370,6 +376,7 @@ export function buyBoat(state: GameState, classId: string, now: number): GameSta
   const cls = getBoatClass(classId)
   if (cls.rarity === 'legendary' || cls.rarity === 'mythic') throw new GameError(`${cls.name} can only be crafted`)
   if (cls.price <= 0) throw new GameError('Not for sale')
+  if (cls.starter && state.player.ownedBoats.length) throw new GameError('Starter boats are only sold as a first boat')
   if (state.player.coins < cls.price) throw new GameError('Not enough coins')
   if (!hasParts(state.player.partInventory, cls.requiredParts)) throw new GameError(`Needs ${cls.requiredParts.map(partName).join(', ')}`)
   checkFleetRoom(state, cls.sizeTier)
@@ -564,7 +571,8 @@ export function log(s: GameState, at: number, kind: LogKind, text: string) {
   if (s.log.length > LOG_LIMIT) s.log.length = LOG_LIMIT
 }
 
-function addBoat(s: GameState, classId: string, now: number): Boat {
+/** Put a boat in the harbour, skipping the shipyard (mutates; internal, and for tests). */
+export function addBoat(s: GameState, classId: string, now: number): Boat {
   const boat: Boat = {
     id: `b${s.nextBoatSeq++}`,
     classId,

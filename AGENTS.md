@@ -84,8 +84,14 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
 
 ## Design decisions the user made (they override the spec)
 
-- Start: 500 coins, a Dinghy Hauler (cargo) and a Water Taxi (passenger), and ONE 1-anchor
-  captain. Every boat needs a captain to sail, managed boats included.
+- Start (user-approved 2026-11-03): no boats and no captain, just 750 coins. Wick the
+  harbourmaster walks a new player through it (`src/game/guide.ts`, phone `guideLine.ts`): buy a
+  starter (Dinghy Hauler or Water Taxi, 400c, sold only as a first boat), court the keen captain on
+  the quay (drink, then a walk round the harbour), sign them, put them aboard, send her out. When
+  the first boat sails, Wick gives you his old boat (the other starter), and the quay keeps a keen
+  captain (half fee) until a new harbour has two. Every boat needs a captain to sail, managed boats
+  included. Starter capacity 5 and the half fee are Claude's picks to hold pacing: sim (6 h) first
+  purchase 59 → 47 min, tier 2 5.3 → 4.8 h (settle-in) / 4.9 → 4.5 h (wide).
 - Pacing targets: first purchase (a tier-1 boat) after 30–60 min of play; first tier-2 boat after
   4–5 h. Tier-1 boats cost 2,000c, tier-2 22,000c.
 - No auto-pilot for hand-run boats: players queue 1..N trips (N = fuel tank); trips run at full

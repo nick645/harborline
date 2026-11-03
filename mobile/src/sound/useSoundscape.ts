@@ -28,6 +28,7 @@ function cueFor(e: LogEntry): Sfx | null {
       return null
     case 'info':
       if (/finished charting/.test(e.text)) return 'bell'
+      if (/harbourmaster gave you/.test(e.text)) return 'find'
       if (/chose your line|signed on with/.test(e.text)) return 'signed'
       return null
   }

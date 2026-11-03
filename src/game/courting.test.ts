@@ -1,6 +1,7 @@
+import { harbourGame } from './testing'
 import { describe, expect, it } from 'vitest'
 import type { Captain, GameState } from './types'
-import { newGame, settle } from './state'
+import { settle } from './state'
 import { court, courtingOf, hireCaptain } from './crew'
 import { courtingView, leadingRival, rivalStanding } from './courting'
 import { newRecruit } from './captains'
@@ -22,7 +23,7 @@ function recruit(s: GameState, wants: WantId[]): Captain {
 
 describe('courting', () => {
   it('rivals gain ground over time, and the strongest finishes where it was set to', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const c = recruit(s, ['pay']).courting!
     const r = c.rivals[0]
     expect(rivalStanding(c, r, c.arrivedAt)).toBe(r.start)
@@ -31,7 +32,7 @@ describe('courting', () => {
   })
 
   it('aimed efforts move people much further than ones they do not care about', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     recruit(s, ['pay', 'company'])
     const before = s.recruitPool.recruits[0].courting!.yours
     s = court(s, 'r1', 'terms', T0)
@@ -39,7 +40,7 @@ describe('courting', () => {
     expect(afterPay - before).toBeGreaterThan(15)
     expect(s.recruitPool.recruits[0].courting!.known).toContain('pay')
 
-    let t = newGame(1, T0)
+    let t = harbourGame(1, T0)
     recruit(t, ['company', 'storms'])
     const b2 = t.recruitPool.recruits[0].courting!.yours
     t = court(t, 'r1', 'terms', T0)
@@ -49,7 +50,7 @@ describe('courting', () => {
   })
 
   it('a drink tells you something they want, once per watch', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     recruit(s, ['harbour', 'company'])
     const watches = s.recruitPool.watchesLeft
     s = court(s, 'r1', 'drink', T0)
@@ -60,7 +61,7 @@ describe('courting', () => {
   })
 
   it('at their deadline they sign with you if you are level with every rival, and pay their fee', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const c = recruit(s, ['pay'])
     c.courting!.yours = 99
     c.courting!.walked = true // you courted them
@@ -73,7 +74,7 @@ describe('courting', () => {
   })
 
   it('nobody signs with a line that never courted them', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const c = recruit(s, ['pay'])
     c.courting!.yours = 99
     const after = settle(s, c.courting!.decidesAt + 1)
@@ -81,7 +82,7 @@ describe('courting', () => {
   })
 
   it('behind at their deadline, they sign with a rival line and leave the quay', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const c = recruit(s, ['pay'])
     c.courting!.yours = 0
     c.courting!.terms = 1 // you courted them, so the log says where they went
@@ -94,7 +95,7 @@ describe('courting', () => {
   })
 
   it('only someone won over signs before their time is up', () => {
-    let s = newGame(1, T0)
+    let s = harbourGame(1, T0)
     s.player.coins = 1e6
     recruit(s, ['pay'])
     expect(() => hireCaptain(s, 'r1', T0)).toThrow(/weighing up/)
@@ -104,7 +105,7 @@ describe('courting', () => {
   })
 
   it('a hand signs at their deadline: aboard a docked boat, or waiting at home for one at sea', () => {
-    const s = newGame(9, T0)
+    const s = harbourGame(9, T0)
     s.player.coins = 1e6
     s.player.ownedBoats.push({ ...s.player.ownedBoats[0], id: 'big', classId: 'coastal-trawler', nickname: 'Big', captainId: null })
     const h = s.tavern!.hands[0]
@@ -124,7 +125,7 @@ describe('courting', () => {
   })
 
   it('what they really want never reaches the UI', () => {
-    const s = newGame(1, T0)
+    const s = harbourGame(1, T0)
     const c = recruit(s, ['storms', 'harbour'])
     c.courting!.heard = 'pay'
     const v = courtingView(c.courting!, T0) as unknown as Record<string, unknown>
