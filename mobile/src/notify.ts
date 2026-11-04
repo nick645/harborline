@@ -9,6 +9,8 @@ import { upcomingAlerts } from '../../src/game/alerts'
 import { adriftDeadline } from '../../src/game/state'
 import { getPort } from '../../src/game/economy'
 import { WEATHER } from '../../src/game/data/weather'
+import { WEATHER_WORDS, getRegion } from '../../src/game/data/ports'
+import { getPortDef } from '../../src/game/regions'
 import { duration } from '../../src/format'
 
 const PREF_KEY = 'harborline.stormAlerts'
@@ -46,8 +48,12 @@ export async function setAlertsWanted(on: boolean): Promise<boolean> {
 /** The words for an alert, shared by the notification and the in-app card. */
 export function alertText(state: GameState, alert: StormAlert): { title: string; body: string } {
   const names = alert.boatIds.map((id) => state.player.ownedBoats.find((b) => b.id === id)?.nickname ?? 'A boat')
-  const port = getPort(state.routes.find((r) => r.id === alert.routeId)!.portB).name
-  const weather = WEATHER[alert.weather].name
+  const portId = state.routes.find((r) => r.id === alert.routeId)!.portB
+  const port = getPort(portId).name
+  // Named for its climate: a squall off the shoals, a blizzard under the cliffs, a sandstorm.
+  const climate = getRegion(getPortDef(portId).region).climate
+  const word = alert.weather === 'rough' || alert.weather === 'storm' ? WEATHER_WORDS[climate][alert.weather] : WEATHER[alert.weather].name.toLowerCase()
+  const weather = word[0].toUpperCase() + word.slice(1)
   return {
     title: alert.inMs > 0 ? `${weather} reaching ${port} in ${duration(alert.inMs)}` : `${weather} over ${port}`,
     body: `${names.join(', ')} ${names.length === 1 ? 'has' : 'have'} trips queued there. Open Harborline to bring ${names.length === 1 ? 'her' : 'them'} home.`,

@@ -125,7 +125,7 @@ export function VisitScreen(props: Props) {
 
   return (
     <View style={{ flex: 1, gap: 8 }}>
-      <Measure>{(w, h) => <PortScene width={Math.min(w, 720)} height={h} light={lightAt(now)} port={port} />}</Measure>
+      <Measure>{(w, h) => <PortScene width={Math.min(w, 720)} height={h} light={lightAt(now)} port={port} weather={weather ?? 'calm'} />}</Measure>
       <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
         <Title size={24}>{port.name}</Title>
         {weather && <Tag label={WEATHER[weather].name} color={t[weather]} />}

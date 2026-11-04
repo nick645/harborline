@@ -8,9 +8,11 @@
 
 import { Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
-import type { Port } from '../../../src/game/types'
-import type { RegionId } from '../../../src/game/data/ports'
-import type { Light } from './light'
+import type { Port, Weather } from '../../../src/game/types'
+import { STORM, type Light } from './light'
+import { Fall } from './Climate'
+import { CLIMATE_LOOK, GLOOM } from './climateLook'
+import { getRegion, type RegionId } from '../../../src/game/data/ports'
 import { lookFor } from './looks'
 import { REGION_STYLE } from './regionStyle'
 import { Walker } from './Walker'
@@ -29,10 +31,10 @@ const QUAY = 182
 /** How a region builds: house kinds to pick from, roof pitch, trims. */
 const BUILD: Record<RegionId, { kinds: HouseKind[]; pitch: number; trims: string[]; snow?: boolean; lanterns?: boolean }> = {
   bay: { kinds: ['cottage', 'cottage', 'cottage', 'warehouse', 'stone'], pitch: 1, trims: ['#f3e7d8', '#e9dcc4', '#2e1c19'] },
-  fogbanks: { kinds: ['stone', 'stone', 'cottage', 'tall'], pitch: 1.5, trims: ['#c9c4bc', '#e8eef2', '#3f4650'] },
+  fogbanks: { kinds: ['cottage', 'stone', 'cottage', 'tall'], pitch: 1.5, trims: ['#c9c4bc', '#e8eef2', '#3f4650'] },
   sunward: { kinds: ['plaster', 'plaster', 'plaster', 'cottage'], pitch: 0, trims: ['#f3efe6', '#ffffff', '#e9b23c'] },
   ironcliffs: { kinds: ['tall', 'tall', 'stone', 'warehouse'], pitch: 1.7, trims: ['#e8eef2', '#9ec0cf', '#2a2e36'], snow: true },
-  lantern: { kinds: ['tall', 'tall', 'cottage', 'stone'], pitch: 1.4, trims: ['#e9b23c', '#c99a2e', '#2a1e30'], lanterns: true },
+  lantern: { kinds: ['plaster', 'plaster', 'plaster', 'warehouse'], pitch: 0, trims: ['#f0e2c8', '#e9b23c', '#8a4a2a'], lanterns: true },
 }
 
 const FRONT: Record<Port['size'], number> = { village: 4, town: 6, city: 8 }
@@ -45,6 +47,28 @@ function picker(seed: number) {
     s = Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) ^ Math.imul(s ^ (s >>> 13), 0x297a2d39)
     return ((s >>> 0) % 10000) / 10000
   }
+}
+
+/** A pine, its tip at (x, y), h tall. */
+const pine = (x: number, y: number, h: number) =>
+  `M${x} ${y} L ${x - h * 0.22} ${y + h * 0.4} L ${x - h * 0.1} ${y + h * 0.4} L ${x - h * 0.3} ${y + h * 0.75} L ${x - h * 0.12} ${y + h * 0.75} L ${x - h * 0.36} ${y + h} L ${x + h * 0.36} ${y + h} L ${x + h * 0.12} ${y + h * 0.75} L ${x + h * 0.3} ${y + h * 0.75} L ${x + h * 0.1} ${y + h * 0.4} L ${x + h * 0.22} ${y + h * 0.4} Z `
+
+/** A palm, its foot at (x, base), h tall, fronds in one path. */
+function Palm({ x, base, h, lean, trunk, frond }: { x: number; base: number; h: number; lean: number; trunk: string; frond: string }) {
+  const tx = x + lean
+  const ty = base - h
+  return (
+    <Group>
+      <Path path={`M${x} ${base} C ${x + lean * 0.2} ${base - h * 0.5}, ${tx - lean * 0.3} ${ty + h * 0.2}, ${tx} ${ty}`} color={trunk} style="stroke" strokeWidth={h * 0.06} strokeCap="round" />
+      <Path
+        path={`M${tx} ${ty} q ${-h * 0.3} ${-h * 0.02} ${-h * 0.42} ${h * 0.2} M${tx} ${ty} q ${h * 0.3} ${-h * 0.02} ${h * 0.42} ${h * 0.2} M${tx} ${ty} q ${-h * 0.18} ${-h * 0.2} ${-h * 0.36} ${-h * 0.12} M${tx} ${ty} q ${h * 0.18} ${-h * 0.2} ${h * 0.36} ${-h * 0.12} M${tx} ${ty} q ${h * 0.04} ${-h * 0.2} ${h * 0.02} ${-h * 0.3}`}
+        color={frond}
+        style="stroke"
+        strokeWidth={h * 0.08}
+        strokeCap="round"
+      />
+    </Group>
+  )
 }
 
 /** What stands far behind the town: the region's skyline. */
@@ -65,10 +89,15 @@ function Backdrop({ region, light, clock }: { region: RegionId; light: Light; cl
   switch (region) {
     case 'bay':
       return <Path path={`M0 ${WATER} L 0 96 C 60 76, 120 80, 170 92 C 230 70, 300 74, 358 88 L 358 ${WATER} Z`} color={far} />
-    case 'fogbanks':
+    case 'fogbanks': {
+      // Forested hills, ridge behind ridge, dark with pines, the fog lying in the valleys.
+      const pines = mix(mix('#24402f', light.skyLow, 0.3), light.silhouette, light.dim * 0.6)
+      let ridge = ''
+      for (let x = -10; x < 370; x += 11) ridge += pine(x + ((x * 7) % 5), 70 + Math.abs(Math.sin(x / 40)) * 22, 26 + ((x * 13) % 9))
       return (
         <Group>
-          <Path path={`M-10 ${WATER} L 20 70 L 60 84 L 100 60 L 150 90 L 200 66 L 250 80 L 300 56 L 368 76 L 368 ${WATER} Z`} color={far} />
+          <Path path={`M-10 ${WATER} L -10 92 C 60 74, 120 84, 180 76 C 240 68, 300 82, 368 74 L 368 ${WATER} Z`} color={far} />
+          <Path path={ridge} color={pines} />
           <Group transform={fogA} opacity={0.6}>
             <RoundedRect x={0} y={84} width={240} height={20} r={10} color="#e8eef2" />
           </Group>
@@ -77,8 +106,17 @@ function Backdrop({ region, light, clock }: { region: RegionId; light: Light; cl
           </Group>
         </Group>
       )
+    }
     case 'sunward':
-      return <Path path={`M0 ${WATER} L 0 116 C 80 104, 160 110, 240 100 C 290 96, 330 104, 358 106 L 358 ${WATER} Z`} color={far} />
+      // Green headlands and palms leaning out over the water.
+      return (
+        <Group>
+          <Path path={`M0 ${WATER} L 0 112 C 80 96, 160 104, 240 94 C 290 90, 330 98, 358 100 L 358 ${WATER} Z`} color={mix(mix('#5a9a5a', light.skyLow, 0.3), light.silhouette, light.dim * 0.6)} />
+          {[16, 46, 300, 334].map((x, i) => (
+            <Palm key={x} x={x} base={WATER - 4} h={46 + (i % 2) * 12} lean={i < 2 ? 8 : -8} trunk={mix('#8a5a3a', light.silhouette, light.dim * 0.6)} frond={mix('#3f8a5a', light.silhouette, light.dim * 0.6)} />
+          ))}
+        </Group>
+      )
     case 'ironcliffs':
       return (
         <Group>
@@ -87,21 +125,30 @@ function Backdrop({ region, light, clock }: { region: RegionId; light: Light; cl
           <Path path={snow} color="#ffffff" opacity={0.7} />
         </Group>
       )
-    case 'lantern':
+    case 'lantern': {
+      // Red-rock mesas behind rolling dunes, date palms at an oasis, lanterns strung at night.
+      const rock = mix(mix('#b8603a', light.skyLow, 0.35), light.silhouette, light.dim * 0.6)
+      const dune = mix(mix('#e8c48a', light.skyLow, 0.2), light.silhouette, light.dim * 0.6)
       return (
         <Group>
-          <Path path={`M0 ${WATER} L 0 100 L 60 90 L 120 104 L 200 84 L 280 98 L 358 88 L 358 ${WATER} Z`} color={far} />
-          {[40, 320].map((x) => (
-            <Group key={x}>
-              <Rect x={x - 3} y={60} width={6} height={40} color={shade(far, 0.3)} />
-              <Rect x={x - 6} y={52} width={12} height={9} color="#ffb054" />
-              <Circle cx={x} cy={56} r={18}>
-                <RadialGradient c={vec(x, 56)} r={18} colors={['#ffb05477', '#ffb05400']} />
-              </Circle>
-            </Group>
+          <Path path={`M-10 ${WATER} L -10 84 L 40 84 L 52 70 L 104 70 L 116 86 L 220 90 L 236 64 L 300 64 L 312 82 L 368 86 L 368 ${WATER} Z`} color={rock} />
+          <Path path={`M60 70 h 40 M240 64 h 56`} color={shade(rock, 0.25)} style="stroke" strokeWidth={2} />
+          <Path path={`M-10 ${WATER} L -10 118 C 50 100, 110 112, 170 104 C 230 96, 300 112, 368 104 L 368 ${WATER} Z`} color={dune} />
+          <Path path={`M40 112 C 80 104, 120 108, 150 106 M210 100 C 250 98, 300 106, 340 104`} color={mix(dune, '#ffffff', 0.25)} style="stroke" strokeWidth={1.2} opacity={0.6} />
+          {[22, 330].map((x, i) => (
+            <Palm key={x} x={x} base={WATER - 2} h={40} lean={i ? -6 : 6} trunk={mix('#8a5a3a', light.silhouette, light.dim * 0.6)} frond={mix('#5a7a3a', light.silhouette, light.dim * 0.6)} />
           ))}
+          {light.stars > 0 && (
+            <Group>
+              <Path path={`M0 96 Q 90 112 180 98 Q 270 86 358 100`} color="#3a2420" style="stroke" strokeWidth={0.6} />
+              {Array.from({ length: 14 }, (_, i) => (
+                <Circle key={i} cx={12 + i * 25} cy={i < 7 ? 96 + Math.sin((i / 7) * Math.PI) * 10 : 98 - Math.sin(((i - 7) / 7) * Math.PI) * 8} r={2} color="#ffb054" />
+              ))}
+            </Group>
+          )}
         </Group>
       )
+    }
   }
 }
 
@@ -124,10 +171,11 @@ function Moored({ x, y, color, mast, clock, i, lit }: { x: number; y: number; co
   )
 }
 
-export function PortScene({ width, height, light, port }: { width: number; height?: number; light: Light; port: Port }) {
+export function PortScene({ width, height, light, port, weather = 'calm' }: { width: number; height?: number; light: Light; port: Port; weather?: Weather }) {
   const clock = useSceneClock()
   const st = REGION_STYLE[port.region]
   const build = BUILD[port.region]
+  const climate = getRegion(port.region).climate
   const seed = hash(port.id)
   const sky = mix(light.sky, st.tint, st.tintAmount)
   const skyLow = mix(light.skyLow, st.tint, st.tintAmount)
@@ -304,6 +352,10 @@ export function PortScene({ width, height, light, port }: { width: number; heigh
             offset={i * 1300}
           />
         ))}
+
+        {/* The weather over the town: its climate's rain, snow or dust, and the sky sinking with it */}
+        <Rect x={-60} y={-200} width={W + 120} height={H + 260} color={climate === 'temperate' ? STORM.veil : CLIMATE_LOOK[climate].veil} opacity={GLOOM[weather] * 0.55} />
+        <Fall climate={climate} weather={weather} clock={clock} />
       </Group>
     </Stage>
   )

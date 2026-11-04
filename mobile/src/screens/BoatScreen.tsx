@@ -11,6 +11,7 @@ import { handCount } from '../../../src/game/hands'
 import { getPortDef, homeOf } from '../../../src/game/regions'
 import { routeWeather } from '../../../src/game/weather'
 import { WEATHER } from '../../../src/game/data/weather'
+import { getRegion } from '../../../src/game/data/ports'
 import { coins, duration, percent } from '../../../src/format'
 import { BoatScene, SCENE_H, SCENE_W, type BoatMode } from '../art/BoatScene'
 import { SunkScene } from '../art/SunkScene'
@@ -33,6 +34,8 @@ export function BoatScreen(props: BoatProps) {
   const weather: Weather = v?.weatherAtStart ?? (boat.currentRoute ? routeWeather(game, boat.currentRoute, now) : 'calm')
   const route = v ? game.routes.find((r) => r.id === v.routeId) : null
   const dest = route ? getPort(route.portB).name : null
+  // The weather looks like where she's headed (home waters while she's in port).
+  const climate = getRegion(getPortDef(route?.portB ?? homeOf(game)).region).climate
   const progress = v ? Math.min(1, Math.max(0, (now - v.startedAt) / v.durationMs)) : 0
   const [panel, setPanel] = useState<Panel>(boat.captainId || boat.state === 'sunk' ? 'send' : 'crew')
   // Dev only: preview the scene in any weather.
@@ -68,6 +71,7 @@ export function BoatScreen(props: BoatProps) {
                 captain={look}
                 condition={boat.condition}
                 hands={handCount(game, boat.id)}
+                climate={climate}
               />
             )}
             <View style={[styles.pill, { backgroundColor: 'rgba(29,20,32,0.75)' }]}>

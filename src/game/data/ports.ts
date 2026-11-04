@@ -1,4 +1,5 @@
 import type { Port, Weather } from '../types'
+import type { Season } from './weather'
 
 export const HOME_PORT_ID = 'saltmarsh'
 
@@ -6,6 +7,18 @@ export const HOME_PORT_ID = 'saltmarsh'
 export const MAP_UNITS_PER_DISTANCE = 40
 
 export type RegionId = 'bay' | 'fogbanks' | 'sunward' | 'ironcliffs' | 'lantern'
+
+/** The land and sky each region has (user-approved 2026-11-03). */
+export type Climate = 'temperate' | 'forest' | 'tropical' | 'snow' | 'desert'
+
+/** What the weather is called in each climate when it turns rough, and in a storm. */
+export const WEATHER_WORDS: Record<Climate, { rough: string; storm: string }> = {
+  temperate: { rough: 'a gale', storm: 'a storm' },
+  forest: { rough: 'driving rain', storm: 'a tempest' },
+  tropical: { rough: 'a squall', storm: 'a hurricane' },
+  snow: { rough: 'a snow squall', storm: 'a blizzard' },
+  desert: { rough: 'a dust squall', storm: 'a sandstorm' },
+}
 
 export interface RegionDef {
   id: RegionId
@@ -16,8 +29,11 @@ export interface RegionDef {
   chart: number
   /** Trips to these ports chart this region. */
   chartedFrom: string[]
+  climate: Climate
   /** How this region's sea leans against the season's odds (multipliers; 1 = no change). */
   weather: Record<Weather, number>
+  /** A season when this climate is at its worst (or best): a further lean on top. */
+  seasons?: Partial<Record<Season, Partial<Record<Weather, number>>>>
   /** Pay multiplier. Long trips waste less on (flat) fuel, so far waters pay a little less
    * per load to keep pay per minute level with the bay; they still pay far more per trip. */
   payout: number
@@ -32,25 +48,32 @@ export const REGIONS: RegionDef[] = [
     blurb: 'Home waters: a lighthouse, a tavern and five ports you know by heart.',
     chart: 0,
     chartedFrom: [],
+    climate: 'temperate',
     weather: { calm: 1, choppy: 1, rough: 1, storm: 1 },
     payout: 1,
   },
   {
     id: 'fogbanks',
     name: 'The Fogbanks',
-    blurb: 'Grey stone isles in a sea that rarely sits still. Bells ring in the mist.',
+    blurb: 'Pine-dark isles under rain and drifting fog. Bells ring in the mist.',
     chart: 150,
     chartedFrom: ['cobble', 'farhaven'],
-    weather: { calm: 0.8, choppy: 1.2, rough: 1.2, storm: 1 },
+    climate: 'forest',
+    // Rain more often than not, rarely a dead calm; autumn brings the tempests.
+    weather: { calm: 0.7, choppy: 1.35, rough: 1.2, storm: 0.9 },
+    seasons: { autumn: { rough: 1.2, storm: 1.4 } },
     payout: 0.94,
   },
   {
     id: 'sunward',
     name: 'Sunward Shoals',
-    blurb: 'Bright shallows, painted houses and palms. The calmest water on the coast.',
+    blurb: 'Bright shallows, painted houses and palms. Glassy most of the year, until the summer squalls.',
     chart: 700,
     chartedFrom: ['mistle', 'greyhollow', 'wickstone', 'sealrock'],
+    climate: 'tropical',
+    // The calmest water on the coast, except in summer, when the squalls come through.
     weather: { calm: 1.3, choppy: 1, rough: 0.8, storm: 0.6 },
+    seasons: { summer: { calm: 0.8, rough: 1.5, storm: 2.4 } },
     payout: 0.92,
   },
   {
@@ -59,16 +82,22 @@ export const REGIONS: RegionDef[] = [
     blurb: 'Snow on black cliffs, and storms that come down off the north without warning.',
     chart: 2200,
     chartedFrom: ['coralby', 'driftwood', 'saffron'],
+    climate: 'snow',
+    // The worst water anywhere, and worse still in winter.
     weather: { calm: 0.7, choppy: 1, rough: 1.3, storm: 1.5 },
+    seasons: { winter: { storm: 1.3 } },
     payout: 0.9,
   },
   {
     id: 'lantern',
     name: 'Lantern Reach',
-    blurb: "The far edge of the charts, where they leave a lamp lit in every window.",
+    blurb: 'A desert coast at the edge of the charts: dunes, hot glassy seas, and night markets under a thousand lanterns.',
     chart: 5000,
     chartedFrom: ['holdfast', 'frostgate', 'anvil'],
-    weather: { calm: 0.9, choppy: 1, rough: 1.1, storm: 1.2 },
+    climate: 'desert',
+    // Hot and glassy most days; when it turns, it turns hard: dust squalls and sandstorms.
+    weather: { calm: 1.4, choppy: 0.8, rough: 0.8, storm: 1.2 },
+    seasons: { summer: { calm: 1.2 }, spring: { storm: 1.3 } },
     payout: 0.885,
   },
 ]

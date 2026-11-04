@@ -26,17 +26,18 @@ export function weatherChangesAt(t: number): number {
   return (weatherSlot(t) + 1) * WEATHER_SLOT_MS
 }
 
-const ROUTE_LEAN = new Map(
-  ROUTES.map((r) => [r.id, getRegion(PORTS.find((p) => p.id === r.portB)!.region).weather] as const).filter(([, w]) => w.calm !== 1 || w.storm !== 1),
-)
+const ROUTE_REGION = new Map(ROUTES.map((r) => [r.id, getRegion(PORTS.find((p) => p.id === r.portB)!.region)] as const))
 
 /** The sea's own weather on a route at time t, before any boat ability bends it. */
 export function naturalWeather(seed: number, routeId: string, t: number): Weather {
   const slot = weatherSlot(t)
   const season = SEASON_WEATHER_ODDS[seasonAt(slot * WEATHER_SLOT_MS)]
-  // Each region's sea leans its own way against the season (the home bay doesn't).
-  const lean = ROUTE_LEAN.get(routeId)
-  const odds = lean ? { calm: season.calm * lean.calm, choppy: season.choppy * lean.choppy, rough: season.rough * lean.rough, storm: season.storm * lean.storm } : season
+  // Each region's sea leans its own way against the season (the home bay doesn't), and its
+  // climate has a season of its own: summer squalls in the tropics, autumn tempests in the pines.
+  const region = ROUTE_REGION.get(routeId)
+  const extra = region?.seasons?.[seasonAt(slot * WEATHER_SLOT_MS)] ?? {}
+  const lean = (w: Weather) => (region?.weather[w] ?? 1) * (extra[w] ?? 1)
+  const odds = { calm: season.calm * lean('calm'), choppy: season.choppy * lean('choppy'), rough: season.rough * lean('rough'), storm: season.storm * lean('storm') }
   const total = odds.calm + odds.choppy + odds.rough + odds.storm
   let r = weatherRoll(seed, routeId, slot) * total
   for (const w of ['calm', 'choppy', 'rough', 'storm'] as const) {

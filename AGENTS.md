@@ -160,6 +160,16 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   place, effects from log entries and actions (`mobile/src/sound/`). On by default, silent switch
   mutes, mixes with other apps. Needs `expo-audio` (native: rebuild after adding it).
 
+- Climates and ports (user-approved 2026-11-03): each region has a climate (`climate` in
+  `data/ports.ts`): the bay temperate, the Fogbanks a rainy pine-forest coast, Sunward tropical
+  (calm, but summer squalls), the Ironcliffs snow (worst in winter), Lantern Reach a desert coast
+  (glassy seas, sandstorms). Weather odds lean by climate and season; scenes draw rain, snow or
+  dust and alerts name it (a squall, a blizzard, a sandstorm). Every port is its own town with a
+  landmark (`mobile/src/art/port/`), and leans to cargo or passengers (×1.1/×0.9) with a weekly
+  market day (×1.4) in `data/portLife.ts`. Numbers are Claude's picks. Sim (6 h): first purchase
+  48 min, tier 2 4.4 h (settle-in) / 4.2 h (wide); 40 h (wide): tier 3 11.4 h, tier 4 29.4 h,
+  Sunward 7 h, Ironcliffs 26 h.
+
 ## Originality
 
 The user does not want this to read as a copy of Pocket Planes or of EA's college football

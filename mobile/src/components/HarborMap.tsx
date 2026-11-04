@@ -8,7 +8,7 @@ import { getBoatClass, getPort } from '../../../src/game/economy'
 import { getVoyage } from '../../../src/game/state'
 import { routeWeather, weatherChangesAt } from '../../../src/game/weather'
 import { chartingNext, homeOf, openPorts } from '../../../src/game/regions'
-import { PORTS, REGIONS } from '../../../src/game/data/ports'
+import { PORTS, REGIONS, getRegion, type Climate } from '../../../src/game/data/ports'
 import { WEATHER } from '../../../src/game/data/weather'
 import { duration } from '../../../src/format'
 import { fonts, useTheme } from '../theme'
@@ -25,14 +25,71 @@ function bounds(ports: Port[]) {
   return { x0: Math.min(...xs) - PAD, y0: Math.min(...ys) - PAD, x1: Math.max(...xs) + PAD, y1: Math.max(...ys) + PAD }
 }
 
-/** A soft blob of land under a region's ports. */
-function landBlob(ports: Port[]): string {
-  return ports
-    .map((p, i) => {
-      const r = 70 + ((p.x * 7 + p.y * 3 + i * 31) % 40)
-      return `M${p.x - r} ${p.y + 30} C ${p.x - r} ${p.y - r}, ${p.x + r} ${p.y - r}, ${p.x + r} ${p.y + 30} C ${p.x + r * 0.6} ${p.y + r * 0.8}, ${p.x - r * 0.6} ${p.y + r * 0.8}, ${p.x - r} ${p.y + 30} Z`
-    })
-    .join(' ')
+/** What the land looks like from above in each climate. */
+const LAND: Record<Climate, string> = { temperate: '#6f8a52', forest: '#2f5040', tropical: '#c9c07a', snow: '#d8e0e8', desert: '#d8a868' }
+
+/** The climate drawn on the land round a port: what grows or lies there. `z` grows it with the
+ * chart's zoom, so a far-out view still reads as forest, desert or snow. Map units. */
+function Biome({ climate, x, y, seed, light, z }: { climate: Climate; x: number; y: number; seed: number; light: ReturnType<typeof lightAt>; z: number }) {
+  const c = (hex: string) => mix(hex, light.silhouette, light.dim * 0.5)
+  // A ring of spots round the port, clear of its marker and label.
+  const spots = Array.from({ length: 7 }, (_, i) => {
+    const a = (i / 7) * Math.PI * 2 + (Math.abs(seed) % 100) / 50
+    const r = (62 + ((seed >>> (i * 3)) % 30)) * z
+    return { x: x + Math.cos(a) * r * 1.25, y: y - 14 * z + Math.sin(a) * r * 0.6, s: (0.9 + ((seed >>> (i * 2)) % 5) / 10) * z }
+  }).filter((p) => p.y < y + 14 * z)
+  return (
+    <G>
+      {spots.map((p, i) => {
+        const s = p.s
+        switch (climate) {
+          case 'temperate':
+            return (
+              <G key={i}>
+                <Line x1={p.x} y1={p.y} x2={p.x} y2={p.y - 10 * s} stroke={c('#5a3a2a')} strokeWidth={3 * s} />
+                <Circle cx={p.x} cy={p.y - 16 * s} r={10 * s} fill={c(i % 2 ? '#5a8a4a' : '#6a9a52')} />
+              </G>
+            )
+          case 'forest':
+            return (
+              <G key={i}>
+                <Path d={`M${p.x} ${p.y - 34 * s} L ${p.x - 11 * s} ${p.y} L ${p.x + 11 * s} ${p.y} Z`} fill={c('#24402f')} />
+                <Path d={`M${p.x + 12 * s} ${p.y - 24 * s} L ${p.x + 4 * s} ${p.y + 2} L ${p.x + 20 * s} ${p.y + 2} Z`} fill={c('#2f5040')} />
+              </G>
+            )
+          case 'tropical':
+            return (
+              <G key={i}>
+                <Path d={`M${p.x} ${p.y} q ${3 * s} ${-14 * s} ${-2 * s} ${-28 * s}`} stroke={c('#8a5a3a')} strokeWidth={3 * s} fill="none" strokeLinecap="round" />
+                <Path
+                  d={`M${p.x - 2 * s} ${p.y - 28 * s} q ${-10 * s} ${-2 * s} ${-14 * s} ${6 * s} M${p.x - 2 * s} ${p.y - 28 * s} q ${10 * s} ${-2 * s} ${14 * s} ${6 * s} M${p.x - 2 * s} ${p.y - 28 * s} q ${-4 * s} ${-9 * s} ${-12 * s} ${-6 * s} M${p.x - 2 * s} ${p.y - 28 * s} q ${4 * s} ${-9 * s} ${12 * s} ${-6 * s}`}
+                  stroke={c('#3f8a5a')}
+                  strokeWidth={3.5 * s}
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </G>
+            )
+          case 'snow':
+            return (
+              <G key={i}>
+                <Path d={`M${p.x - 18 * s} ${p.y} L ${p.x} ${p.y - 30 * s} L ${p.x + 18 * s} ${p.y} Z`} fill={c('#3a3f48')} />
+                <Path d={`M${p.x - 7 * s} ${p.y - 18 * s} L ${p.x} ${p.y - 30 * s} L ${p.x + 7 * s} ${p.y - 18 * s} L ${p.x + 3 * s} ${p.y - 20 * s} L ${p.x} ${p.y - 17 * s} L ${p.x - 3 * s} ${p.y - 20 * s} Z`} fill={c('#f3f6fa')} />
+              </G>
+            )
+          case 'desert':
+            return i % 3 === 0 ? (
+              <G key={i}>
+                <Path d={`M${p.x - 16 * s} ${p.y} L ${p.x - 10 * s} ${p.y - 18 * s} L ${p.x + 10 * s} ${p.y - 18 * s} L ${p.x + 16 * s} ${p.y} Z`} fill={c('#b8603a')} />
+                <Line x1={p.x - 10 * s} y1={p.y - 18 * s} x2={p.x + 10 * s} y2={p.y - 18 * s} stroke={c('#8a4a2a')} strokeWidth={2 * s} />
+              </G>
+            ) : (
+              <Path key={i} d={`M${p.x - 20 * s} ${p.y} q ${10 * s} ${-12 * s} ${20 * s} ${-6 * s} q ${10 * s} ${-6 * s} ${20 * s} ${6 * s}`} stroke={c('#e8c48a')} strokeWidth={4 * s} fill="none" strokeLinecap="round" />
+            )
+        }
+      })}
+    </G>
+  )
 }
 
 export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now: number; onOpenPort: (portId: string) => void; box: { w: number; h: number } }) {
@@ -64,6 +121,8 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
   const view = { x: (b.x0 + b.x1) / 2 - vw / 2, y: (b.y0 + b.y1) / 2 - vh / 2 + (next ? 60 * (vw / 1000) : 0), w: vw, h: vh }
   // Sizes in map units that stay the same on screen whatever the zoom.
   const k = vw / 1000
+  // Land and what grows on it swell a little as the chart zooms out, so climates stay legible.
+  const landZ = Math.max(1, Math.min(1.8, k * 0.7))
   const home = getPort(homeOf(game))
   const atSea = game.player.ownedBoats.filter((x) => x.state === 'sailing' || x.state === 'returning')
   const regions = REGIONS.filter((r) => open.some((p) => p.region === r.id))
@@ -88,7 +147,17 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
 
       {/* Land under each open region, in its own colour */}
       {regions.map((r) => (
-        <Path key={r.id} d={landBlob(open.filter((p) => p.region === r.id))} fill={mix(REGION_STYLE[r.id].land, light.silhouette, light.dim * 0.5)} opacity={0.55} />
+        <G key={r.id} opacity={0.8}>
+          {open
+            .filter((p) => p.region === r.id)
+            .map((p, i) => (
+              <Circle key={p.id} cx={p.x + ((i * 37) % 40) - 20} cy={p.y - 10} r={(95 + ((p.x * 7 + p.y * 3) % 30)) * landZ} fill={mix(LAND[r.climate], light.silhouette, light.dim * 0.5)} />
+            ))}
+        </G>
+      ))}
+      {/* What grows or lies on that land: trees, pines, palms, snowy peaks, dunes */}
+      {open.map((p) => (
+        <Biome key={p.id} climate={getRegion(p.region).climate} x={p.x} y={p.y} seed={p.x * 31 + p.y * 7} light={light} z={landZ} />
       ))}
 
       {/* Routes from home, coloured by their weather now */}

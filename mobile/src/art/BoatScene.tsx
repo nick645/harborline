@@ -9,6 +9,9 @@ import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { BoatClass, Weather } from '../../../src/game/types'
 import type { Look } from './looks'
 import { STORM, type Light } from './light'
+import { Fall } from './Climate'
+import { CLIMATE_LOOK } from './climateLook'
+import type { Climate } from '../../../src/game/data/ports'
 import { BoatArt } from './BoatArt'
 import { boatLayout } from './boatGeometry'
 import { useSceneClock } from './clock'
@@ -33,6 +36,8 @@ type Props = {
   condition?: number
   /** Deckhands aboard. */
   hands?: number
+  /** The climate she's sailing in: rain, snow or dust, and what the storm turns the sky. */
+  climate?: Climate
 }
 
 /** How each weather looks. `k` runs 0 (calm) to 3 (storm). */
@@ -85,17 +90,6 @@ function foamPath(amp: number, len: number): string {
   return d
 }
 
-/** Rain streaks in a 358 × 360 tile, a stable scatter. */
-function rainPath(n: number, slant: number, len: number, seed: number): string {
-  let d = ''
-  for (let i = 0; i < n; i++) {
-    const x = ((i * 73 + seed * 31) % 400) - 20
-    const y = (i * 137 + seed * 17) % 360
-    d += `M${x} ${y} l ${-slant} ${len} `
-  }
-  return d
-}
-
 const CLOUDS = [
   'M-40 70 C -20 40, 30 36, 50 56 C 70 26, 130 22, 150 52 C 170 40, 210 44, 214 70 Z',
   'M150 64 C 170 34, 230 30, 250 54 C 270 30, 330 30, 340 58 C 370 54, 390 70, 384 80 L 150 80 Z',
@@ -113,7 +107,7 @@ function usePuff(clock: SharedValue<number>, k: number, x: number, y: number, dr
   }
 }
 
-export function BoatScene({ width, light, weather, mode, cls, captain, condition = 100, hands }: Props) {
+export function BoatScene({ width, light, weather, mode, cls, captain, condition = 100, hands, climate = 'temperate' }: Props) {
   const clock = useSceneClock()
   const s = width / SCENE_W
   const m = MOODS[weather]
@@ -129,13 +123,16 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
   const wind = flip ? 1 : -1
 
   // Colours, sunk toward the storm by the weather's gloom.
-  const g = (c: string, extra = 0) => mix(c, STORM.veil, Math.min(1, m.gloom + extra))
+  // The bay's storms go violet; the snow's icy grey, the desert's dusty ochre.
+  const look = CLIMATE_LOOK[climate]
+  const veil = climate === 'temperate' ? STORM.veil : look.veil
+  const g = (c: string, extra = 0) => mix(c, veil, Math.min(1, m.gloom + extra))
   const sky = g(light.sky)
   const skyLow = g(light.skyLow, 0.05)
   const sea = g(light.sea, -0.1)
   const seaDeep = mix(sea, '#0e0a18', 0.35 + m.k * 0.08)
   const seaLine = g(light.seaLine)
-  const cloud = mix(mix(light.skyLow, '#c9c0cf', 0.4), STORM.cloud, Math.min(1, m.gloom * 1.3))
+  const cloud = mix(mix(light.skyLow, '#c9c0cf', 0.4), climate === 'temperate' ? STORM.cloud : mix(look.veil, '#ffffff', 0.25), Math.min(1, m.gloom * 1.3))
 
   const backSea = useMemo(() => seaPath(m.wave * 0.45, 46, true), [m.wave])
   const midSea = useMemo(() => seaPath(m.wave * 0.7, 64, true), [m.wave])
@@ -143,8 +140,6 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
   const frontLine = useMemo(() => seaPath(m.wave, 92, false), [m.wave])
   const frontFoam = useMemo(() => foamPath(m.wave, 92), [m.wave])
   const midFoam = useMemo(() => foamPath(m.wave * 0.7, 64), [m.wave])
-  const rainNear = useMemo(() => rainPath(m.rain, m.slant * wind * -1, 22, 1), [m.rain, m.slant, wind])
-  const rainFar = useMemo(() => rainPath(Math.round(m.rain * 0.8), m.slant * 0.6 * wind * -1, 12, 7), [m.rain, m.slant, wind])
 
   const run = (len: number, ms: number) => {
     'worklet'
@@ -171,23 +166,6 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
   })
   const flicker = useDerivedValue(() => 0.85 + 0.15 * Math.sin(clock.value / 280))
   const beam = useDerivedValue(() => [{ rotate: Math.sin(clock.value / 1400) * 0.6 }])
-  const rainNearT = useDerivedValue(() => {
-    const o = (clock.value / 5) % 360
-    return [{ translateX: (o * m.slant * wind * -1) / 22 }, { translateY: o - 360 }]
-  })
-  const rainNearT2 = useDerivedValue(() => {
-    const o = (clock.value / 5) % 360
-    return [{ translateX: (o * m.slant * wind * -1) / 22 }, { translateY: o }]
-  })
-  const rainFarT = useDerivedValue(() => {
-    const o = (clock.value / 9) % 360
-    return [{ translateX: (o * m.slant * 0.6 * wind * -1) / 12 }, { translateY: o - 360 }]
-  })
-  const rainFarT2 = useDerivedValue(() => {
-    const o = (clock.value / 9) % 360
-    return [{ translateX: (o * m.slant * 0.6 * wind * -1) / 12 }, { translateY: o }]
-  })
-
   // Lightning: a strike every few seconds at a different place, a double flash, a bright veil.
   const STRIKE_MS = 4300
   const strikeN = useDerivedValue(() => Math.floor(clock.value / STRIKE_MS))
@@ -256,7 +234,7 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
             ))}
           </Group>
         </Group>
-        {m.lightning && (
+        {m.lightning && look.lightning && (
           <Group>
             <Rect x={0} y={0} width={SCENE_W} height={HORIZON} color={STORM.bolt} opacity={boltGlow} />
             <Path path={bolt} color="#ffe6f2" style="stroke" strokeWidth={2.4} strokeJoin="round" opacity={flash} />
@@ -360,24 +338,9 @@ export function BoatScene({ width, light, weather, mode, cls, captain, condition
           />
         )}
 
-        {/* Rain in two layers, the near one longer and faster. */}
-        {m.rain > 0 && (
-          <Group>
-            <Group transform={rainFarT}>
-              <Path path={rainFar} color={STORM.rain} style="stroke" strokeWidth={0.8} opacity={0.45} />
-            </Group>
-            <Group transform={rainFarT2}>
-              <Path path={rainFar} color={STORM.rain} style="stroke" strokeWidth={0.8} opacity={0.45} />
-            </Group>
-            <Group transform={rainNearT}>
-              <Path path={rainNear} color={STORM.rain} style="stroke" strokeWidth={1.2} opacity={0.7} />
-            </Group>
-            <Group transform={rainNearT2}>
-              <Path path={rainNear} color={STORM.rain} style="stroke" strokeWidth={1.2} opacity={0.7} />
-            </Group>
-          </Group>
-        )}
-        {m.lightning && <Rect x={0} y={0} width={SCENE_W} height={SCENE_H} color="#ffe6f2" opacity={flashVeil} />}
+        {/* Rain, snow or blowing dust, by the climate she's in. */}
+        <Fall climate={climate} weather={weather} clock={clock} wind={wind} />
+        {m.lightning && look.lightning && <Rect x={0} y={0} width={SCENE_W} height={SCENE_H} color="#ffe6f2" opacity={flashVeil} />}
       </Group>
     </Canvas>
   )
