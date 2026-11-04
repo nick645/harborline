@@ -28,6 +28,7 @@ npm test                    # vitest: game logic
 npm run lint                # oxlint (covers mobile/ too)
 npx tsc -b                  # typecheck web + scripts
 npm run sim                 # balance harness (pacing); --mode storms compares weather play styles
+npx tsx scripts/check-map.ts # the chart: every sea lane from home at sea, every port on a shore
 cd mobile && npx expo start --dev-client   # dev server the installed app loads from (port 8081)
 cd mobile && npx tsc --noEmit              # typecheck the phone app
 ```
@@ -169,6 +170,12 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   market day (×1.4) in `data/portLife.ts`. Numbers are Claude's picks. Sim (6 h): first purchase
   48 min, tier 2 4.4 h (settle-in) / 4.2 h (wide); 40 h (wide): tier 3 11.4 h, tier 4 29.4 h,
   Sunward 7 h, Ironcliffs 26 h.
+
+- The chart (user-approved 2026-11-03): a mainland coast (temperate west and south, forest in
+  the north-west, tropical then desert to the east), a snowy northern coast with Frostgate's
+  fjord, and islands for the other ports (`mobile/src/map/geography.ts`; shapes are Claude's).
+  Ports keep their positions; islands fit themselves clear of every lane from Saltmarsh, and
+  `scripts/check-map.ts` checks it. Uncharted regions lie under cloud. Pinch to zoom, drag to pan.
 
 ## Originality
 
