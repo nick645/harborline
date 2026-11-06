@@ -257,7 +257,7 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
                 ))}
                 {Array.from({ length: seated }, (_, i) => {
                   const x = 30 + i * ((BENCH_W - 40) / seated)
-                  return <Figure key={`sit${i}`} look={passenger(seed, i, wet)} x={x} y={seatY - 83} scale={0.86} clock={clock} offset={i * 1300} wind={weather !== 'calm'} />
+                  return <Figure key={`sit${i}`} look={passenger(seed, i, wet)} x={x} y={seatY - 77} scale={0.86} clock={clock} offset={i * 1300} wind={weather !== 'calm'} />
                 })}
                 {/* The seat, then each passenger's knees and shins over its edge */}
                 <Rect x={10} y={seatY - 2} width={BENCH_W + 4} height={8} color={lit('#8a5a3a')} />
@@ -269,14 +269,14 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
                     <Group key={`legs${i}`}>
                       {/* The lap, from under the coat over the seat to the knees, then the shins */}
                       {/* Shins and knees in trousers, then the coat falling over the lap to just above them */}
-                      <Rect x={cx - 10} y={seatY + 6} width={8} height={30} color={lit(shade(look.trousers, 0.1))} />
-                      <Rect x={cx + 2} y={seatY + 6} width={8} height={30} color={lit(shade(look.trousers, 0.1))} />
+                      <Rect x={cx - 10} y={seatY + 2} width={8} height={34} color={lit(shade(look.trousers, 0.1))} />
+                      <Rect x={cx + 2} y={seatY + 2} width={8} height={34} color={lit(shade(look.trousers, 0.1))} />
+                      {/* Their lap: hips on the seat, the coat's hem just over its front edge */}
                       <Path
-                        path={`M${cx - 13} ${seatY - 14} L ${cx + 13} ${seatY - 14} L ${cx + 15} ${seatY + 9} Q ${cx} ${seatY + 13} ${cx - 15} ${seatY + 9} Z`}
+                        path={`M${cx - 13} ${seatY - 6} L ${cx + 13} ${seatY - 6} L ${cx + 14} ${seatY + 3} Q ${cx} ${seatY + 6} ${cx - 14} ${seatY + 3} Z`}
                         color={lit(look.coat)}
                       />
-                      <Path path={`M${cx} ${seatY - 6} L ${cx} ${seatY + 11}`} color={lit(shade(look.coat, 0.25))} style="stroke" strokeWidth={1} />
-                      <Path path={`M${cx - 15} ${seatY + 9} Q ${cx} ${seatY + 13} ${cx + 15} ${seatY + 9}`} color={lit(shade(look.coat, 0.3))} style="stroke" strokeWidth={1.2} />
+                      <Path path={`M${cx - 14} ${seatY + 3} Q ${cx} ${seatY + 6} ${cx + 14} ${seatY + 3}`} color={lit(shade(look.coat, 0.3))} style="stroke" strokeWidth={1.2} />
                       <RoundedRect x={cx - 11} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
                       <RoundedRect x={cx + 1} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
                     </Group>
