@@ -100,10 +100,7 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (e, gs) => e.nativeEvent.touches.length > 1 || Math.abs(gs.dx) + Math.abs(gs.dy) > 6,
-        onPanResponderGrant: (e) => {
-          console.log('MAPDBG grant', e.nativeEvent.touches.length)
-          startGesture(e)
-        },
+        onPanResponderGrant: startGesture,
         onPanResponderMove: (e) => {
           const g = gesture.current
           const p = pinch(e)
@@ -126,7 +123,6 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
           anim.y.setValue((from.cy - to.cy) * to.z * sc)
         },
         onPanResponderRelease: () => {
-          console.log('MAPDBG release', JSON.stringify(pending.current))
           gesture.current = null
           if (pending.current) setCam(pending.current)
           pending.current = null
