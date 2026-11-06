@@ -268,10 +268,15 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
                   return (
                     <Group key={`legs${i}`}>
                       {/* The lap, from under the coat over the seat to the knees, then the shins */}
-                      <RoundedRect x={cx - 16} y={seatY - 7} width={32} height={19} r={7} color={lit(look.trousers)} />
-                      <Rect x={cx - 16} y={seatY - 7} width={32} height={5} color={lit(shade(look.trousers, 0.2))} />
-                      <Rect x={cx - 10} y={seatY + 8} width={8} height={28} color={lit(shade(look.trousers, 0.12))} />
-                      <Rect x={cx + 2} y={seatY + 8} width={8} height={28} color={lit(shade(look.trousers, 0.12))} />
+                      {/* Shins and knees in trousers, then the coat falling over the lap to just above them */}
+                      <Rect x={cx - 10} y={seatY + 6} width={8} height={30} color={lit(shade(look.trousers, 0.1))} />
+                      <Rect x={cx + 2} y={seatY + 6} width={8} height={30} color={lit(shade(look.trousers, 0.1))} />
+                      <Path
+                        path={`M${cx - 13} ${seatY - 14} L ${cx + 13} ${seatY - 14} L ${cx + 15} ${seatY + 9} Q ${cx} ${seatY + 13} ${cx - 15} ${seatY + 9} Z`}
+                        color={lit(look.coat)}
+                      />
+                      <Path path={`M${cx} ${seatY - 6} L ${cx} ${seatY + 11}`} color={lit(shade(look.coat, 0.25))} style="stroke" strokeWidth={1} />
+                      <Path path={`M${cx - 15} ${seatY + 9} Q ${cx} ${seatY + 13} ${cx + 15} ${seatY + 9}`} color={lit(shade(look.coat, 0.3))} style="stroke" strokeWidth={1.2} />
                       <RoundedRect x={cx - 11} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
                       <RoundedRect x={cx + 1} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
                     </Group>
