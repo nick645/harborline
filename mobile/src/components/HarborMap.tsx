@@ -3,22 +3,22 @@
 // shallows pale along every shore, and cloud over the regions you haven't charted. Pinch to
 // zoom and drag to pan; a tap on a port opens it. Routes run from home, coloured by their weather.
 
-import { useMemo, useRef, useState } from 'react'
-import { PanResponder, Pressable, Text, View, type GestureResponderEvent } from 'react-native'
-import Svg, { Circle, ClipPath, Defs, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Animated, PanResponder, Pressable, Text, View, type GestureResponderEvent } from 'react-native'
+import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg'
 import type { GameState, Port, Weather } from '../../../src/game/types'
 import { getBoatClass, getPort } from '../../../src/game/economy'
 import { getVoyage } from '../../../src/game/state'
 import { routeWeather, weatherChangesAt } from '../../../src/game/weather'
 import { chartingNext, homeOf, openPorts } from '../../../src/game/regions'
-import { PORTS, REGIONS, type Climate } from '../../../src/game/data/ports'
+import { PORTS } from '../../../src/game/data/ports'
 import { WEATHER } from '../../../src/game/data/weather'
 import { duration } from '../../../src/format'
 import { fonts, useTheme } from '../theme'
 import { lightAt } from '../art/light'
 import { REGION_STYLE } from '../art/regionStyle'
-import { mix, shade } from '../art/paint'
-import { LAND as LAND_PIECES, RIVERS, ZONE_SHAPES, scatter, smooth, type Decor } from '../map/geography'
+import { LAND as LAND_PIECES } from '../map/geography'
+import { ChartBase } from '../map/ChartBase'
 
 const LABEL_BG = '#1d1420'
 const PAD = 170
@@ -29,85 +29,14 @@ function bounds(ports: Port[]) {
   return { x0: Math.min(...xs) - PAD, y0: Math.min(...ys) - PAD, x1: Math.max(...xs) + PAD, y1: Math.max(...ys) + PAD }
 }
 
-/** What the land looks like from above in each climate. */
-const LAND: Record<Climate, string> = { temperate: '#6f8a52', forest: '#2f5040', tropical: '#c9c07a', snow: '#d8e0e8', desert: '#d8a868' }
-
-/** One thing on the land: a tree, a pine, a palm, a snowy peak, a dune or a mesa. Map units. */
-function Icon({ d, light }: { d: Decor; light: ReturnType<typeof lightAt> }) {
-  const c = (hex: string) => mix(hex, light.silhouette, light.dim * 0.5)
-  const { x, y, s, v } = d
-  switch (d.climate) {
-    case 'temperate':
-      return (
-        <G>
-          <Line x1={x} y1={y} x2={x} y2={y - 12 * s} stroke={c('#5a3a2a')} strokeWidth={3.5 * s} />
-          <Circle cx={x} cy={y - 20 * s} r={12 * s} fill={c(v > 0.5 ? '#4f7a3e' : '#5f8a48')} />
-          <Circle cx={x + 5 * s} cy={y - 24 * s} r={5 * s} fill={c('#7aa05a')} />
-        </G>
-      )
-    case 'forest':
-      return (
-        <G>
-          <Path d={`M${x} ${y - 40 * s} L ${x - 13 * s} ${y} L ${x + 13 * s} ${y} Z`} fill={c(v > 0.5 ? '#1f3a2a' : '#26442f')} />
-          <Path d={`M${x} ${y - 40 * s} L ${x + 13 * s} ${y} L ${x + 4 * s} ${y} Z`} fill={c('#335a40')} />
-        </G>
-      )
-    case 'tropical':
-      return (
-        <G>
-          <Path d={`M${x} ${y} q ${4 * s} ${-16 * s} ${-2 * s} ${-32 * s}`} stroke={c('#8a5a3a')} strokeWidth={3.5 * s} fill="none" strokeLinecap="round" />
-          <Path
-            d={`M${x - 2 * s} ${y - 32 * s} q ${-12 * s} ${-2 * s} ${-16 * s} ${7 * s} M${x - 2 * s} ${y - 32 * s} q ${12 * s} ${-2 * s} ${16 * s} ${7 * s} M${x - 2 * s} ${y - 32 * s} q ${-5 * s} ${-10 * s} ${-14 * s} ${-7 * s} M${x - 2 * s} ${y - 32 * s} q ${5 * s} ${-10 * s} ${14 * s} ${-7 * s}`}
-            stroke={c('#3f8a5a')}
-            strokeWidth={4 * s}
-            fill="none"
-            strokeLinecap="round"
-          />
-        </G>
-      )
-    case 'snow':
-      return (
-        <G>
-          <Path d={`M${x - 26 * s} ${y} L ${x - 2 * s} ${y - 40 * s} L ${x + 24 * s} ${y} Z`} fill={c('#5a6470')} />
-          <Path d={`M${x - 2 * s} ${y - 40 * s} L ${x + 24 * s} ${y} L ${x + 6 * s} ${y} Z`} fill={c('#3f4650')} />
-          <Path d={`M${x - 11 * s} ${y - 25 * s} L ${x - 2 * s} ${y - 40 * s} L ${x + 8 * s} ${y - 24 * s} L ${x + 2 * s} ${y - 27 * s} L ${x - 3 * s} ${y - 22 * s} Z`} fill={c('#f3f6fa')} />
-        </G>
-      )
-    case 'desert':
-      return v > 0.7 ? (
-        <G>
-          <Path d={`M${x - 22 * s} ${y} L ${x - 14 * s} ${y - 22 * s} L ${x + 14 * s} ${y - 22 * s} L ${x + 22 * s} ${y} Z`} fill={c('#b8603a')} />
-          <Path d={`M${x - 14 * s} ${y - 22 * s} L ${x + 14 * s} ${y - 22 * s} L ${x + 22 * s} ${y} L ${x + 8 * s} ${y} Z`} fill={c('#9a4a2a')} />
-        </G>
-      ) : (
-        <Path d={`M${x - 26 * s} ${y} q ${13 * s} ${-16 * s} ${26 * s} ${-8 * s} q ${13 * s} ${-8 * s} ${26 * s} ${8 * s}`} stroke={c('#c99a5a')} strokeWidth={4 * s} fill="none" strokeLinecap="round" />
-      )
-  }
-}
-
-/** Where each region's name is written across its land. */
-const REGION_LABEL: Record<string, { x: number; y: number }> = {
-  bay: { x: 380, y: 760 },
-  fogbanks: { x: 300, y: -860 },
-  sunward: { x: 1450, y: 820 },
-  ironcliffs: { x: 1720, y: -1120 },
-  lantern: { x: 2700, y: 420 },
-}
-
-/** Every port, framed with room round it: the furthest the chart can be panned. */
+/** All the land with sea round it: the furthest the chart can be panned or zoomed out. */
 const WORLD = (() => {
-  const xs = PORTS.map((p) => p.x)
-  const ys = PORTS.map((p) => p.y)
-  return { x0: Math.min(...xs) - 500, y0: Math.min(...ys) - 600, x1: Math.max(...xs) + 500, y1: Math.max(...ys) + 500 }
+  const pts = LAND_PIECES.flatMap((l) => l.pts)
+  const xs = pts.map((p) => p[0])
+  const ys = pts.map((p) => p[1])
+  return { x0: Math.min(...xs) - 300, y0: Math.min(...ys) - 300, x1: Math.max(...xs) + 300, y1: Math.max(...ys) + 300 }
 })()
 
-const DECOR = scatter(PORTS, 104)
-const COAST = LAND_PIECES.map((l) => ({ ...l, d: smooth(l.pts) }))
-const MAINLAND_D = COAST.find((l) => l.id === 'mainland')!.d
-/** A river as one soft line through its points. */
-const riverPath = (pts: [number, number][]) => pts.map((p, i) => (i === 0 ? `M${p[0]} ${p[1]}` : i === pts.length - 1 ? ` L ${p[0]} ${p[1]}` : ` Q ${p[0]} ${p[1]} ${(p[0] + pts[i + 1][0]) / 2} ${(p[1] + pts[i + 1][1]) / 2}`)).join('')
-const RIVERS_D = RIVERS.map(riverPath)
-const ZONES_D = ZONE_SHAPES.map((z) => ({ climate: z.climate, d: smooth(z.pts) }))
 
 export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now: number; onOpenPort: (portId: string) => void; box: { w: number; h: number } }) {
   const t = useTheme()
@@ -131,13 +60,25 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
   const frameKey = `${open.length}-${next?.id ?? ''}-${box.w}x${box.h}`
   const c = cam.key === frameKey ? cam : { z: 1, cx: base.cx, cy: base.cy, key: frameKey }
   const view = { x: c.cx - base.w / c.z / 2, y: c.cy - base.h / c.z / 2, w: base.w / c.z, h: base.h / c.z }
+  const wide = { x: view.x - view.w, y: view.y - view.h, w: view.w * 3, h: view.h * 3 }
   const camRef = useRef(c)
   camRef.current = c
   const origin = useRef({ x: 0, y: 0 })
   const viewRef = useRef<View>(null)
+  const pending = useRef<{ z: number; cx: number; cy: number; key: string } | null>(null)
+  const anim = useRef({ k: new Animated.Value(1), x: new Animated.Value(0), y: new Animated.Value(0) }).current
+  // Once the chart has redrawn at the new camera, drop the picture's stand-in transform.
+  useLayoutEffect(() => {
+    anim.k.setValue(1)
+    anim.x.setValue(0)
+    anim.y.setValue(0)
+  }, [cam, anim])
   const gesture = useRef<{ n: number; d0: number; mx: number; my: number; z0: number; cx0: number; cy0: number } | null>(null)
+  // Zoomed all the way out, the whole world fits.
+  const zMin = Math.max(0.12, Math.min(base.w / (WORLD.x1 - WORLD.x0), base.h / (WORLD.y1 - WORLD.y0)))
+  const zClamp = (z: number) => Math.min(5, Math.max(zMin, z))
   const clampCam = (z: number, cx: number, cy: number) => {
-    const zz = Math.min(5, Math.max(0.6, z))
+    const zz = zClamp(z)
     const hw = base.w / zz / 2
     const hh = base.h / zz / 2
     const fit = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)))
@@ -159,7 +100,10 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (e, gs) => e.nativeEvent.touches.length > 1 || Math.abs(gs.dx) + Math.abs(gs.dy) > 6,
-        onPanResponderGrant: startGesture,
+        onPanResponderGrant: (e) => {
+          console.log('MAPDBG grant', e.nativeEvent.touches.length)
+          startGesture(e)
+        },
         onPanResponderMove: (e) => {
           const g = gesture.current
           const p = pinch(e)
@@ -167,13 +111,26 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
           // Map units per screen point, before and after the zoom.
           const u0 = base.w / g.z0 / box.w
           const z = g.n > 1 && g.d0 > 0 ? g.z0 * (p.d / g.d0) : g.z0
-          const u1 = base.w / Math.min(5, Math.max(0.6, z)) / box.w
+          const u1 = base.w / zClamp(z) / box.w
           // Keep the map point under the fingers' midpoint under it.
           const px = g.cx0 + (g.mx - box.w / 2) * u0
           const py = g.cy0 + (g.my - box.h / 2) * u0
-          setCam(clampCam(z, px - (p.mx - box.w / 2) * u1, py - (p.my - box.h / 2) * u1))
+          const to = clampCam(z, px - (p.mx - box.w / 2) * u1, py - (p.my - box.h / 2) * u1)
+          pending.current = to
+          // While the fingers move, the drawing slides and scales as a picture; it's redrawn
+          // properly once, when they lift.
+          const from = camRef.current
+          const sc = box.w / base.w
+          anim.k.setValue(to.z / from.z)
+          anim.x.setValue((from.cx - to.cx) * to.z * sc)
+          anim.y.setValue((from.cy - to.cy) * to.z * sc)
         },
-        onPanResponderRelease: () => (gesture.current = null),
+        onPanResponderRelease: () => {
+          console.log('MAPDBG release', JSON.stringify(pending.current))
+          gesture.current = null
+          if (pending.current) setCam(pending.current)
+          pending.current = null
+        },
         onPanResponderTerminationRequest: () => false,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,8 +138,9 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
   )
   // Sizes in map units that stay the same on screen whatever the zoom.
   const k = view.w / 1000
+  // Zoomed far out, ports are just their markers: names and weather would only pile up.
+  const far = view.w > base.w * 1.6
   const moved = c.z !== 1 || Math.abs(c.cx - base.cx) > 1 || Math.abs(c.cy - base.cy) > 1
-  const seen = (x: number, y: number, pad = 60) => x > view.x - pad && x < view.x + view.w + pad && y > view.y - pad && y < view.y + view.h + pad
   const home = getPort(homeOf(game))
   const atSea = game.player.ownedBoats.filter((x) => x.state === 'sailing' || x.state === 'returning')
   const weatherOf = (portId: string): Weather | null => {
@@ -190,10 +148,17 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
     return r ? routeWeather(game, r.id, now) : null
   }
 
-  const night = light.stars > 0
-  const landColor = (cl: Climate) => mix(LAND[cl], light.silhouette, light.dim * 0.55)
-  const shallow = mix(light.sea, '#ffffff', night ? 0.08 : 0.22)
-  const coastLine = mix('#3a2a24', light.silhouette, light.dim * 0.4)
+  // The waters you know: round every port you've charted, and along the lanes from home.
+  const clear = useMemo(() => {
+    const out: { x: number; y: number; r: number }[] = []
+    for (const p of open) {
+      out.push({ x: p.x, y: p.y, r: p.region === 'bay' ? 520 : 400 })
+      const len = Math.hypot(p.x - home.x, p.y - home.y)
+      for (let d = 160; d < len; d += 160) out.push({ x: home.x + ((p.x - home.x) * d) / len, y: home.y + ((p.y - home.y) * d) / len, r: 230 })
+    }
+    return out
+  }, [open, home.x, home.y])
+
 
   return (
     <View
@@ -202,86 +167,12 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
       onLayout={() => viewRef.current?.measureInWindow((x, y) => (origin.current = { x, y }))}
       {...responder.panHandlers}
     >
-    <Svg width={box.w} height={box.h} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}>
-      <Defs>
-        <ClipPath id="mainland">
-          <Path d={MAINLAND_D} />
-        </ClipPath>
-      </Defs>
-      <Rect x={WORLD.x0 - 2000} y={WORLD.y0 - 2000} width={WORLD.x1 - WORLD.x0 + 4000} height={WORLD.y1 - WORLD.y0 + 4000} fill={light.sea} />
-      {/* Swell lines on the open sea */}
-      {Array.from({ length: 9 }, (_, i) => WORLD.y0 + 120 + i * 300).map((y) => (
-        <Path
-          key={y}
-          d={`M${WORLD.x0 - 400} ${y} ${Array.from({ length: 40 }, () => 'q 60 -14 120 0').join(' ')}`}
-          stroke={light.seaLine}
-          strokeWidth={3}
-          fill="none"
-          opacity={0.22}
-        />
-      ))}
-
-      {/* Shallows: pale water hugging every shore */}
-      {COAST.map((l) => (
-        <G key={`sh-${l.id}`}>
-          <Path d={l.d} fill="none" stroke={shallow} strokeWidth={64} opacity={0.35} strokeLinejoin="round" />
-          <Path d={l.d} fill="none" stroke={shallow} strokeWidth={30} opacity={0.5} strokeLinejoin="round" />
-        </G>
-      ))}
-
-      {/* The land, in its climates' colours: the mainland clipped zone by zone */}
-      {COAST.map((l) => (
-        <Path key={l.id} d={l.d} fill={landColor(l.climate === 'by-zone' ? 'temperate' : l.climate)} />
-      ))}
-      {/* The mainland's other climates, their borders wandering, clipped to its shore */}
-      <G clipPath="url(#mainland)">
-        {ZONES_D.map((z) => (
-          <G key={z.climate}>
-            <Path d={z.d} fill="none" stroke={landColor(z.climate)} strokeWidth={60} opacity={0.35} />
-            <Path d={z.d} fill={landColor(z.climate)} />
-          </G>
-        ))}
-      </G>
-      {/* Rivers winding down to the sea */}
-      {RIVERS_D.map((d, i) => (
-        <G key={`r${i}`}>
-          <Path d={d} fill="none" stroke={shallow} strokeWidth={14} strokeLinecap="round" strokeLinejoin="round" opacity={0.9} />
-          <Path d={d} fill="none" stroke={light.sea} strokeWidth={7} strokeLinecap="round" strokeLinejoin="round" />
-        </G>
-      ))}
-      {/* A sandy beach line, then the coast's ink */}
-      {COAST.map((l) => (
-        <G key={`cl-${l.id}`}>
-          <Path d={l.d} fill="none" stroke={mix('#e8d4a0', light.silhouette, light.dim * 0.5)} strokeWidth={7} opacity={0.75} />
-          <Path d={l.d} fill="none" stroke={coastLine} strokeWidth={2.4} opacity={0.85} />
-        </G>
-      ))}
-
-      {/* What grows or lies on the land you know */}
-      {DECOR.filter((d) => openRegions.has(d.region) && seen(d.x, d.y)).map((d, i) => (
-        <Icon key={i} d={d} light={light} />
-      ))}
-
-      {/* Region names written across the land */}
-      {REGIONS.filter((r) => openRegions.has(r.id)).map((r) => {
-        const at = REGION_LABEL[r.id]
-        return (
-          <SvgText
-            key={r.id}
-            x={at.x}
-            y={at.y}
-            textAnchor="middle"
-            fontSize={Math.max(44, 30 * k)}
-            fontFamily={fonts.titleItalic}
-            letterSpacing={6}
-            fill={night ? '#f3e7d8' : '#2b1f2c'}
-            opacity={0.45}
-          >
-            {r.name.toUpperCase()}
-          </SvgText>
-        )
-      })}
-
+    <View style={{ width: box.w, height: box.h, overflow: 'hidden' }}>
+    {/* Drawn a screen wider on every side than you see, so a drag or pinch, which slides and
+        scales this as a picture until the fingers lift, never shows an empty edge. */}
+    <Animated.View style={{ position: 'absolute', left: -box.w, top: -box.h, width: box.w * 3, height: box.h * 3, transform: [{ translateX: anim.x }, { translateY: anim.y }, { scale: anim.k }] }}>
+    <ChartBase width={box.w * 3} height={box.h * 3} view={wide} light={light} openRegions={openRegions} clear={clear} />
+    <Svg width={box.w * 3} height={box.h * 3} viewBox={`${wide.x} ${wide.y} ${wide.w} ${wide.h}`} style={{ position: 'absolute', left: 0, top: 0 }}>
       {/* Routes from home, coloured by their weather now */}
       {game.routes.map((r) => {
         const a = getPort(r.portA)
@@ -304,9 +195,6 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
       })}
 
       {/* Cloud over every region not yet charted */}
-      {REGIONS.filter((r) => !openRegions.has(r.id)).map((r) => (
-        <CloudCover key={r.id} region={r.id} light={light} />
-      ))}
 
       {/* The next region, under fog, with its chart filling */}
       {next && (
@@ -355,7 +243,7 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
                 <Rect x={32} y={-62} width={16} height={10} fill={light.lamp} />
               </G>
             )}
-            {wx && !isHome && (
+            {wx && !isHome && !far && (
               <G transform="translate(0 -62)">
                 <Rect x={-46} y={-16} width={92} height={30} rx={8} fill={t[wx]} />
                 <SvgText y={6} textAnchor="middle" fontSize={20} fontFamily={fonts.bold} fill="#fff">
@@ -363,10 +251,14 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
                 </SvgText>
               </G>
             )}
-            <Rect x={-86} y={18} width={172} height={34} rx={17} fill={LABEL_BG} opacity={0.78} />
-            <SvgText y={42} textAnchor="middle" fontSize={22} fontFamily={fonts.semibold} fill="#f3e7d8">
-              {p.name}
-            </SvgText>
+            {(!far || isHome) && (
+              <>
+                <Rect x={-86} y={18} width={172} height={34} rx={17} fill={LABEL_BG} opacity={0.78} />
+                <SvgText y={42} textAnchor="middle" fontSize={22} fontFamily={fonts.semibold} fill="#f3e7d8">
+                  {p.name}
+                </SvgText>
+              </>
+            )}
           </G>
         )
       })}
@@ -413,10 +305,12 @@ export function HarborMap({ game, now, onOpenPort, box }: { game: GameState; now
         )
       })}
 
-      <SvgText x={view.x + view.w - 28 * k} y={view.y + 50 * k} textAnchor="end" fontSize={28 * k} fontFamily={fonts.semibold} fill={light.stars ? '#e9dccd' : '#2b1f2c'} opacity={0.8}>
-        {`Weather turns in ${duration(weatherChangesAt(now) - now)}`}
-      </SvgText>
     </Svg>
+    </Animated.View>
+    </View>
+      <Text pointerEvents="none" style={{ position: 'absolute', right: 14, top: 12, color: light.stars ? '#e9dccd' : '#2b1f2c', opacity: 0.8, fontFamily: fonts.semibold, fontSize: 13 }}>
+        {`Weather turns in ${duration(weatherChangesAt(now) - now)}`}
+      </Text>
       {moved && (
         <Pressable
           onPress={() => setCam({ z: 1, cx: base.cx, cy: base.cy, key: frameKey })}
@@ -442,39 +336,6 @@ function ChartLines({ ports, from, k, light }: { ports: Port[]; from: string[]; 
         const f = getPort(id)
         return <Line key={id} x1={f.x} y1={f.y} x2={cx} y2={cy} stroke={fogColor} strokeWidth={4 * k} strokeDasharray={`${4 * k} ${14 * k}`} opacity={0.8} />
       })}
-    </G>
-  )
-}
-
-/** Thick cloud over a region you haven't charted: its ports, its coast, all of it. */
-function CloudCover({ region, light }: { region: string; light: ReturnType<typeof lightAt> }) {
-  const ports = PORTS.filter((p) => p.region === region)
-  const xs = ports.map((p) => p.x)
-  const ys = ports.map((p) => p.y)
-  const x0 = Math.min(...xs) - 260
-  const x1 = Math.max(...xs) + 260
-  const y0 = Math.min(...ys) - 260
-  const y1 = Math.max(...ys) + 260
-  const night = light.stars > 0
-  const base = night ? '#3a2e46' : '#dcd6e0'
-  const puff = night ? '#4a3c58' : '#f2eef4'
-  const step = 120
-  const puffs: { x: number; y: number; r: number; tone: boolean }[] = []
-  let i = 0
-  for (let y = y0; y <= y1; y += step * 0.75) {
-    for (let x = x0 + ((i++ % 2) * step) / 2; x <= x1; x += step) puffs.push({ x, y, r: step * (0.75 + ((x * 7 + y * 3) % 40) / 100), tone: (x + y) % 3 === 0 })
-  }
-  return (
-    <G>
-      <Rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} rx={step} fill={base} opacity={0.92} />
-      {puffs.map((p, j) => (
-        <Circle key={j} cx={p.x} cy={p.y} r={p.r} fill={p.tone ? base : puff} opacity={0.9} />
-      ))}
-      {puffs
-        .filter((_, j) => j % 3 === 0)
-        .map((p, j) => (
-          <Circle key={`s${j}`} cx={p.x + p.r * 0.3} cy={p.y + p.r * 0.35} r={p.r * 0.55} fill={shade(base, 0.08)} opacity={0.35} />
-        ))}
     </G>
   )
 }

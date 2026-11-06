@@ -68,11 +68,12 @@ export function roughen(pts: Pt[], seed: number, quiet: Pt[] = [], levels = 3): 
   return cur
 }
 
-const MAINLAND: Pt[] = [
-  // The west shore, from the far north down to Saltmarsh, with Wickstone's cape.
-  [-900, -4000],
-  [40, -4000],
-  [40, -1900],
+/** Westmark, your home continent: Wickstone's cape on its east coast, Saltmarsh at its
+ * south-east corner, green in the south and pine forest in the north. */
+const WESTMARK: Pt[] = [
+  [-300, -1900],
+  [-60, -1820],
+  [70, -1500],
   [70, -1300],
   [30, -1000],
   [62, -790],
@@ -86,9 +87,28 @@ const MAINLAND: Pt[] = [
   [62, 540],
   // Saltmarsh, in the corner of the bay.
   [100, 602],
-  [170, 652],
-  // The south coast, low enough to keep the lanes east clear.
-  [330, 700],
+  [130, 680],
+  [70, 800],
+  [-80, 900],
+  [-300, 1010],
+  [-560, 960],
+  [-820, 1120],
+  [-1100, 980],
+  [-1300, 640],
+  [-1220, 260],
+  [-1420, -140],
+  [-1260, -600],
+  [-1380, -1000],
+  [-1160, -1420],
+  [-880, -1680],
+  [-600, -1960],
+]
+
+/** The southern continent, across a strait from Saltmarsh: palm country, then the desert coast
+ * climbing to the Last Light's cape. */
+const SOUTHLAND: Pt[] = [
+  [260, 860],
+  [330, 712],
   [560, 690],
   [800, 720],
   [1040, 700],
@@ -109,13 +129,24 @@ const MAINLAND: Pt[] = [
   [2650, -40],
   [2700, -98],
   [2760, -70],
-  [2900, -160],
-  [3500, -200],
-  [3500, 4000],
-  [-900, 4000],
+  [2920, -180],
+  [3160, -140],
+  [3380, 120],
+  [3460, 520],
+  [3300, 900],
+  [3440, 1300],
+  [3180, 1680],
+  [2800, 1880],
+  [2300, 1780],
+  [1900, 1990],
+  [1400, 1840],
+  [1000, 1960],
+  [620, 1800],
+  [380, 1500],
+  [200, 1180],
 ]
 
-/** The northern coast: Holdfast and Anvil Sound on its shore, Frostgate at the head of its fjord. */
+/** The frozen north: Holdfast and Anvil Sound on its shore, Frostgate at the head of its fjord. */
 const NORTH: Pt[] = [
   [1900, -452],
   [1760, -482],
@@ -134,20 +165,41 @@ const NORTH: Pt[] = [
   [1120, -860],
   [1090, -960],
   [1060, -1300],
-  [1020, -1700],
-  [1060, -4000],
-  [2500, -4000],
+  [1000, -1700],
+  [880, -2000],
+  [1080, -2300],
+  [1500, -2240],
+  [1900, -2420],
+  [2300, -2220],
+  [2620, -1900],
+  [2560, -1500],
   [2420, -1300],
   [2300, -900],
   [2180, -680],
   [2060, -540],
 ]
 
+/** Islands with no port: skerries and cays scattered over the open sea. */
+const ISLETS: { at: Pt; r: number; climate: Climate; region: RegionId }[] = [
+  { at: [880, -1150], r: 70, climate: 'forest', region: 'fogbanks' },
+  { at: [-300, -2200], r: 60, climate: 'forest', region: 'fogbanks' },
+  { at: [2950, -620], r: 90, climate: 'desert', region: 'lantern' },
+  { at: [3250, -420], r: 50, climate: 'desert', region: 'lantern' },
+  { at: [2900, -1300], r: 80, climate: 'snow', region: 'ironcliffs' },
+  { at: [-1700, 300], r: 90, climate: 'temperate', region: 'bay' },
+  { at: [-1650, -800], r: 60, climate: 'forest', region: 'fogbanks' },
+  { at: [3800, 900], r: 100, climate: 'desert', region: 'lantern' },
+  { at: [1200, 2250], r: 90, climate: 'tropical', region: 'sunward' },
+  { at: [600, 2200], r: 60, climate: 'tropical', region: 'sunward' },
+]
+
 /** Rivers across the mainland, from inland to their mouths on the coast. */
 export const RIVERS: Pt[][] = [
   [[380, 1300], [420, 1100], [360, 960], [440, 840], [400, 760], [450, 700]],
   [[1180, 1400], [1120, 1180], [1200, 1000], [1140, 860], [1170, 760], [1150, 718]],
-  [[-300, -900], [-180, -760], [-120, -560], [-40, -420], [30, -380]],
+  [[-900, -1000], [-600, -880], [-320, -760], [-120, -560], [-40, -420], [30, -380]],
+  [[-700, 200], [-500, 320], [-300, 300], [-120, 420], [0, 520], [52, 560]],
+  [[2900, 1300], [2700, 1100], [2500, 900], [2350, 700], [2200, 520]],
 ]
 
 /** An island round a port: the port on its shore, the island lying off in direction `dir`
@@ -246,8 +298,10 @@ const ISLES: { port: { id: string; x: number; y: number }; r: number; stretch: n
 function build(): LandPiece[] {
   const quiet: Pt[] = [HOME, ...ALL_PORTS.map((p) => [p.x, p.y] as Pt)]
   const pieces: LandPiece[] = [
-    { id: 'mainland', pts: roughen(MAINLAND, 11, quiet), climate: 'by-zone', region: 'by-zone' },
+    { id: 'westmark', pts: roughen(WESTMARK, 11, quiet), climate: 'by-zone', region: 'by-zone' },
+    { id: 'southland', pts: roughen(SOUTHLAND, 14, quiet), climate: 'by-zone', region: 'by-zone' },
     { id: 'north', pts: roughen(NORTH, 12, quiet), climate: 'snow', region: 'ironcliffs' },
+    ...ISLETS.map((i, k) => ({ id: `islet-${k}`, pts: roughen(isleRaw(i.at[0], i.at[1], i.r, 1.3, k * 0.9, k + 20), k + 30, [], 3), climate: i.climate, region: i.region })),
   ]
   ISLES.forEach((i, k) => {
     const pts = fitIsle(i.port, i.r, i.stretch, k + 1, pieces.map((p) => p.pts))
@@ -310,10 +364,10 @@ export function scatter(ports: { x: number; y: number }[], step = 84): Decor[] {
     const xs = piece.pts.map((p) => p[0])
     const ys = piece.pts.map((p) => p[1])
     // Keep to where the chart can show; the mainland runs off far beyond it.
-    const x0 = Math.max(Math.min(...xs), -500)
-    const x1 = Math.min(Math.max(...xs), 3100)
-    const y0 = Math.max(Math.min(...ys), -1500)
-    const y1 = Math.min(Math.max(...ys), 1200)
+    const x0 = Math.min(...xs)
+    const x1 = Math.max(...xs)
+    const y0 = Math.min(...ys)
+    const y1 = Math.max(...ys)
     for (let y = y0; y < y1; y += step * 0.8) {
       for (let x = x0; x < x1; x += step) {
         const px = x + (rnd() - 0.5) * step * 0.8
