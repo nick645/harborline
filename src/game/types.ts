@@ -198,6 +198,8 @@ export interface Captain {
   region?: import('./data/ports').RegionId
   /** While looking for work: the rivals courting them, and how they lean. */
   courting?: Courting
+  /** What they've done that counts toward badges (data/badges.ts). Old Salt counts voyages. */
+  marks?: Partial<Record<import('./data/badges').BadgeId, number>>
 }
 
 /** Someone looking for work, and the rival lines courting them too (see courting.ts). */

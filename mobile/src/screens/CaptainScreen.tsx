@@ -13,6 +13,7 @@ import { homeTavern } from '../homeTavern'
 import { fonts, useTheme } from '../theme'
 import { Body, Button, Card, Measure, Muted, Row, Segments, Tag, Title } from '../components/ui'
 import { Lodestone, RankAbilities, SkillSheet, Standing } from '../components/SkillSheet'
+import { BadgesPanel, RatingBlock, RecordPanel } from '../components/CaptainGrowth'
 
 type Props = {
   game: GameState
@@ -30,7 +31,7 @@ const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'T
 
 export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFire, onTakeOver, onManagerCrewing, onPromote }: Props) {
   const t = useTheme()
-  const [panel, setPanel] = useState<'skills' | 'log' | 'orders'>('skills')
+  const [panel, setPanel] = useState<'skills' | 'badges' | 'record' | 'log' | 'orders'>('skills')
   const c = captainViewById(game, captainId)
   if (!c) return <Muted>That captain has moved on.</Muted>
   const boat = boatOfCaptain(game, c.id)
@@ -58,6 +59,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
           <Standing c={c} />
         </Row>
         <Row>
+          {c.grade && <Tag label={c.grade.name} color={c.grade.id === 'pearl' ? t.accent : c.grade.id === 'barnacle' ? t.bad : t.muted} dark />}
           {c.verdict && <Tag label={VERDICT[c.verdict]} color={c.verdict === 'sleeper' ? t.good : c.verdict === 'all-talk' ? t.bad : t.muted} dark />}
           <Muted>
             {c.persona ? `${c.persona.name} · ` : ''}
@@ -67,12 +69,15 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
         <Muted>
           From {c.homePort} · takes tier {c.sailsTiers[0]}–{c.sailsTiers[1]} boats
         </Muted>
+        <RatingBlock c={c} />
       </Card>
 
       <Segments
         items={[
           { id: 'skills', label: 'Skills' },
-          { id: 'log', label: 'Logbook' },
+          { id: 'badges', label: 'Badges' },
+          { id: 'record', label: 'Record' },
+          { id: 'log', label: 'Log' },
           { id: 'orders', label: role ? 'Desk' : 'Orders' },
         ]}
         value={panel}
@@ -128,6 +133,9 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
           )}
         </View>
       )}
+
+      {panel === 'badges' && <BadgesPanel c={c} />}
+      {panel === 'record' && <RecordPanel c={c} />}
 
       {panel === 'log' && (
       <View style={[styles.logbook, { backgroundColor: t.paper }]}>

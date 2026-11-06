@@ -53,7 +53,8 @@ import { routeWeather, weatherSlot } from './weather'
 import { handBerths, handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
 import { migrateKeepsakes, rollKeepsake } from './keepsakes'
 import { chartTrip, getPortDef, homeOf, portOpen, refreshPortPools } from './regions'
-import { portDemandMult } from './portLife'
+import { marketDay, portDemandMult } from './portLife'
+import { badgeValue } from './data/badges'
 import { getRegion, HOME_PRICE } from './data/ports'
 import type { Milestone } from './data/home'
 import { countParts, dropChances, getPart, hasParts, partName, pickPart, takeParts } from './parts'
@@ -66,6 +67,8 @@ import {
   getTrait,
   proveTrait,
   recordVoyage,
+  marksOf,
+  type TripFacts,
   refreshRecruitPool,
   severance,
   willSail,
@@ -184,8 +187,22 @@ function tripContext(state: GameState, boat: Boat, routeId: string, t: number): 
 }
 
 /** Everything the people aboard change about a trip: captains' traits, and a full crew of hands. */
+/** What the captains aboard see of a trip: the weather, the hands, and the port it's bound for. */
+function tripFacts(state: GameState, boat: Boat, ctx: TripContext): TripFacts {
+  const route = getRoute(state, ctx.routeId)
+  return {
+    track: ctx.cls.track,
+    weather: ctx.weather,
+    t: ctx.t,
+    hands: handCount(state, boat.id),
+    distance: routeDistance(route),
+    market: marketDay(route.portB, ctx.t),
+    abroad: getPortDef(route.portB).region !== getPortDef(homeOf(state)).region,
+  }
+}
+
 function tripMods(state: GameState, boat: Boat, ctx: TripContext, view: 'known' | 'true'): CaptainMods {
-  const trip = { track: ctx.cls.track, weather: ctx.weather, t: ctx.t, hands: handCount(state, boat.id) }
+  const trip = tripFacts(state, boat, ctx)
   const mods = combineMods(captainsAboard(state, boat).map((c) => captainMods(c, trip, view)))
   const hands = handMods(state, boat, ctx.weather, view)
   return {
@@ -899,7 +916,9 @@ function settleInPlace(s: GameState, now: number) {
           keepsakes.push(keepsake.id)
           log(s, ev.at, 'part', `${boat.nickname} brought home ${keepsake.name}: something new for home`)
         }
-        const opened = chartTrip(s, getRoute(s, v.routeId).portB, ctx.weather)
+        // Chart-makers aboard chart new waters faster.
+        const charter = Math.max(1, ...captainsAboard(s, boat).map((c) => badgeValue(marksOf(c), 'charter')))
+        const opened = chartTrip(s, getRoute(s, v.routeId).portB, ctx.weather, charter)
         if (opened) {
           ensureRoutes(s)
           log(s, ev.at, 'info', `${boat.nickname} finished charting ${opened}: new waters to sail`)
@@ -1028,7 +1047,7 @@ function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number) 
   const revealEvery = hooksOf(boat).traitRevealEvery
   for (const c of captainsAboard(s, boat)) {
     const taken = s.player.roster.flatMap((x) => (x.persona ? [x.persona] : []))
-    const news = recordVoyage(s.rng, c, { track: ctx.cls.track, weather: ctx.weather, t: ctx.t, hands: handCount(s, boat.id) }, revealEvery, taken)
+    const news = recordVoyage(s.rng, c, { ...tripFacts(s, boat, ctx), hullAfter: boat.condition }, revealEvery, taken)
     for (const id of news.proven) log(s, at, 'captain', `${c.name} showed what they're made of: ${getTrait(id).name}`)
     for (const id of news.disproven) log(s, at, 'captain', `Turns out ${c.name} isn't ${getTrait(id).name.toLowerCase()} after all`)
     if (news.developmentRevealed) log(s, at, 'captain', `You're getting the measure of ${c.name}`)

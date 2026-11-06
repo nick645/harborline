@@ -23,7 +23,13 @@ export function SkillSheet({ c, paper, compact }: { c: CaptainView; paper?: bool
             <Text style={{ width: 66, color: sk.known ? ink : faint, fontFamily: fonts.semibold, fontSize: compact ? 12 : 13 }}>{sk.name}</Text>
             <View style={{ flex: 1, height: compact ? 7 : 9, borderRadius: 5, backgroundColor: track, overflow: 'hidden' }}>
               {sk.known ? (
-                <View style={{ position: 'absolute', top: 0, bottom: 0, left: `${lo - 1}%`, width: `${Math.max(3, hi - lo + 1)}%`, borderRadius: 5, backgroundColor: paper ? '#8a5a3a' : t.accent }} />
+                <>
+                  {/* Filled to your best guess; the range you're not sure of, paler on either side of it */}
+                  <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: `${sk.guess}%`, borderRadius: 5, backgroundColor: paper ? '#8a5a3a' : t.accent }} />
+                  {hi - lo > 4 && (
+                    <View style={{ position: 'absolute', top: 0, bottom: 0, left: `${lo - 1}%`, width: `${hi - lo + 1}%`, backgroundColor: paper ? '#8a5a3a' : t.accent, opacity: 0.3 }} />
+                  )}
+                </>
               ) : (
                 // Not learned yet: faint hatching across the whole scale.
                 <View style={{ flexDirection: 'row', flex: 1, gap: 4, paddingHorizontal: 2 }}>
@@ -33,10 +39,15 @@ export function SkillSheet({ c, paper, compact }: { c: CaptainView; paper?: bool
                 </View>
               )}
             </View>
-            <Text style={{ width: 46, textAlign: 'right', color: sk.known ? ink : faint, fontFamily: fonts.body, fontSize: compact ? 12 : 13 }}>{sk.known ? `${lo}–${hi}` : '?'}</Text>
+            <Text style={{ width: 46, textAlign: 'right', color: sk.known ? ink : faint, fontFamily: sk.known ? fonts.bold : fonts.body, fontSize: compact ? 12 : 14 }}>
+              {sk.known ? `${hi - lo > 8 ? '~' : ''}${sk.guess}` : '?'}
+            </Text>
           </View>
         )
       })}
+      {!compact && c.skills.some((sk) => sk.known && sk.band[1] - sk.band[0] > 8) && (
+        <Text style={{ color: faint, fontFamily: fonts.body, fontSize: 12 }}>~ is your best guess: the pale part of the bar is how far off it could be.</Text>
+      )}
       {!compact && c.skills.every((sk) => !sk.known) && (
         <Text style={{ color: faint, fontFamily: fonts.body, fontSize: 12 }}>Nothing learned yet. Scouting and voyages fill this in.</Text>
       )}

@@ -67,6 +67,7 @@ import {
 import { nextFloat, nextInt, rollChance, rollNormal, rollPick, rollWeighted } from './rolls'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS, type PersonaDef } from './data/personas'
 import { newCourting, termsFee } from './courting'
+import { BADGES, CEILING_KNOWN_AFTER, GRADES, GRADE_KNOWN_AFTER, type GradeId, LONG_TRIP, STEADY_HULL, badgeLevel, badgeValue, type BadgeId } from './data/badges'
 import { KEEN_DECIDES_MS, KEEN_FEE_SHARE, KEEN_RIVAL_FINISH, KEEN_UNTIL_CAPTAINS, KEEN_YOURS } from './data/courting'
 
 const traitsById = new Map(TRAITS.map((t) => [t.id, t]))
@@ -360,6 +361,19 @@ export interface TripFacts {
   t: number
   /** Hands aboard, which Command works with. */
   hands?: number
+  /** Leagues each way, for Long Hauler. */
+  distance?: number
+  /** Landing on the port's market day, for Market Trader. */
+  market?: boolean
+  /** A port beyond home waters, for Chart-maker. */
+  abroad?: boolean
+  /** The hull when she came home (recordVoyage only), for Steady Keel. */
+  hullAfter?: number
+}
+
+/** A captain's badge counts, with Old Salt read from their voyages. */
+export function marksOf(c: Captain): Partial<Record<BadgeId, number>> {
+  return { ...c.marks, 'old-salt': c.voyageCount }
 }
 
 /**
@@ -386,6 +400,13 @@ export function captainMods(c: Captain, trip: TripFacts, mode: 'true' | 'known')
     m.damageMult *= 1 - soft(sk('command')) * SKILL_COMMAND_PER_POINT
     m.durationMult *= 1 - soft(sk('command')) * SKILL_COMMAND_PER_POINT * 0.5
   }
+  // Badges are public too: what they've earned at sea, level by level.
+  const marks = marksOf(c)
+  if (trip.weather === 'storm') m.damageMult *= badgeValue(marks, 'storm-hand')
+  if (trip.weather === 'calm' || trip.weather === 'choppy') m.damageMult *= badgeValue(marks, 'steady-keel')
+  if ((trip.distance ?? 0) >= LONG_TRIP) m.durationMult *= badgeValue(marks, 'long-hauler')
+  if (trip.market) m.payoutMult *= badgeValue(marks, 'trader')
+
   // A Legend's and a Mythic's signatures are public: they count in every quote.
   for (const id of c.rankAbilities ?? []) {
     switch (id) {
@@ -523,6 +544,14 @@ export interface VoyageNews {
 export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealEvery = REVEAL_EVERY, takenPersonas: string[] = []): VoyageNews {
   const news: VoyageNews = { proven: [], disproven: [], developmentRevealed: false, reputationChange: 0, potentialRevealed: false, rankUp: null }
   c.voyageCount++
+  // What this voyage counts toward their badges.
+  const mk = (c.marks ??= {})
+  const bump = (id: BadgeId) => (mk[id] = (mk[id] ?? 0) + 1)
+  if (trip.weather === 'storm') bump('storm-hand')
+  if ((trip.distance ?? 0) >= LONG_TRIP) bump('long-hauler')
+  if (trip.market) bump('trader')
+  if ((trip.hullAfter ?? 0) >= STEADY_HULL) bump('steady-keel')
+  if (trip.abroad) bump('charter')
   const exp: Exposure = c.exposure
   exp[trip.weather]++
   exp[trip.track]++
@@ -533,7 +562,9 @@ export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealE
   if (c.voyageCount > g.startAfter) {
     for (const id of SKILL_IDS) {
       const use = SKILL_USE[id][trip.weather] + (id === 'command' ? COMMAND_USE_PER_HAND * (trip.hands ?? 0) : 0)
-      if (!rollChance(rng, Math.min(1, Math.abs(g.rate) * use))) continue
+      // Old Salts learn faster; those slipping past their peak slip no faster for it.
+      const salt = g.rate > 0 ? badgeValue(marksOf(c), 'old-salt') : 1
+      if (!rollChance(rng, Math.min(1, Math.abs(g.rate) * use * salt))) continue
       c.skills[id] = g.rate > 0 ? Math.min(c.ceilings[id], c.skills[id] + 1) : Math.max(SKILL_MIN, c.skills[id] - 1)
       // Keep the displayed range honest if the skill moves out of it.
       const [lo, hi] = c.bands[id]
@@ -625,8 +656,21 @@ export interface CaptainView {
   fee: number
   /** Overall: the averages of the five skill ranges. */
   skillBand: [number, number]
-  /** Each skill's range as far as you know it; `known` once it's narrower than the whole scale. */
-  skills: { id: SkillId; name: string; description: string; band: [number, number]; known: boolean }[]
+  /** Each skill's range as far as you know it; `known` once it's narrower than the whole scale; `guess` its middle. */
+  skills: { id: SkillId; name: string; description: string; band: [number, number]; known: boolean; guess: number }[]
+  /** Their sea rating (the five skills' average): your best guess, and whether you're sure of it. */
+  rating: { guess: number; band: [number, number]; sure: boolean; from: 'skills' | 'reputation' }
+  /** How high they could grow, as far as you know: a band on the 1–100 scale, and how well it's known. */
+  growth: { band: [number, number]; known: 'unknown' | 'rough' | 'close' }
+  /** Badges, earned and still to earn, with progress. */
+  badges: { id: BadgeId; name: string; mark: string; earn: string; level: 0 | 1 | 2 | 3; count: number; next: number | null; bonus: string | null; bonuses: [string, string, string] }[]
+  /** Their grade once you know them well enough (null until then), and voyages until it shows. */
+  grade: { id: GradeId; name: string; blurb: string } | null
+  gradeIn: number
+  /** What they've sailed: voyages by weather, by cargo or passengers, and by night. */
+  record: { calm: number; choppy: number; rough: number; storm: number; cargo: number; passenger: number; night: number }
+  /** The ranks above five anchors: what it takes, and the signatures each could bring. */
+  rankGoals: { rank: 'legend' | 'mythic'; at: number; reached: boolean; open: 'yes' | 'no' | 'unknown'; abilities: { id: string; name: string; description: string }[] }[]
   /** Shown once scouting or the sea turns it up: they could become a Legend, or a Mythic. */
   potential: 'legend' | 'mythic' | null
   /** Earned at sea, above five anchors. */
@@ -658,6 +702,57 @@ export interface CaptainView {
   region: import('./data/ports').RegionId
 }
 
+/** Their sea rating as far as you know it: the average of the five skill ranges. */
+function ratingOf(c: Captain): CaptainView['rating'] {
+  const lo = Math.round(SKILL_IDS.reduce((n, id) => n + c.bands[id][0], 0) / SKILL_IDS.length)
+  const hi = Math.round(SKILL_IDS.reduce((n, id) => n + c.bands[id][1], 0) / SKILL_IDS.length)
+  // Knowing little of their skills, go by their reputation: each anchor is a 20-point band.
+  if (hi - lo > 40) {
+    const rep: [number, number] = [Math.max(lo, (Math.min(5, c.reputation) - 1) * 20 + 1), Math.min(hi, Math.min(5, c.reputation) * 20)]
+    if (rep[0] <= rep[1]) return { guess: Math.round((rep[0] + rep[1]) / 2), band: rep, sure: false, from: 'reputation' }
+  }
+  return { guess: Math.round((lo + hi) / 2), band: [lo, hi], sure: hi - lo <= 8, from: 'skills' }
+}
+
+/**
+ * How high they could grow, as you'd judge it: nothing beyond their rating until their potential
+ * shows (scouting, or enough voyages), then the band that potential allows, and close to the
+ * truth once you've sailed long enough with them to know.
+ */
+function growthOf(c: Captain): CaptainView['growth'] {
+  const lo = ratingOf(c).band[0]
+  if (c.voyageCount >= CEILING_KNOWN_AFTER) {
+    const at = Math.round(c.ceiling)
+    return { band: [Math.max(lo, at - 3), Math.min(100, at + 3)], known: 'close' }
+  }
+  if (!c.potentialKnown) return { band: [lo, 100], known: 'unknown' }
+  if (c.potential === 'mythic') return { band: [Math.max(lo, MYTHIC_CEILING[0]), MYTHIC_CEILING[1]], known: 'rough' }
+  if (c.potential === 'legend') return { band: [Math.max(lo, LEGEND_CEILING[0]), LEGEND_CEILING[1]], known: 'rough' }
+  return { band: [lo, Math.max(lo, ORDINARY_CEILING)], known: 'rough' }
+}
+
+/**
+ * What sort of captain they've turned out to be, once you know them: a Pearl of the fleet at the
+ * top; a Barnacle when they've sailed plenty, rate low and have stopped getting better.
+ */
+function gradeOf(c: Captain): CaptainView['grade'] {
+  const r = ratingOf(c)
+  if (!r.sure || c.voyageCount < GRADE_KNOWN_AFTER) return null
+  const g = growthOf(c)
+  const room = g.known !== 'unknown' && g.band[1] - r.guess >= 10
+  const id: GradeId = c.rank || r.guess >= 80 ? 'pearl' : r.guess >= 65 ? 'seasoned' : r.guess >= 50 ? 'able' : room || g.known === 'unknown' ? 'driftwood' : 'barnacle'
+  return { id, ...GRADES[id] }
+}
+
+/** Whether a rank is open to them, as far as you know. */
+function openFor(c: Captain, rank: 'legend' | 'mythic'): 'yes' | 'no' | 'unknown' {
+  if (c.rank === rank || (rank === 'legend' && c.rank === 'mythic')) return 'yes'
+  if (!c.potentialKnown) return 'unknown'
+  if (c.potential === 'mythic') return 'yes'
+  if (c.potential === 'legend') return rank === 'legend' ? 'yes' : 'no'
+  return 'no'
+}
+
 export function captainView(c: Captain): CaptainView {
   const dev = c.developmentKnown ? DEVELOPMENT.find((d) => d.id === c.development)! : null
   return {
@@ -671,7 +766,28 @@ export function captainView(c: Captain): CaptainView {
       Math.round(SKILL_IDS.reduce((n, id) => n + c.bands[id][0], 0) / SKILL_IDS.length),
       Math.round(SKILL_IDS.reduce((n, id) => n + c.bands[id][1], 0) / SKILL_IDS.length),
     ],
-    skills: SKILLS.map((d) => ({ id: d.id, name: d.name, description: d.description, band: [...c.bands[d.id]] as [number, number], known: c.bands[d.id][1] - c.bands[d.id][0] < 99 })),
+    skills: SKILLS.map((d) => ({
+      id: d.id,
+      name: d.name,
+      description: d.description,
+      band: [...c.bands[d.id]] as [number, number],
+      known: c.bands[d.id][1] - c.bands[d.id][0] < 99,
+      guess: Math.round((c.bands[d.id][0] + c.bands[d.id][1]) / 2),
+    })),
+    rating: ratingOf(c),
+    growth: growthOf(c),
+    grade: gradeOf(c),
+    gradeIn: Math.max(0, GRADE_KNOWN_AFTER - c.voyageCount),
+    record: { calm: c.exposure.calm, choppy: c.exposure.choppy, rough: c.exposure.rough, storm: c.exposure.storm, cargo: c.exposure.cargo, passenger: c.exposure.passenger, night: c.exposure.night },
+    badges: BADGES.map((b) => {
+      const count = marksOf(c)[b.id] ?? 0
+      const level = badgeLevel(b, count)
+      return { id: b.id, name: b.name, mark: b.mark, earn: b.earn, level, count, next: level < 3 ? b.levels[level as 0 | 1 | 2] : null, bonus: level ? b.bonus[level - 1] : null, bonuses: b.bonus }
+    }),
+    rankGoals: [
+      { rank: 'legend' as const, at: LEGEND_AT, reached: !!c.rank, open: openFor(c, 'legend'), abilities: LEGEND_ABILITIES },
+      { rank: 'mythic' as const, at: MYTHIC_AT, reached: c.rank === 'mythic', open: openFor(c, 'mythic'), abilities: MYTHIC_ABILITIES },
+    ],
     potential: c.potentialKnown && c.potential !== 'none' ? c.potential : null,
     rank: c.rank ?? null,
     persona: PERSONAS.find((p) => p.id === c.persona) ?? null,

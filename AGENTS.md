@@ -177,6 +177,14 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   Ports keep their positions; islands fit themselves clear of every lane from Saltmarsh, and
   `scripts/check-map.ts` checks it. Uncharted regions lie under cloud. Pinch to zoom, drag to pan.
 
+- Captain growth (user-approved 2026-11-06): the captain page leads with a sea rating (best guess
+  from what you've learned, by reputation until then) and a potential bar marking Legend 90 and
+  Mythic 96 that narrows as potential shows (`growthOf` in captains.ts). Badges (`data/badges.ts`):
+  Storm Hand, Long Hauler, Market Trader, Steady Keel, Old Salt, Chart-maker, three levels each,
+  earned at sea, never hidden. Grades once known: Pearl of the fleet, Seasoned, Able, Driftwood,
+  Barnacle. Tabs: Skills, Badges, Record, Log, Orders. Numbers and names are Claude's picks. Sim
+  (6 h): tier 2 4.4 → 4.1 h (settle-in), 4.2 → 4.0 h (wide).
+
 ## Originality
 
 The user does not want this to read as a copy of Pocket Planes or of EA's college football

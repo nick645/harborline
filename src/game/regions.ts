@@ -38,11 +38,11 @@ export function chartingNext(state: GameState): { id: RegionId; name: string; po
 }
 
 /** A completed trip to a port charts the region beyond it. Returns a region's name if this opened it. */
-export function chartTrip(s: GameState, portId: string, weather: Weather): string | null {
+export function chartTrip(s: GameState, portId: string, weather: Weather, mult = 1): string | null {
   for (const r of REGIONS) {
     if (r.chart === 0 || regionOpen(s, r.id) || !r.chartedFrom.includes(portId)) continue
     s.charts ??= {}
-    s.charts[r.id] = Math.min(r.chart, (s.charts[r.id] ?? 0) + CHART_POINTS[weather])
+    s.charts[r.id] = Math.min(r.chart, (s.charts[r.id] ?? 0) + CHART_POINTS[weather] * mult)
     if (s.charts[r.id] >= r.chart) return r.name
   }
   return null

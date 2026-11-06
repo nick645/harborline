@@ -505,3 +505,44 @@ describe('five skills, potential and the ranks above five anchors', () => {
     expect('skillBand' in old).toBe(false)
   })
 })
+
+describe('badges, rating and potential', () => {
+  it('badges build trip by trip, level up, and pay off', () => {
+    const c = captain(21)
+    const rng = createRng(1)
+    const storm = { track: 'cargo' as const, weather: 'storm' as const, t: T0 }
+    const before = captainMods(c, storm, 'known').damageMult
+    for (let i = 0; i < 8; i++) recordVoyage(rng, c, { ...storm, hullAfter: 50 })
+    expect(c.marks?.['storm-hand']).toBe(8)
+    const v = captainView(c).badges.find((b) => b.id === 'storm-hand')!
+    expect(v.level).toBe(1)
+    expect(v.next).toBe(25)
+    // Storm Hand I: less hull damage in storms (skills may have grown a little too, so compare
+    // against the badge alone).
+    expect(captainMods(c, storm, 'known').damageMult).toBeLessThan(before)
+    // Market days, long trips, sound hulls and far waters each count toward their own.
+    recordVoyage(rng, c, { track: 'cargo', weather: 'calm', t: T0, distance: 30, market: true, abroad: true, hullAfter: 95 })
+    expect(c.marks).toMatchObject({ 'long-hauler': 1, trader: 1, charter: 1, 'steady-keel': 1 })
+    // Old Salt reads straight from their voyages.
+    expect(captainView(c).badges.find((b) => b.id === 'old-salt')!.count).toBe(c.voyageCount)
+  })
+
+  it('shows a rating and how high they could grow, only as far as you know', () => {
+    const c = captain(22, { potential: 'none', potentialKnown: false, voyageCount: 0 })
+    const v = captainView(c)
+    expect(v.rating.band[0]).toBeLessThanOrEqual(v.rating.guess)
+    expect(v.rating.band[1]).toBeGreaterThanOrEqual(v.rating.guess)
+    // Nothing known: they could grow anywhere above what you can see.
+    expect(v.growth).toEqual({ band: [v.rating.band[0], 100], known: 'unknown' })
+    expect(v.rankGoals.map((g) => g.open)).toEqual(['unknown', 'unknown'])
+    // Their potential shows: an ordinary captain tops out below Legend.
+    c.potentialKnown = true
+    expect(captainView(c).growth.band[1]).toBeLessThan(LEGEND_AT)
+    expect(captainView(c).rankGoals.map((g) => g.open)).toEqual(['no', 'no'])
+    // Long enough at sea together, you know it to within a few points.
+    c.voyageCount = 40
+    const g = captainView(c).growth
+    expect(g.known).toBe('close')
+    expect(g.band[1] - g.band[0]).toBeLessThanOrEqual(6)
+  })
+})
