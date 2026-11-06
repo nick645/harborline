@@ -16,6 +16,7 @@ import { coins, duration, percent } from '../../../src/format'
 import { BoatScene, SCENE_H, SCENE_W, type BoatMode } from '../art/BoatScene'
 import { SunkScene } from '../art/SunkScene'
 import { DockScene } from '../art/DockScene'
+import { DeckScene } from '../art/DeckScene'
 import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
 import { fonts, useTheme } from '../theme'
@@ -41,6 +42,9 @@ export function BoatScreen(props: BoatProps) {
   // Dev only: preview the scene in any weather.
   const [preview, setPreview] = useState<Weather | null>(null)
   const look = captain ? lookFor(captain.id, captain.rare, captain.region, captain.persona?.id) : null
+  // At sea: aboard with your captain and passengers, or the whole boat from off her beam.
+  const [view, setView] = useState<'deck' | 'boat'>('deck')
+  const atSea = mode === 'sailing' || mode === 'returning'
 
   return (
     <View style={{ flex: 1, gap: 8 }}>
@@ -59,6 +63,20 @@ export function BoatScreen(props: BoatProps) {
                 condition={boat.condition}
                 hands={handCount(game, boat.id)}
                 handIds={handViewsOn(game, boat.id).map((h) => h.id)}
+                onOpenCaptain={captain ? () => onOpenCaptain(captain.id) : undefined}
+              />
+            ) : (atSea || preview) && view === 'deck' ? (
+              <DeckScene
+                width={w}
+                light={lightAt(now)}
+                weather={preview ?? weather}
+                cls={cls}
+                captain={look}
+                captainName={captain?.name}
+                hands={handCount(game, boat.id)}
+                handIds={handViewsOn(game, boat.id).map((h) => h.id)}
+                climate={climate}
+                outbound={mode === 'sailing'}
                 onOpenCaptain={captain ? () => onOpenCaptain(captain.id) : undefined}
               />
             ) : (
@@ -80,6 +98,16 @@ export function BoatScreen(props: BoatProps) {
                 {mode === 'sunk' ? 'Sunk' : mode === 'docked' ? `Moored at ${getPortDef(homeOf(game)).name}` : `${WEATHER[weather].name}${WEATHER[weather].lossRisk ? ` · ${percent(WEATHER[weather].lossRisk)} risk` : ''}`}
               </Text>
             </View>
+            {(atSea || preview) && (
+              <Pressable
+                onPress={() => setView(view === 'deck' ? 'boat' : 'deck')}
+                accessibilityRole="button"
+                accessibilityLabel={view === 'deck' ? 'See the whole boat' : 'Go on deck'}
+                style={[styles.viewToggle, { backgroundColor: 'rgba(29,20,32,0.8)' }]}
+              >
+                <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 12 }}>{view === 'deck' ? '⤢ Whole boat' : '⤡ On deck'}</Text>
+              </Pressable>
+            )}
             {__DEV__ && (
               <View style={styles.devChips}>
                 {(['calm', 'choppy', 'rough', 'storm'] as const).map((wx) => (
@@ -136,6 +164,7 @@ export function BoatScreen(props: BoatProps) {
 const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderRadius: 10, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   devChips: { position: 'absolute', right: 10, top: 10, flexDirection: 'row', gap: 4 },
+  viewToggle: { position: 'absolute', right: 10, bottom: 10, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
   pill: { position: 'absolute', left: 10, top: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
   dot: { width: 9, height: 9, borderRadius: 5 },
   track: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
