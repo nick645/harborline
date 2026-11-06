@@ -480,3 +480,41 @@ export function setManagerCrewing(state: GameState, managerId: string, on: boole
   getCaptain(s, managerId).handlesCrew = on
   return s
 }
+
+/** Someone you've started courting, wherever they are, and where to find them. */
+export interface CourtedView {
+  id: string
+  name: string
+  kind: 'captain' | 'hand'
+  portId: string
+  /** On the quay, or by the tavern fire. */
+  place: 'quay' | 'tavern'
+  reputation: number | null
+  rare: boolean
+  region: import('./data/ports').RegionId
+  court: import('./courting').CourtingView
+}
+
+/** Everyone you've courted and who is still deciding, soonest to decide first. */
+export function courtedPeople(state: GameState, now: number): CourtedView[] {
+  const out: CourtedView[] = []
+  const add = (p: Captain | Deckhand, kind: 'captain' | 'hand', portId: string, place: 'quay' | 'tavern') => {
+    if (!p.courting) return
+    const v = courtingView(p.courting, now)
+    if (!v.courted) return
+    const cap = kind === 'captain' ? (p as Captain) : null
+    out.push({ id: p.id, name: p.name, kind, portId, place, reputation: cap?.reputation ?? null, rare: !!cap?.rare, region: cap?.region ?? 'bay', court: v })
+  }
+  const home = homeOf(state)
+  for (const c of state.recruitPool.recruits) add(c, 'captain', home, 'quay')
+  if (state.tavern) {
+    for (const h of state.tavern.hands) add(h, 'hand', home, 'tavern')
+    if (state.tavern.captain) add(state.tavern.captain, 'captain', home, 'tavern')
+  }
+  for (const [portId, pool] of Object.entries(state.portPools ?? {})) {
+    for (const c of pool.recruits) add(c, 'captain', portId, 'quay')
+    for (const h of pool.hands) add(h, 'hand', portId, 'tavern')
+    if (pool.captain) add(pool.captain, 'captain', portId, 'tavern')
+  }
+  return out.sort((a, b) => a.court.decidesAt - b.court.decidesAt)
+}

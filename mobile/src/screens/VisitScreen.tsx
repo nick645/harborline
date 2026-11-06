@@ -35,6 +35,8 @@ type Props = {
   onHireHand: (handId: string, boatId: string) => void
   onOpenCaptain: (id: string) => void
   onMoveHome: (portId: string) => void
+  /** Someone to have selected when the quay or tavern opens. */
+  focusId?: string | null
   /** Which page of the port; kept by the caller so other screens can send you straight to a tavern. */
   page: VisitPage
   onPage: (p: VisitPage) => void

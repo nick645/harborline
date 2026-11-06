@@ -99,7 +99,10 @@ function Harbor() {
   const [portsSel, setPortsSel] = useState<string | null>(null)
   const [portsPage, setPortsPage] = useState<VisitPage>('menu')
   const confirm = useConfirm()
-  const goToPort = (id: string, page: VisitPage = 'menu') => {
+  // Someone to have selected when a quay or tavern opens (from the Captains tab's courting list).
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const goToPort = (id: string, page: VisitPage = 'menu', focus: string | null = null) => {
+    setFocusId(focus)
     setStack([])
     setPortsSel(id)
     setPortsPage(page)
@@ -301,7 +304,9 @@ function Harbor() {
               </>
             )}
 
-            {tab === 'captains' && <CaptainsScreen game={game} now={now} onOpenCaptain={(id) => open({ kind: 'captain', id })} />}
+            {tab === 'captains' && (
+              <CaptainsScreen game={game} now={now} onOpenCaptain={(id) => open({ kind: 'captain', id })} onOpenCourted={(portId, place, id) => goToPort(portId, place, id)} />
+            )}
 
             {tab === 'ports' && (
               <PortsScreen
@@ -314,6 +319,7 @@ function Harbor() {
                 }}
                 page={portsPage}
                 onPage={setPortsPage}
+                focusId={focusId}
                 onSend={(boatId, routeId, trips) => void send(boatById(boatId), routeId, trips)}
                 onScout={(id, a) =>
                   ask(

@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
-import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtingOf, managerRole, portPeople, quayInfo, recruitViewById, rosterViews } from '../../../src/game/crew'
+import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtedPeople, courtingOf, managerRole, portPeople, quayInfo, recruitViewById, rosterViews } from '../../../src/game/crew'
 import { termsFee } from '../../../src/game/courting'
 import { COURT_ACTIONS, TERMS_MAX, type CourtAction } from '../../../src/game/data/courting'
 import type { RegionId } from '../../../src/game/data/ports'
@@ -46,6 +46,8 @@ type Props = {
   onView: (v: CaptainsView) => void
   /** Whose quay and tavern: home by default. A port screen shows only its quay and tavern. */
   portId?: string
+  /** Someone to have selected on arrival (from the Captains tab's courting list). */
+  focusId?: string | null
 }
 
 export type CaptainsView = 'quay' | 'tavern'
@@ -67,9 +69,86 @@ export function HiringScreen(props: Props) {
   )
 }
 
-/** Your captains: at work on the home quay, and the roster. */
-export function CaptainsScreen({ game, now, onOpenCaptain }: { game: GameState; now: number; onOpenCaptain: (id: string) => void }) {
-  return <Roster game={game} now={now} onOpenCaptain={onOpenCaptain} />
+/** Your captains: at work on the home quay, and the roster; then everyone you're courting. */
+export function CaptainsScreen({
+  game,
+  now,
+  onOpenCaptain,
+  onOpenCourted,
+}: {
+  game: GameState
+  now: number
+  onOpenCaptain: (id: string) => void
+  onOpenCourted: (portId: string, place: CaptainsView, id: string) => void
+}) {
+  return (
+    <View style={{ flex: 1, gap: 10 }}>
+      <Roster game={game} now={now} onOpenCaptain={onOpenCaptain} />
+      <Courting game={game} now={now} onOpen={onOpenCourted} />
+    </View>
+  )
+}
+
+/** Your prospects: everyone you've started winning over, wherever they are: when they decide, which way it's going. */
+function Courting({ game, now, onOpen }: { game: GameState; now: number; onOpen: (portId: string, place: CaptainsView, id: string) => void }) {
+  const t = useTheme()
+  const people = courtedPeople(game, now)
+  return (
+    <View style={{ gap: 6 }}>
+      <Row style={{ justifyContent: 'space-between' }}>
+        <Title size={20}>Prospects</Title>
+        <Muted>{people.length ? `${people.length} deciding` : ''}</Muted>
+      </Row>
+      {people.length === 0 ? (
+        <Muted>None yet. Anyone you start winning over on a quay or in a tavern shows here, with when they'll decide.</Muted>
+      ) : (
+        <Strip>
+          {people.map((p) => {
+            const v = p.court
+            const ready = v.canSign
+            const yours = v.forecast === 'you'
+            const color = ready ? t.good : yours ? t.good : t.bad
+            const status = ready ? 'Won over: sign now' : yours ? 'Signs with you' : `Going to ${v.finalLeader.name}`
+            return (
+              <Pressable
+                key={p.id}
+                onPress={() => onOpen(p.portId, p.place, p.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`${p.name}, ${status}, at ${getPortDef(p.portId).name}`}
+                style={({ pressed }) => ({ width: 150, padding: 8, gap: 3, borderRadius: 14, borderWidth: 1.5, borderColor: ready ? t.good : p.rare ? t.legendary : t.border, backgroundColor: t.surface, opacity: pressed ? 0.8 : 1 })}
+              >
+                <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
+                  {p.kind === 'captain' ? (
+                    <Portrait id={p.id} rare={p.rare} region={p.region} small />
+                  ) : (
+                    <View style={{ width: 34, height: 38, borderRadius: 8, backgroundColor: t.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: t.muted, fontSize: 16 }}>⚓︎</Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 16 }}>
+                      {p.rare ? '✦ ' : ''}
+                      {p.name}
+                    </Text>
+                    {p.reputation ? <Standing c={{ reputation: p.reputation, rank: null }} size={10} /> : <Muted style={{ fontSize: 11 }}>Deckhand</Muted>}
+                  </View>
+                </Row>
+                <Text numberOfLines={1} style={{ color, fontFamily: fonts.semibold, fontSize: 12 }}>
+                  {status}
+                </Text>
+                <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 11 }}>
+                  {ready ? 'Before anyone else does' : `Decides in ${duration(Math.max(0, v.decidesAt - now))}`}
+                </Text>
+                <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 11 }}>
+                  {getPortDef(p.portId).name} · {p.place === 'quay' ? 'the quay' : 'the tavern'} ›
+                </Text>
+              </Pressable>
+            )
+          })}
+        </Strip>
+      )}
+    </View>
+  )
 }
 
 /** How many watches are left today, and when new faces arrive. */
@@ -96,7 +175,7 @@ function Tavern(props: Props) {
   const t = useTheme()
   const { hands, captain } = portPeople(game, props.portId ?? homeOf(game))
   const region = portRegion(props.portId ?? homeOf(game))
-  const [selectedId, setSelected] = useState<string | null>(null)
+  const [selectedId, setSelected] = useState<string | null>(props.focusId ?? null)
   const selHand = hands.find((h) => h.id === selectedId) ?? (captain && selectedId === captain.id ? null : hands[0] ?? null)
   const selCaptain = captain && (selectedId === captain.id || (!selHand && !hands.length)) ? captain : null
   const boats = boatsNeedingHands(game).filter((b) => b.state === 'idle')
@@ -270,7 +349,7 @@ function Forecast({ v, first, fee, coins: have, now }: { v: NonNullable<ReturnTy
     color = t.good
   } else if (!v.courted) {
     head = `If nothing changes: signs with ${v.finalLeader.name} in ${when}`
-    body = `${first} hasn't heard from you yet. Court them at least once, or they'll go elsewhere.`
+    body = `${first} hasn't heard from you yet. Make at least one move to win them over, or they'll go elsewhere.`
     color = t.bad
   } else if (v.forecast === 'you') {
     head = `If nothing changes: signs with you in ${when}`
@@ -294,7 +373,7 @@ function Quay(props: Props) {
   const people = portPeople(game, props.portId ?? homeOf(game))
   const recruits = people.recruits
   const region = portRegion(props.portId ?? homeOf(game))
-  const [selectedId, setSelected] = useState<string | null>(null)
+  const [selectedId, setSelected] = useState<string | null>(props.focusId ?? null)
   const sel = recruits.find((r) => r.id === selectedId) ?? recruits[0] ?? null
   return (
     <View style={{ flex: 1, gap: 8 }}>
@@ -443,11 +522,12 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
 }
 
 /** A small head-and-shoulders portrait under lamplight. */
-function Portrait({ id, rare, region, persona }: { id: string; rare: boolean; region: RegionId; persona?: string }) {
+function Portrait({ id, rare, region, persona, small }: { id: string; rare: boolean; region: RegionId; persona?: string; small?: boolean }) {
   const clock = useSceneClock()
+  const k = small ? 0.6 : 1
   return (
-    <Canvas style={{ width: 56, height: 64 }}>
-      <Group clip={rrect(rect(0, 0, 56, 64), 10, 10)}>
+    <Canvas style={{ width: 56 * k, height: 64 * k }}>
+      <Group transform={[{ scale: k }]} clip={rrect(rect(0, 0, 56, 64), 10, 10)}>
         <Rect x={0} y={0} width={56} height={64} color="#433145" />
         <Figure look={lookFor(id, rare, region, persona)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
       </Group>

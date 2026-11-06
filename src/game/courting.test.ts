@@ -2,7 +2,7 @@ import { harbourGame } from './testing'
 import { describe, expect, it } from 'vitest'
 import type { Captain, GameState } from './types'
 import { settle } from './state'
-import { court, courtingOf, hireCaptain } from './crew'
+import { court, courtedPeople, courtingOf, hireCaptain } from './crew'
 import { courtingView, leadingRival, rivalStanding } from './courting'
 import { newRecruit } from './captains'
 import { createRng } from './rolls'
@@ -131,5 +131,22 @@ describe('courting', () => {
     const v = courtingView(c.courting!, T0) as unknown as Record<string, unknown>
     expect(v).not.toHaveProperty('wants')
     expect(JSON.stringify(v)).not.toContain('"storms"')
+  })
+})
+
+describe('prospects', () => {
+  it('lists everyone you have started winning over, with where to find them, soonest first', () => {
+    let s = harbourGame(31, T0)
+    expect(courtedPeople(s, T0)).toEqual([])
+    const [a, b] = s.recruitPool.recruits
+    s = court(s, b.id, 'harbour', T0)
+    s = court(s, a.id, 'drink', T0)
+    const list = courtedPeople(s, T0)
+    expect(list.map((p) => p.id).sort()).toEqual([a.id, b.id].sort())
+    expect(list[0].court.decidesAt).toBeLessThanOrEqual(list[1].court.decidesAt)
+    expect(list.every((p) => p.portId === 'saltmarsh' && p.place === 'quay' && p.kind === 'captain')).toBe(true)
+    // Once they've decided, they leave the list.
+    const later = settle(s, Math.max(...list.map((p) => p.court.decidesAt)) + 1000)
+    expect(courtedPeople(later, Math.max(...list.map((p) => p.court.decidesAt)) + 1000).some((p) => p.id === a.id || p.id === b.id)).toBe(false)
   })
 })
