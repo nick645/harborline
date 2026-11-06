@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
-import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtingOf, managerRole, portPeople, quayInfo, rosterViews } from '../../../src/game/crew'
+import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtingOf, managerRole, portPeople, quayInfo, recruitViewById, rosterViews } from '../../../src/game/crew'
 import { termsFee } from '../../../src/game/courting'
 import { COURT_ACTIONS, TERMS_MAX, type CourtAction } from '../../../src/game/data/courting'
 import type { RegionId } from '../../../src/game/data/ports'
@@ -173,6 +173,8 @@ function CourtPanel({ game, now, onCourt, personId, name, hand }: Props & { pers
   const watches = quayInfo(game, now).watchesLeft
   const boat = boatToShowTo(game, personId)
   const cost = (a: CourtAction) => (hand ? COURT_ACTIONS[a].handWatches : COURT_ACTIONS[a].watches)
+  // A captain's fee, better terms included (a hand's depends on the boat they'd join).
+  const fee = hand ? undefined : recruitViewById(game, personId)?.fee
   // Remember what they'd shown you before, so the reaction can tell what's new.
   const act = async (a: CourtAction) => {
     const knownBefore = v.known.length
@@ -191,11 +193,17 @@ function CourtPanel({ game, now, onCourt, personId, name, hand }: Props & { pers
           : said === 'ship'
             ? `${first} walks the deck of ${boat?.nickname ?? 'your boat'} and runs a hand along the rail.`
             : `${first} takes in your harbour.`
-  const buttons: { a: CourtAction; label: string; disabled: boolean }[] = [
-    { a: 'drink', label: `Drink${cost('drink') ? ` · ${cost('drink')}` : ''}`, disabled: !v.drinkReady || watches < cost('drink') },
-    { a: 'harbour', label: 'Harbour', disabled: v.walked || watches < cost('harbour') },
-    { a: 'ship', label: 'A boat', disabled: v.shown || !boat },
-    { a: 'terms', label: 'Terms', disabled: v.terms >= TERMS_MAX },
+  // What each costs, and why it can't be done right now.
+  const buttons: { a: CourtAction; label: string; cost: string; why: string | null }[] = [
+    {
+      a: 'drink',
+      label: 'Drink',
+      cost: `${cost('drink')} watch${cost('drink') === 1 ? '' : 'es'} (time)`,
+      why: !v.drinkReady ? 'Again later' : watches < cost('drink') ? 'No watches' : null,
+    },
+    { a: 'harbour', label: 'Harbour', cost: 'Free · once', why: v.walked ? 'Done' : null },
+    { a: 'ship', label: 'A boat', cost: 'Free · once', why: v.shown ? 'Done' : !boat ? 'None docked' : null },
+    { a: 'terms', label: 'Terms', cost: fee ? `+${coins(Math.round((fee * 0.25) / 10) * 10)}c fee` : 'Fee +25%', why: v.terms >= TERMS_MAX ? 'Maxed' : null },
   ]
   return (
     <View style={{ gap: 6 }}>
@@ -217,11 +225,66 @@ function CourtPanel({ game, now, onCourt, personId, name, hand }: Props & { pers
       )}
       <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
         {buttons.map((b) => (
-          <View key={b.a} style={{ flex: 1 }}>
-            <Button small kind="secondary" label={b.label} disabled={b.disabled} onPress={() => void act(b.a)} />
-          </View>
+          <Pressable
+            key={b.a}
+            disabled={!!b.why}
+            onPress={() => void act(b.a)}
+            accessibilityRole="button"
+            accessibilityLabel={`${b.label}, ${b.why ?? b.cost}`}
+            style={({ pressed }) => ({
+              flex: 1,
+              alignItems: 'center',
+              paddingVertical: 7,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: b.why ? t.border : t.accent,
+              backgroundColor: pressed ? t.surface2 : t.surface,
+              opacity: b.why ? 0.5 : 1,
+            })}
+          >
+            <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 14 }}>{b.label}</Text>
+            <Text style={{ color: b.why ? t.muted : t.accent, fontFamily: fonts.medium, fontSize: 11, textAlign: 'center' }}>{b.cost}</Text>
+            {b.why && <Text style={{ color: t.muted, fontFamily: fonts.semibold, fontSize: 10 }}>{b.why}</Text>}
+          </Pressable>
         ))}
       </Row>
+      <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 11 }}>
+        Watches are your time on the quay: {watches} left, a fresh few every 6 hours. Coins are only paid when they sign: their fee, plus anything better terms add. Each helps a little; whatever answers what they want helps a lot.
+      </Text>
+      <Forecast v={v} first={first} fee={fee} coins={game.player.coins} now={now} />
+    </View>
+  )
+}
+
+/** In plain words: when they'll decide, who they'll go with if nothing changes, and what it takes. */
+function Forecast({ v, first, fee, coins: have, now }: { v: NonNullable<ReturnType<typeof courtingOf>>; first: string; fee?: number; coins: number; now: number }) {
+  const t = useTheme()
+  const when = duration(Math.max(0, v.decidesAt - now))
+  const short = fee !== undefined && have < fee
+  let head: string
+  let body: string
+  let color = t.text
+  if (v.canSign) {
+    head = `${first} is won over`
+    body = 'Sign them on now, before anyone else does.'
+    color = t.good
+  } else if (!v.courted) {
+    head = `If nothing changes: signs with ${v.finalLeader.name} in ${when}`
+    body = `${first} hasn't heard from you yet. Court them at least once, or they'll go elsewhere.`
+    color = t.bad
+  } else if (v.forecast === 'you') {
+    head = `If nothing changes: signs with you in ${when}`
+    body = `${short ? `You'll need ${coins(fee!)}c by then, or they'll go to ${v.finalLeader.name}. ` : `They join on their own when time's up${fee !== undefined ? ` (${coins(fee)}c)` : ''}. `}To sign sooner, win them over: ${v.toWinOver} more.`
+    color = t.good
+  } else {
+    head = `If nothing changes: signs with ${v.finalLeader.name} in ${when}`
+    body = `The rivals keep gaining until then. You need ${v.toLevel} more to stay level at the end.`
+    color = t.bad
+  }
+  return (
+    <View style={{ borderRadius: 10, borderWidth: 1, borderColor: color, padding: 8, gap: 2 }}>
+      <Text style={{ color, fontFamily: fonts.bold, fontSize: 14 }}>{head}</Text>
+      <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 16 }}>{body}</Text>
     </View>
   )
 }
@@ -314,11 +377,7 @@ function RecruitCard(props: Props & { sel: CaptainView; rare?: boolean }) {
           </Row>
         </View>
       )}
-      {court?.canSign ? (
-        <Button small label={`Sign them on · ${coins(sel.fee)}c`} disabled={game.player.coins < sel.fee} onPress={() => onHire(sel.id)} />
-      ) : (
-        panel === 'court' && <Muted numberOfLines={1}>{court?.leaning ? 'If you stay level with every rival, they sign with you.' : 'Get level with every rival before they decide.'}</Muted>
-      )}
+      {court?.canSign && <Button small label={`Sign them on · ${coins(sel.fee)}c`} disabled={game.player.coins < sel.fee} onPress={() => onHire(sel.id)} />}
     </Card>
   )
 }

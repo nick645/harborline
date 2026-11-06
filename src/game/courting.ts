@@ -223,6 +223,16 @@ export interface CourtingView {
   walked: boolean
   shown: boolean
   terms: number
+  /** You've done something to court them (nobody signs with a line that never spoke to them). */
+  courted: boolean
+  /** The strongest rival as they'll stand when time's up: rivals keep gaining until then. */
+  finalLeader: { name: string; standing: number }
+  /** If nothing changes: who they'll sign with when time's up. */
+  forecast: 'you' | 'rival'
+  /** How much more standing it takes to win them over now (sign early), 0 once you have. */
+  toWinOver: number
+  /** How much more standing it takes to be level with the strongest rival at the deadline. */
+  toLevel: number
 }
 
 export function courtingView(c: Courting, t: number): CourtingView {
@@ -233,6 +243,8 @@ export function courtingView(c: Courting, t: number): CourtingView {
     })
     .sort((a, b) => b.standing - a.standing)
   const want = (id: WantId) => WANTS.find((w) => w.id === id)!
+  const courted = c.known.length > 0 || c.walked || c.shown || c.terms > 0 || c.drinkSlot !== null
+  const final = leadingRival(c, c.decidesAt)
   return {
     decidesAt: c.decidesAt,
     yours: c.yours,
@@ -248,6 +260,11 @@ export function courtingView(c: Courting, t: number): CourtingView {
     walked: c.walked,
     shown: c.shown,
     terms: c.terms,
+    courted,
+    finalLeader: { name: RIVALS.find((x) => x.id === final.id)!.name, standing: final.standing },
+    forecast: courted && c.yours >= final.standing ? 'you' : 'rival',
+    toWinOver: wonOver(c, t) ? 0 : Math.max(WON_OVER_AT - c.yours, rivals[0].standing + WON_OVER_LEAD - c.yours, 1),
+    toLevel: Math.max(0, final.standing - c.yours),
   }
 }
 
