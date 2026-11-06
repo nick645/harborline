@@ -1,5 +1,5 @@
 // On deck, at sea: you're standing aboard. Your captain at the wheel by the wheelhouse, close
-// enough to know; passengers on the benches under the awning and at the rail (a passenger
+// enough to know; passengers strolling the deck under the awning and at the rail (a passenger
 // boat), or the cargo lashed down with the hands working it (a cargo boat). Past the rail the
 // sea runs by and the coast slides past; everything rolls with the swell, harder as the weather
 // worsens, under its climate's rain, snow or blowing dust. Design space matches BoatScene
@@ -18,7 +18,7 @@ import { Walker } from './Walker'
 import { Fall } from './Climate'
 import { CLIMATE_LOOK, GLOOM } from './climateLook'
 import { useSceneClock } from './clock'
-import { hash, mix, shade, tint } from './paint'
+import { hash, mix, shade } from './paint'
 import { SCENE_H, SCENE_W } from './BoatScene'
 
 const HORIZON = 120
@@ -107,11 +107,7 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
 
   // Who's aboard, and where.
   const capX = 274
-  /** The bench seat's top, at a seated passenger's waist. */
-  const seatY = DECK + 14
-  const BENCH_W = 206
-  const seated = passengers ? Math.min(4, 3 + Math.floor(cls.sizeTier / 3)) : 0
-  const strollers = passengers ? (cls.sizeTier >= 2 ? 2 : 1) : 0
+  const walkers = passengers ? Math.min(6, 3 + cls.sizeTier) : 0
   const workers = passengers ? Math.min(hands, 1) : Math.max(1, Math.min(3, hands + 1))
   const awning = AWNINGS[(seed >>> 7) % AWNINGS.length]
   const deckWood = cls.sizeTier >= 4 ? '#a08a6a' : '#b88e5e'
@@ -228,65 +224,30 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
               )
             })}
 
-            {/* Passengers strolling at the rail */}
-            {Array.from({ length: strollers }, (_, i) => (
-              <Walker
-                key={`walk${i}`}
-                look={passenger(seed, 10 + i, wet)}
-                clock={clock}
-                x0={20 + i * 90}
-                x1={150 + i * 70}
-                footY={DECK + 20 - i * 3}
-                scale={0.55}
-                speed={6 + i * 2}
-                pauseMs={3800}
-                offset={i * 2700}
-                wind={weather !== 'calm'}
-              />
-            ))}
-
-            {/* Passengers on a bench: a slatted back behind them, the seat under them, legs down in front */}
-            {seated > 0 && (
-              <Group>
-                {/* The backrest */}
-                {[seatY - 44, seatY - 30, seatY - 16].map((y) => (
-                  <Rect key={y} x={12} y={y} width={BENCH_W} height={9} color={lit(tint('#6e4733', 0.08))} />
-                ))}
-                {[16, BENCH_W + 2].map((x) => (
-                  <Rect key={x} x={x} y={seatY - 50} width={8} height={52} color={lit(shade('#6e4733', 0.25))} />
-                ))}
-                {Array.from({ length: seated }, (_, i) => {
-                  const x = 30 + i * ((BENCH_W - 40) / seated)
-                  return <Figure key={`sit${i}`} look={passenger(seed, i, wet)} x={x} y={seatY - 77} scale={0.86} clock={clock} offset={i * 1300} wind={weather !== 'calm'} />
-                })}
-                {/* The seat, then each passenger's knees and shins over its edge */}
-                <Rect x={10} y={seatY - 2} width={BENCH_W + 4} height={8} color={lit('#8a5a3a')} />
-                <Rect x={10} y={seatY + 6} width={BENCH_W + 4} height={3} color={lit(shade('#6e4733', 0.3))} />
-                {Array.from({ length: seated }, (_, i) => {
-                  const look = passenger(seed, i, wet)
-                  const cx = 30 + i * ((BENCH_W - 40) / seated) + 24
-                  return (
-                    <Group key={`legs${i}`}>
-                      {/* The lap, from under the coat over the seat to the knees, then the shins */}
-                      {/* Shins and knees in trousers, then the coat falling over the lap to just above them */}
-                      <Rect x={cx - 10} y={seatY + 2} width={8} height={34} color={lit(shade(look.trousers, 0.1))} />
-                      <Rect x={cx + 2} y={seatY + 2} width={8} height={34} color={lit(shade(look.trousers, 0.1))} />
-                      {/* Their lap: hips on the seat, the coat's hem just over its front edge */}
-                      <Path
-                        path={`M${cx - 13} ${seatY - 6} L ${cx + 13} ${seatY - 6} L ${cx + 14} ${seatY + 3} Q ${cx} ${seatY + 6} ${cx - 14} ${seatY + 3} Z`}
-                        color={lit(look.coat)}
-                      />
-                      <Path path={`M${cx - 14} ${seatY + 3} Q ${cx} ${seatY + 6} ${cx + 14} ${seatY + 3}`} color={lit(shade(look.coat, 0.3))} style="stroke" strokeWidth={1.2} />
-                      <RoundedRect x={cx - 11} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
-                      <RoundedRect x={cx + 1} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
-                    </Group>
-                  )
-                })}
-                {[16, BENCH_W + 2].map((x) => (
-                  <Rect key={`leg${x}`} x={x} y={seatY + 6} width={7} height={36} color={lit('#3a2420')} />
-                ))}
-              </Group>
-            )}
+            {/* Passengers on their feet: strolling the deck at different distances, and stopping
+                at the rail to look out to sea. Farther ones are smaller and further up the deck,
+                drawn first so nearer ones pass in front. */}
+            {Array.from({ length: walkers }, (_, i) => i)
+              .sort((a, b) => (a % 3) - (b % 3))
+              .map((i) => {
+                const depth = i % 3
+                const lane = ([[10, 150], [70, 230], [0, 120], [120, 240], [30, 200]] as [number, number][])[i % 5]
+                return (
+                  <Walker
+                    key={`pax${i}`}
+                    look={passenger(seed, i, wet)}
+                    clock={clock}
+                    x0={lane[0]}
+                    x1={lane[1]}
+                    footY={DECK + 16 + depth * 30}
+                    scale={0.5 + depth * 0.14}
+                    speed={5 + depth * 2}
+                    pauseMs={i % 2 ? 6500 : 3200}
+                    offset={i * 2300}
+                    wind={weather !== 'calm'}
+                  />
+                )
+              })}
 
             {/* Your captain at the wheel */}
             {captain && (
