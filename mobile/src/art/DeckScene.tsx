@@ -267,9 +267,11 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
                   const cx = 30 + i * ((BENCH_W - 40) / seated) + 24
                   return (
                     <Group key={`legs${i}`}>
-                      <RoundedRect x={cx - 11} y={seatY + 1} width={22} height={12} r={4} color={lit(look.trousers)} />
-                      <Rect x={cx - 9} y={seatY + 10} width={7} height={26} color={lit(shade(look.trousers, 0.12))} />
-                      <Rect x={cx + 2} y={seatY + 10} width={7} height={26} color={lit(shade(look.trousers, 0.12))} />
+                      {/* The lap, from under the coat over the seat to the knees, then the shins */}
+                      <RoundedRect x={cx - 16} y={seatY - 7} width={32} height={19} r={7} color={lit(look.trousers)} />
+                      <Rect x={cx - 16} y={seatY - 7} width={32} height={5} color={lit(shade(look.trousers, 0.2))} />
+                      <Rect x={cx - 10} y={seatY + 8} width={8} height={28} color={lit(shade(look.trousers, 0.12))} />
+                      <Rect x={cx + 2} y={seatY + 8} width={8} height={28} color={lit(shade(look.trousers, 0.12))} />
                       <RoundedRect x={cx - 11} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
                       <RoundedRect x={cx + 1} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
                     </Group>
