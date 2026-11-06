@@ -36,3 +36,25 @@ export const LANDMARK_SHIFT: Record<string, number> = {
   ember: -36,
   lastlight: -36,
 }
+
+/** How tall each landmark stands above the water (scene units), for framing it on a postcard. */
+export const LANDMARK_HEIGHT: Record<string, number> = {
+  saltmarsh: 90,
+  gullwick: 56,
+  brindle: 112,
+  cobble: 104,
+  farhaven: 118,
+  mistle: 46,
+  greyhollow: 118,
+  wickstone: 94,
+  sealrock: 34,
+  coralby: 34,
+  driftwood: 60,
+  saffron: 102,
+  holdfast: 92,
+  frostgate: 94,
+  anvil: 120,
+  lanternhold: 145,
+  ember: 104,
+  lastlight: 124,
+}

@@ -302,8 +302,9 @@ export function PortScene({ width, height, light, port, weather = 'calm' }: { wi
         ))}
 
         {/* The quay you're standing on */}
-        <Rect x={0} y={QUAY} width={W} height={H - QUAY}>
-          <LinearGradient start={vec(0, QUAY)} end={vec(0, H)} colors={[lit(port.region === 'sunward' ? '#c9a26a' : '#7a5038'), lit(port.region === 'sunward' ? '#a8845a' : '#4a2e22')]} />
+        {/* Runs on past the bottom: a taller frame shows more of the quay, not a band of nothing */}
+        <Rect x={-60} y={QUAY} width={W + 120} height={H - QUAY + 400}>
+          <LinearGradient start={vec(0, QUAY)} end={vec(0, H + 60)} colors={[lit(port.region === 'sunward' ? '#c9a26a' : '#7a5038'), lit(port.region === 'sunward' ? '#a8845a' : '#4a2e22')]} />
         </Rect>
         {Array.from({ length: 12 }, (_, i) => (
           <Path key={i} path={`M${i * 32 + 10} ${QUAY + 2} v ${H - QUAY}`} color={lit('#3a2420')} style="stroke" strokeWidth={0.6} opacity={0.5} />
@@ -354,7 +355,7 @@ export function PortScene({ width, height, light, port, weather = 'calm' }: { wi
         ))}
 
         {/* The weather over the town: its climate's rain, snow or dust, and the sky sinking with it */}
-        <Rect x={-60} y={-200} width={W + 120} height={H + 260} color={climate === 'temperate' ? STORM.veil : CLIMATE_LOOK[climate].veil} opacity={GLOOM[weather] * 0.55} />
+        <Rect x={-60} y={-400} width={W + 120} height={H + 800} color={climate === 'temperate' ? STORM.veil : CLIMATE_LOOK[climate].veil} opacity={GLOOM[weather] * 0.55} />
         <Fall climate={climate} weather={weather} clock={clock} />
       </Group>
     </Stage>
