@@ -106,8 +106,10 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
   const hills = 'M-460 0 C -380 -24, -300 -30, -220 -14 C -150 -30, -60 -26, 20 -10 C 90 -22, 180 -34, 260 -16 C 330 -28, 400 -20, 460 -6 L 460 4 L -460 4 Z'
 
   // Who's aboard, and where.
-  const capX = 262
-  const benchY = DECK + 30
+  const capX = 274
+  /** The bench seat's top, at a seated passenger's waist. */
+  const seatY = DECK + 14
+  const BENCH_W = 206
   const seated = passengers ? Math.min(4, 3 + Math.floor(cls.sizeTier / 3)) : 0
   const strollers = passengers ? (cls.sizeTier >= 2 ? 2 : 1) : 0
   const workers = passengers ? Math.min(hands, 1) : Math.max(1, Math.min(3, hands + 1))
@@ -243,18 +245,38 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
               />
             ))}
 
-            {/* Passengers on the bench, waist up behind its back */}
+            {/* Passengers on a bench: a slatted back behind them, the seat under them, legs down in front */}
             {seated > 0 && (
               <Group>
+                {/* The backrest */}
+                {[seatY - 44, seatY - 30, seatY - 16].map((y) => (
+                  <Rect key={y} x={12} y={y} width={BENCH_W} height={9} color={lit(tint('#6e4733', 0.08))} />
+                ))}
+                {[16, BENCH_W + 2].map((x) => (
+                  <Rect key={x} x={x} y={seatY - 50} width={8} height={52} color={lit(shade('#6e4733', 0.25))} />
+                ))}
                 {Array.from({ length: seated }, (_, i) => {
-                  const x = 24 + i * (220 / seated)
-                  return <Figure key={`sit${i}`} look={passenger(seed, i, wet)} x={x} y={benchY - 98} scale={0.86} clock={clock} offset={i * 1300} wind={weather !== 'calm'} />
+                  const x = 30 + i * ((BENCH_W - 40) / seated)
+                  return <Figure key={`sit${i}`} look={passenger(seed, i, wet)} x={x} y={seatY - 83} scale={0.86} clock={clock} offset={i * 1300} wind={weather !== 'calm'} />
                 })}
-                <Rect x={10} y={benchY - 8} width={240} height={12} color={lit('#6e4733')} />
-                <Rect x={10} y={benchY - 12} width={240} height={5} color={lit(tint('#6e4733', 0.15))} />
-                <Rect x={10} y={benchY + 4} width={240} height={24} color={lit(shade('#6e4733', 0.2))} />
-                {[22, 130, 238].map((x) => (
-                  <Rect key={x} x={x} y={benchY + 28} width={6} height={22} color={lit('#3a2420')} />
+                {/* The seat, then each passenger's knees and shins over its edge */}
+                <Rect x={10} y={seatY - 2} width={BENCH_W + 4} height={8} color={lit('#8a5a3a')} />
+                <Rect x={10} y={seatY + 6} width={BENCH_W + 4} height={3} color={lit(shade('#6e4733', 0.3))} />
+                {Array.from({ length: seated }, (_, i) => {
+                  const look = passenger(seed, i, wet)
+                  const cx = 30 + i * ((BENCH_W - 40) / seated) + 24
+                  return (
+                    <Group key={`legs${i}`}>
+                      <RoundedRect x={cx - 11} y={seatY + 1} width={22} height={12} r={4} color={lit(look.trousers)} />
+                      <Rect x={cx - 9} y={seatY + 10} width={7} height={26} color={lit(shade(look.trousers, 0.12))} />
+                      <Rect x={cx + 2} y={seatY + 10} width={7} height={26} color={lit(shade(look.trousers, 0.12))} />
+                      <RoundedRect x={cx - 11} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
+                      <RoundedRect x={cx + 1} y={seatY + 34} width={10} height={6} r={2} color={lit(look.boots)} />
+                    </Group>
+                  )
+                })}
+                {[16, BENCH_W + 2].map((x) => (
+                  <Rect key={`leg${x}`} x={x} y={seatY + 6} width={7} height={36} color={lit('#3a2420')} />
                 ))}
               </Group>
             )}
@@ -262,17 +284,19 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
             {/* Your captain at the wheel */}
             {captain && (
               <Group>
-                <Figure look={captain} x={capX - 2} y={FOOT - FIGURE_FULL_H * 1.08} scale={1.08} clock={clock} wind={weather !== 'calm'} legs rimLight={night ? light.lamp : undefined} />
+                <Figure look={captain} x={capX - 8} y={FOOT - FIGURE_FULL_H * 1.08} scale={1.08} clock={clock} wind={weather !== 'calm'} legs rimLight={night ? light.lamp : undefined} />
                 {/* The wheel, at their hands, turning a little with the sea */}
-                <Rect x={capX - 18} y={FOOT - 62} width={8} height={62} color={lit('#4a2e22')} />
-                <Group transform={wheelTurn} origin={{ x: capX - 14, y: FOOT - 74 }}>
-                  <Circle cx={capX - 14} cy={FOOT - 74} r={17} color={lit('#6e4733')} style="stroke" strokeWidth={3.5} />
+                {/* The helm stand: a pedestal on the deck, the wheel on top, under their hands */}
+                <Path path={`M${capX - 12} ${FOOT - 2} L ${capX - 8} ${FOOT - 76} L ${capX + 2} ${FOOT - 76} L ${capX + 6} ${FOOT - 2} Z`} color={lit('#5a3a2a')} />
+                <Rect x={capX - 16} y={FOOT - 6} width={26} height={6} color={lit('#3a2420')} />
+                <Group transform={wheelTurn} origin={{ x: capX - 3, y: FOOT - 84 }}>
+                  <Circle cx={capX - 3} cy={FOOT - 84} r={15} color={lit('#6e4733')} style="stroke" strokeWidth={3.5} />
                   {Array.from({ length: 8 }, (_, k) => {
                     const a = (k / 8) * Math.PI * 2
-                    return <Path key={k} path={`M${capX - 14} ${FOOT - 74} l ${Math.cos(a) * 23} ${Math.sin(a) * 23}`} color={lit('#6e4733')} style="stroke" strokeWidth={2.6} strokeCap="round" />
+                    return <Path key={k} path={`M${capX - 3} ${FOOT - 84} l ${Math.cos(a) * 21} ${Math.sin(a) * 21}`} color={lit('#6e4733')} style="stroke" strokeWidth={2.6} strokeCap="round" />
                   })}
                 </Group>
-                <Circle cx={capX - 14} cy={FOOT - 74} r={4} color={lit('#e9b23c')} />
+                <Circle cx={capX - 3} cy={FOOT - 84} r={4} color={lit('#e9b23c')} />
               </Group>
             )}
           </Group>
