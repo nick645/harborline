@@ -185,6 +185,12 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   Barnacle. Tabs: Skills, Badges, Record, Log, Orders. Numbers and names are Claude's picks. Sim
   (6 h): tier 2 4.4 → 4.1 h (settle-in), 4.2 → 4.0 h (wide).
 
+- Boats at sea (user-approved 2026-11-06): three views, Ship · Deck · Helm. Deck: passengers
+  strolling, tap for chatter; Helm: inside the wheelhouse, tap the wheel to steady her and the
+  captain to hear them (`mobile/src/chatter.ts`, known facts only). Flotsam drifts past; tap it
+  for a small find (`src/game/flotsam.ts`: 5–15% of the trip's pay, sometimes a fitting, rarely
+  a keepsake, better in storms, one per boat per 10 min). Numbers are Claude's picks.
+
 ## Originality
 
 The user does not want this to read as a copy of Pocket Planes or of EA's college football

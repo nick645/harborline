@@ -61,9 +61,11 @@ type Props = {
   /** Sailing out (true) or home (false): which way the coast slides. */
   outbound?: boolean
   onOpenCaptain?: () => void
+  /** Tap the deck to hear what's being said on it. */
+  onDeck?: () => void
 }
 
-export function DeckScene({ width, light, weather, cls, captain, captainName, hands = 0, handIds = [], climate = 'temperate', outbound = true, onOpenCaptain }: Props) {
+export function DeckScene({ width, light, weather, cls, captain, captainName, hands = 0, handIds = [], climate = 'temperate', outbound = true, onOpenCaptain, onDeck }: Props) {
   const clock = useSceneClock()
   const s = width / SCENE_W
   const sw = SWELL[weather]
@@ -295,6 +297,14 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
           <Rect x={0} y={0} width={SCENE_W} height={SCENE_H} color="#ffe6f2" opacity={flash} />
         </Group>
       </Canvas>
+      {onDeck && (
+        <Pressable
+          onPress={onDeck}
+          accessibilityRole="button"
+          accessibilityLabel="Listen to who's on deck"
+          style={{ position: 'absolute', left: 0, top: (RAIL - 40) * s, width: (WH_X - 4) * s, height: (FOOT - RAIL + 40) * s }}
+        />
+      )}
       {captain && onOpenCaptain && (
         <Pressable
           onPress={onOpenCaptain}

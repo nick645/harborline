@@ -35,6 +35,8 @@ export type Props = {
   /** Open the live view of this boat; absent when already on it. */
   onOpen?: () => void
   onOpenCaptain: (captainId: string) => void
+  /** Fish out what's drifting past her at sea; returns what was found (null if it got away). */
+  onFlotsam?: () => import('../../../src/game/flotsam').FlotsamFind | null
 }
 
 /** A small drawing of the boat for her card. */

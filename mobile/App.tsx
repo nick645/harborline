@@ -48,6 +48,7 @@ import { PortsScreen } from './src/screens/PortsScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { placeDecor, styleHome } from '../src/game/home'
 import { chartHidden, endGuide, guideStep, homeLocked } from '../src/game/guide'
+import { collectFlotsam, type FlotsamFind } from '../src/game/flotsam'
 import { ChartFog } from './src/art/ChartFog'
 import { Harbourmaster } from './src/components/Harbourmaster'
 import { guideLine } from './src/guideLine'
@@ -212,6 +213,16 @@ function Harbor() {
       )
     },
     onFindHands: () => goToPort(homeOf(game), 'tavern'),
+    onFlotsam: () => {
+      let found: FlotsamFind | null = null
+      act((g, at) => {
+        const r = collectFlotsam(g, b.id, at)
+        found = r.find
+        return r.state
+      })
+      if (found) play('find')
+      return found
+    },
   })
 
   return (

@@ -261,6 +261,8 @@ export interface Player {
   coins: number
   /** The harbourmaster is still walking a new player through their first boat and captain. */
   guide?: boolean
+  /** When each boat last fished something out of the water (flotsam.ts). */
+  flotsamAt?: Record<string, number>
   /** Your prospects in the order you want them: coins are set aside from the top down. */
   prospectOrder?: string[]
   /** Prospects you've passed on: they won't be paid for, whoever they lean to. */
