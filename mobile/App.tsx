@@ -6,7 +6,7 @@ import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
 import { assignRoute, buyBoat, buyHome, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, moveHome, sellBoat, settle } from '../src/game/state'
-import { assignCaptain, boatToShowTo, buyUpgrade, captainViewById, court, courtingOf, hireHand, moveHand, recruitViewById, tavernHandView, UPGRADES, upgradeQuote, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
+import { assignCaptain, moveProspect, passOnProspect, boatToShowTo, buyUpgrade, captainViewById, court, courtingOf, hireHand, moveHand, recruitViewById, tavernHandView, UPGRADES, upgradeQuote, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName, slotName } from '../src/game/parts'
 import { getKeepsake, KEEPSAKES } from '../src/game/data/keepsakes'
 import { getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../src/game/economy'
@@ -305,7 +305,10 @@ function Harbor() {
             )}
 
             {tab === 'captains' && (
-              <CaptainsScreen game={game} now={now} onOpenCaptain={(id) => open({ kind: 'captain', id })} onOpenCourted={(portId, place, id) => goToPort(portId, place, id)} />
+              <CaptainsScreen game={game} now={now} onOpenCaptain={(id) => open({ kind: 'captain', id })} onOpenCourted={(portId, place, id) => goToPort(portId, place, id)}
+                onMoveProspect={(id, by) => act((g, at) => moveProspect(g, id, by, at))}
+                onPassProspect={(id, pass) => act((g) => passOnProspect(g, id, pass))}
+              />
             )}
 
             {tab === 'ports' && (
@@ -502,6 +505,23 @@ function Harbor() {
                         kind="secondary"
                         label="Find every keepsake / lose them"
                         onPress={() => act((g) => ({ ...g, player: { ...g.player, keepsakes: g.player.keepsakes?.length ? [] : KEEPSAKES.map((k) => k.id) } }))}
+                      />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Five prospects, 4,000c"
+                        onPress={() =>
+                          act((g, at) => {
+                            // Dev: five quay captains leaning your way at 1,000c each, deciding an hour apart.
+                            const s = structuredClone(g)
+                            s.player.coins = 4000
+                            s.recruitPool.recruits.forEach((c, i) => {
+                              c.fee = 1000
+                              if (c.courting) Object.assign(c.courting, { yours: 75, drinkSlot: 0, arrivedAt: at, decidesAt: at + (i + 1) * 3600_000, rivals: c.courting.rivals.map((r) => ({ ...r, start: 5, finish: 20 })) })
+                            })
+                            return s
+                          })
+                        }
                       />
                       <Button small kind="secondary" label={gallery ? 'Hide galleries' : 'Boat and Legend galleries'} onPress={() => setGallery(!gallery)} />
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />

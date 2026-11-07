@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
-import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtedPeople, courtingOf, managerRole, portPeople, quayInfo, recruitViewById, rosterViews } from '../../../src/game/crew'
+import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtedPeople, courtingOf, managerRole, prospectBudget, portPeople, quayInfo, recruitViewById, rosterViews } from '../../../src/game/crew'
 import { termsFee } from '../../../src/game/courting'
 import { COURT_ACTIONS, TERMS_MAX, type CourtAction } from '../../../src/game/data/courting'
 import type { RegionId } from '../../../src/game/data/ports'
@@ -75,24 +75,46 @@ export function CaptainsScreen({
   now,
   onOpenCaptain,
   onOpenCourted,
+  onMoveProspect,
+  onPassProspect,
 }: {
   game: GameState
   now: number
   onOpenCaptain: (id: string) => void
   onOpenCourted: (portId: string, place: CaptainsView, id: string) => void
+  onMoveProspect: (id: string, by: -1 | 1) => void
+  onPassProspect: (id: string, pass: boolean) => void
 }) {
   return (
     <View style={{ flex: 1, gap: 10 }}>
       <Roster game={game} now={now} onOpenCaptain={onOpenCaptain} />
-      <Courting game={game} now={now} onOpen={onOpenCourted} />
+      <Courting game={game} now={now} onOpen={onOpenCourted} onMove={onMoveProspect} onPass={onPassProspect} />
     </View>
   )
 }
 
-/** Your prospects: everyone you've started winning over, wherever they are: when they decide, which way it's going. */
-function Courting({ game, now, onOpen }: { game: GameState; now: number; onOpen: (portId: string, place: CaptainsView, id: string) => void }) {
+/**
+ * Your prospects, as a list in your order: who's heading your way, when they decide, and what
+ * your coins cover from the top down. Move them up and down, or pass on one, to choose who gets
+ * paid for first.
+ */
+function Courting({
+  game,
+  now,
+  onOpen,
+  onMove,
+  onPass,
+}: {
+  game: GameState
+  now: number
+  onOpen: (portId: string, place: CaptainsView, id: string) => void
+  onMove: (id: string, by: -1 | 1) => void
+  onPass: (id: string, pass: boolean) => void
+}) {
   const t = useTheme()
   const people = courtedPeople(game, now)
+  const budget = prospectBudget(game, now)
+  const shortOf = budget.wanted - budget.coins
   return (
     <View style={{ gap: 6 }}>
       <Row style={{ justifyContent: 'space-between' }}>
@@ -102,22 +124,39 @@ function Courting({ game, now, onOpen }: { game: GameState; now: number; onOpen:
       {people.length === 0 ? (
         <Muted>None yet. Anyone you start winning over on a quay or in a tavern shows here, with when they'll decide.</Muted>
       ) : (
-        <Strip>
-          {people.map((p) => {
+        <>
+          {/* Coins against everyone heading your way */}
+          <View style={{ borderRadius: 12, borderWidth: 1, borderColor: shortOf > 0 ? t.bad : t.border, backgroundColor: t.surface, padding: 10, gap: 2 }}>
+            <Text style={{ color: shortOf > 0 ? t.bad : t.text, fontFamily: fonts.semibold, fontSize: 14 }}>
+              {budget.wanted === 0
+                ? 'Nobody is heading your way yet'
+                : shortOf > 0
+                  ? `${coins(budget.wanted)}c to sign them all · you have ${coins(budget.coins)}c`
+                  : `${coins(budget.wanted)}c to sign them all · you have ${coins(budget.coins)}c: covered`}
+            </Text>
+            <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12, lineHeight: 16 }}>
+              {shortOf > 0
+                ? `${coins(shortOf)}c short. Coins go to the top of your list first: whoever's short when their time comes goes to a rival. Reorder with ▲▼.`
+                : 'Coins are set aside from the top of your list down. Reorder with ▲▼, or pass on anyone you don\'t want.'}
+            </Text>
+          </View>
+          {people.map((p, i) => {
             const v = p.court
-            const ready = v.canSign
-            const yours = v.forecast === 'you'
-            const color = ready ? t.good : yours ? t.good : t.bad
-            const status = ready ? 'Won over: sign now' : yours ? 'Signs with you' : `Going to ${v.finalLeader.name}`
+            const b = p.budget
+            const tag =
+              b.status === 'covered'
+                ? { text: v.canSign ? 'Won over · covered' : 'Covered', color: t.good }
+                : b.status === 'short'
+                  ? { text: `Short ${coins(b.shortBy)}c`, color: t.bad }
+                  : b.status === 'passed'
+                    ? { text: 'Passed on', color: t.muted }
+                    : b.status === 'no-berth'
+                      ? { text: 'No berth for them', color: t.muted }
+                      : { text: `Going to ${v.finalLeader.name}`, color: t.bad }
             return (
-              <Pressable
-                key={p.id}
-                onPress={() => onOpen(p.portId, p.place, p.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`${p.name}, ${status}, at ${getPortDef(p.portId).name}`}
-                style={({ pressed }) => ({ width: 150, padding: 8, gap: 3, borderRadius: 14, borderWidth: 1.5, borderColor: ready ? t.good : p.rare ? t.legendary : t.border, backgroundColor: t.surface, opacity: pressed ? 0.8 : 1 })}
-              >
-                <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
+              <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, borderWidth: 1, borderColor: b.status === 'short' ? t.bad : p.rare ? t.legendary : t.border, backgroundColor: t.surface, padding: 6, opacity: b.status === 'passed' ? 0.6 : 1 }}>
+                <Text style={{ width: 18, textAlign: 'center', color: t.muted, fontFamily: fonts.bold, fontSize: 14 }}>{i + 1}</Text>
+                <Pressable onPress={() => onOpen(p.portId, p.place, p.id)} accessibilityRole="button" accessibilityLabel={`${p.name}, ${tag.text}, at ${getPortDef(p.portId).name}`} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   {p.kind === 'captain' ? (
                     <Portrait id={p.id} rare={p.rare} region={p.region} small />
                   ) : (
@@ -125,29 +164,52 @@ function Courting({ game, now, onOpen }: { game: GameState; now: number; onOpen:
                       <Text style={{ color: t.muted, fontSize: 16 }}>⚓︎</Text>
                     </View>
                   )}
-                  <View style={{ flex: 1 }}>
-                    <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 16 }}>
-                      {p.rare ? '✦ ' : ''}
-                      {p.name}
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <Row style={{ flexWrap: 'nowrap', gap: 6 }}>
+                      <Text numberOfLines={1} style={{ flexShrink: 1, color: t.text, fontFamily: fonts.title, fontSize: 16 }}>
+                        {p.rare ? '✦ ' : ''}
+                        {p.name}
+                      </Text>
+                      {p.fee !== null && <Text style={{ color: t.accent, fontFamily: fonts.semibold, fontSize: 12 }}>{coins(p.fee)}c</Text>}
+                    </Row>
+                    <Text numberOfLines={1} style={{ color: tag.color, fontFamily: fonts.semibold, fontSize: 12 }}>
+                      {tag.text}
                     </Text>
-                    {p.reputation ? <Standing c={{ reputation: p.reputation, rank: null }} size={10} /> : <Muted style={{ fontSize: 11 }}>Deckhand</Muted>}
+                    <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 11 }}>
+                      {v.canSign ? 'Sign now ›' : `Decides in ${duration(Math.max(0, v.decidesAt - now))}`} · {getPortDef(p.portId).name}
+                    </Text>
                   </View>
-                </Row>
-                <Text numberOfLines={1} style={{ color, fontFamily: fonts.semibold, fontSize: 12 }}>
-                  {status}
-                </Text>
-                <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 11 }}>
-                  {ready ? 'Before anyone else does' : `Decides in ${duration(Math.max(0, v.decidesAt - now))}`}
-                </Text>
-                <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 11 }}>
-                  {getPortDef(p.portId).name} · {p.place === 'quay' ? 'the quay' : 'the tavern'} ›
-                </Text>
-              </Pressable>
+                </Pressable>
+                <View style={{ gap: 4 }}>
+                  <Row style={{ gap: 4, flexWrap: 'nowrap' }}>
+                    <OrderButton label="▲" disabled={i === 0} onPress={() => onMove(p.id, -1)} />
+                    <OrderButton label="▼" disabled={i === people.length - 1} onPress={() => onMove(p.id, 1)} />
+                  </Row>
+                  <Pressable onPress={() => onPass(p.id, b.status !== 'passed')} accessibilityRole="button" hitSlop={6}>
+                    <Text style={{ color: t.muted, fontFamily: fonts.medium, fontSize: 11, textAlign: 'center' }}>{b.status === 'passed' ? 'Take back' : 'Pass on'}</Text>
+                  </Pressable>
+                </View>
+              </View>
             )
           })}
-        </Strip>
+        </>
       )}
     </View>
+  )
+}
+
+function OrderButton({ label, disabled, onPress }: { label: string; disabled: boolean; onPress: () => void }) {
+  const t = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label === '▲' ? 'Move up' : 'Move down'}
+      style={{ width: 30, height: 28, borderRadius: 8, borderWidth: 1, borderColor: t.border, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.3 : 1 }}
+    >
+      <Text style={{ color: t.text, fontSize: 12 }}>{label}</Text>
+    </Pressable>
   )
 }
 

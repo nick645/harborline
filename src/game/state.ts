@@ -749,40 +749,102 @@ export function seekers(s: GameState): { person: Captain | Deckhand; kind: 'capt
   return out
 }
 
+/** The boat a hand who signs now would join: the biggest short of hands, docked ones first. */
+function berthForHand(s: GameState): Boat | undefined {
+  return s.player.ownedBoats
+    .filter((b) => b.state !== 'sunk' && handBerths(s, b.id) < handsNeeded(getBoatClass(b.classId)))
+    .sort((a, b) => Number(b.state === 'idle') - Number(a.state === 'idle') || getBoatClass(b.classId).sizeTier - getBoatClass(a.classId).sizeTier)[0]
+}
+
+export interface ProspectEntry {
+  id: string
+  kind: 'captain' | 'hand'
+  /** What they'd cost to sign now (null: a hand with no berth to join). */
+  fee: number | null
+  passed: boolean
+  /** If nothing changes, they'll choose your line when their time is up. */
+  signsWithYou: boolean
+  decidesAt: number
+}
+
+/**
+ * Your prospects (everyone you've started winning over, still deciding) in your order: the ones
+ * you've placed first, then the rest by who decides soonest.
+ */
+export function prospectsInOrder(s: GameState): ProspectEntry[] {
+  const order = s.player.prospectOrder ?? []
+  const passed = new Set(s.player.passedOn ?? [])
+  const berth = berthForHand(s)
+  const out: ProspectEntry[] = []
+  for (const p of seekers(s)) {
+    const c = p.person.courting
+    if (!c) continue
+    const courted = c.known.length > 0 || c.walked || c.shown || c.terms > 0 || c.drinkSlot !== null
+    if (!courted) continue
+    const fee = p.kind === 'captain' ? termsFee((p.person as Captain).fee, c) : berth ? termsFee(handFee(getBoatClass(berth.classId)), c) : null
+    out.push({ id: p.person.id, kind: p.kind, fee, passed: passed.has(p.person.id), signsWithYou: leaning(c, c.decidesAt), decidesAt: c.decidesAt })
+  }
+  const rank = (id: string) => {
+    const i = order.indexOf(id)
+    return i < 0 ? Infinity : i
+  }
+  return out.sort((a, b) => rank(a.id) - rank(b.id) || a.decidesAt - b.decidesAt)
+}
+
+/** Coins set aside for prospects above this one on your list who'll sign with you. */
+export function reservedAbove(s: GameState, id: string): number {
+  let sum = 0
+  for (const p of prospectsInOrder(s)) {
+    if (p.id === id) return sum
+    if (!p.passed && p.signsWithYou && p.fee !== null) sum += p.fee
+  }
+  return 0
+}
+
 /**
  * Someone's time is up: they sign with you if you courted them and are level with or ahead of
- * every rival (and the coins and a berth are there), else with the rival they lean toward most.
+ * every rival (and the coins and a berth are there, beyond what's set aside for prospects above
+ * them on your list), else with the rival they lean toward most.
  */
 function decide(s: GameState, id: string, at: number) {
   const found = seekers(s).find((p) => p.person.id === id)
   if (!found?.person.courting) return
   const c = found.person.courting
   const courted = c.known.length > 0 || c.walked || c.shown || c.terms > 0 || c.drinkSlot !== null
+  const reserved = reservedAbove(s, id)
+  const passed = (s.player.passedOn ?? []).includes(id)
   found.remove()
+  s.player.prospectOrder = s.player.prospectOrder?.filter((x) => x !== id)
+  s.player.passedOn = s.player.passedOn?.filter((x) => x !== id)
   const rival = rivalName(leadingRival(c, at).id)
   // Nobody signs with a line that never spoke to them.
   const yes = courted && leaning(c, at)
+  const spare = s.player.coins - reserved
+  const name = found.person.name
+  if (yes && passed) {
+    log(s, at, found.kind === 'captain' ? 'captain' : 'info', `You passed on ${name}: they signed with ${rival}`)
+    return
+  }
   if (found.kind === 'captain') {
     const cap = found.person as Captain
     const fee = termsFee(cap.fee, c)
-    if (yes && s.player.coins >= fee) {
+    if (yes && spare >= fee) {
       delete cap.courting
       s.player.coins -= fee
       s.player.roster.push(cap)
       log(s, at, 'captain', `${cap.name} chose your line and signed on for ${fee.toLocaleString('en-US')}c`)
       return
     }
-    if (courted) log(s, at, 'captain', yes ? `${cap.name} chose you, but you couldn't pay their fee: they went to ${rival}` : `${cap.name} signed with ${rival}`)
+    const short = s.player.coins >= fee ? ': your coins were set aside for prospects above them on your list' : ": you couldn't pay their fee"
+    if (courted) log(s, at, 'captain', yes ? `${cap.name} chose you, but they went to ${rival}${short}` : `${cap.name} signed with ${rival}`)
     return
   }
   const hand = found.person as Deckhand
   // The biggest boat short of hands, docked ones first. A boat at sea gets them when she docks:
   // they wait at home, and nobody changes ships at sea.
-  const berth = s.player.ownedBoats
-    .filter((b) => b.state !== 'sunk' && handBerths(s, b.id) < handsNeeded(getBoatClass(b.classId)))
-    .sort((a, b) => Number(b.state === 'idle') - Number(a.state === 'idle') || getBoatClass(b.classId).sizeTier - getBoatClass(a.classId).sizeTier)[0]
+  const berth = berthForHand(s)
   const fee = berth ? termsFee(handFee(getBoatClass(berth.classId)), c) : 0
-  if (yes && berth && s.player.coins >= fee) {
+  if (yes && berth && spare >= fee) {
     delete hand.courting
     s.player.coins -= fee
     const waiting = berth.state !== 'idle'
@@ -791,7 +853,7 @@ function decide(s: GameState, id: string, at: number) {
     return
   }
   if (courted) {
-    const why = !yes ? '' : !berth ? ': none of your boats had a berth for them' : ": you couldn't pay their fee"
+    const why = !yes ? '' : !berth ? ': none of your boats had a berth for them' : s.player.coins >= fee ? ': your coins were set aside for prospects above them on your list' : ": you couldn't pay their fee"
     log(s, at, 'info', `${hand.name} signed with ${rival}${why}`)
   }
 }

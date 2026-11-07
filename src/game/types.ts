@@ -261,6 +261,10 @@ export interface Player {
   coins: number
   /** The harbourmaster is still walking a new player through their first boat and captain. */
   guide?: boolean
+  /** Your prospects in the order you want them: coins are set aside from the top down. */
+  prospectOrder?: string[]
+  /** Prospects you've passed on: they won't be paid for, whoever they lean to. */
+  passedOn?: string[]
   /** A new harbour hasn't bought its cottage on the quay yet (the walk-through's last step). */
   homeDue?: boolean
   /** The harbourmaster's old boat, given when your first boat sails. Set while it's still to come. */

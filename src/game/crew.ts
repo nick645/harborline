@@ -11,7 +11,7 @@ import { getHandTrait, handBerths, handsOn } from './hands'
 import type { RegionId } from './data/ports'
 import { homeOf } from './regions'
 import { hooksOf } from './abilities'
-import { captainsAboard, GameError, getBoat, getCaptain, log, managerOf, seekers, topTier } from './state'
+import { captainsAboard, GameError, getBoat, getCaptain, log, managerOf, prospectsInOrder, seekers, topTier } from './state'
 import { applyCourt, boatToShow, canSign, courtingView, termsFee, type CourtingView } from './courting'
 import { COURT_ACTIONS, WANTS, type CourtAction } from './data/courting'
 import { nextUpgradeCost, scoutLevel, upgradeLevel } from './upgrades'
@@ -493,6 +493,10 @@ export interface CourtedView {
   rare: boolean
   region: import('./data/ports').RegionId
   court: import('./courting').CourtingView
+  /** Their fee if they sign now (null: a hand with no berth to join). */
+  fee: number | null
+  /** Down your list: covered by your coins, short of them, passed on, or going to a rival anyway. */
+  budget: { status: 'covered' | 'short' | 'passed' | 'rival' | 'no-berth'; shortBy: number }
 }
 
 /** Everyone you've courted and who is still deciding, soonest to decide first. */
@@ -503,7 +507,7 @@ export function courtedPeople(state: GameState, now: number): CourtedView[] {
     const v = courtingView(p.courting, now)
     if (!v.courted) return
     const cap = kind === 'captain' ? (p as Captain) : null
-    out.push({ id: p.id, name: p.name, kind, portId, place, reputation: cap?.reputation ?? null, rare: !!cap?.rare, region: cap?.region ?? 'bay', court: v })
+    out.push({ id: p.id, name: p.name, kind, portId, place, reputation: cap?.reputation ?? null, rare: !!cap?.rare, region: cap?.region ?? 'bay', court: v, fee: null, budget: { status: 'rival', shortBy: 0 } })
   }
   const home = homeOf(state)
   for (const c of state.recruitPool.recruits) add(c, 'captain', home, 'quay')
@@ -516,5 +520,56 @@ export function courtedPeople(state: GameState, now: number): CourtedView[] {
     for (const h of pool.hands) add(h, 'hand', portId, 'tavern')
     if (pool.captain) add(pool.captain, 'captain', portId, 'tavern')
   }
-  return out.sort((a, b) => a.court.decidesAt - b.court.decidesAt)
+  // Your order, and your coins set aside down it.
+  const entries = prospectsInOrder(state)
+  let left = state.player.coins
+  for (const e of entries) {
+    const v = out.find((x) => x.id === e.id)
+    if (!v) continue
+    v.fee = e.fee
+    if (e.passed) v.budget = { status: 'passed', shortBy: 0 }
+    else if (!e.signsWithYou) v.budget = { status: 'rival', shortBy: 0 }
+    else if (e.fee === null) v.budget = { status: 'no-berth', shortBy: 0 }
+    else if (left >= e.fee) {
+      v.budget = { status: 'covered', shortBy: 0 }
+      left -= e.fee
+    } else v.budget = { status: 'short', shortBy: e.fee - left }
+  }
+  const rank = new Map(entries.map((e, i) => [e.id, i]))
+  return out.sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9))
+}
+
+/** Coins against everyone heading your way: what they'd all cost, and what you have. */
+export function prospectBudget(state: GameState, now: number): { coins: number; wanted: number; covered: number; short: number } {
+  const list = courtedPeople(state, now)
+  const coming = list.filter((p) => p.budget.status === 'covered' || p.budget.status === 'short')
+  return {
+    coins: state.player.coins,
+    wanted: coming.reduce((n, p) => n + (p.fee ?? 0), 0),
+    covered: coming.filter((p) => p.budget.status === 'covered').length,
+    short: coming.filter((p) => p.budget.status === 'short').length,
+  }
+}
+
+/** Move a prospect up (−1) or down (+1) your list. */
+export function moveProspect(state: GameState, id: string, by: -1 | 1, now: number): GameState {
+  const ids = courtedPeople(state, now).map((p) => p.id)
+  const i = ids.indexOf(id)
+  if (i < 0) throw new GameError('They are no longer deciding')
+  const j = i + by
+  if (j < 0 || j >= ids.length) return state
+  ;[ids[i], ids[j]] = [ids[j], ids[i]]
+  const s = structuredClone(state)
+  s.player.prospectOrder = ids
+  return s
+}
+
+/** Pass on a prospect (or take them back): passed-on prospects are never paid for. */
+export function passOnProspect(state: GameState, id: string, pass: boolean): GameState {
+  const s = structuredClone(state)
+  const set = new Set(s.player.passedOn ?? [])
+  if (pass) set.add(id)
+  else set.delete(id)
+  s.player.passedOn = [...set]
+  return s
 }

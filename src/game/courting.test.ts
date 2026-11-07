@@ -2,7 +2,7 @@ import { harbourGame } from './testing'
 import { describe, expect, it } from 'vitest'
 import type { Captain, GameState } from './types'
 import { settle } from './state'
-import { court, courtedPeople, courtingOf, hireCaptain } from './crew'
+import { court, courtedPeople, courtingOf, hireCaptain, moveProspect, passOnProspect, prospectBudget } from './crew'
 import { courtingView, leadingRival, rivalStanding } from './courting'
 import { newRecruit } from './captains'
 import { createRng } from './rolls'
@@ -148,5 +148,53 @@ describe('prospects', () => {
     // Once they've decided, they leave the list.
     const later = settle(s, Math.max(...list.map((p) => p.court.decidesAt)) + 1000)
     expect(courtedPeople(later, Math.max(...list.map((p) => p.court.decidesAt)) + 1000).some((p) => p.id === a.id || p.id === b.id)).toBe(false)
+  })
+})
+
+describe('prospects in your order', () => {
+  /** Five captains all leaning your way at 1,000c each, deciding an hour apart, and 4,000c. */
+  function fiveFor(seed: number): GameState {
+    const s = harbourGame(seed, T0)
+    s.player.coins = 4000
+    const base = s.recruitPool.recruits[0]
+    s.recruitPool.recruits = Array.from({ length: 5 }, (_, i) => ({
+      ...structuredClone(base),
+      id: `p${i}`,
+      name: `Prospect ${i}`,
+      fee: 1000,
+      courting: { ...structuredClone(base.courting!), yours: 75, decidesAt: T0 + (i + 1) * 3600_000, arrivedAt: T0, drinkSlot: 0, rivals: base.courting!.rivals.map((r) => ({ ...r, start: 5, finish: 20 })), terms: 0 },
+    }))
+    return s
+  }
+
+  it('shows who your coins cover, top down, and who is short', () => {
+    const s = fiveFor(41)
+    const list = courtedPeople(s, T0)
+    expect(list.map((p) => p.id)).toEqual(['p0', 'p1', 'p2', 'p3', 'p4'])
+    expect(list.map((p) => p.budget.status)).toEqual(['covered', 'covered', 'covered', 'covered', 'short'])
+    expect(list[4].budget.shortBy).toBe(1000)
+    expect(prospectBudget(s, T0)).toEqual({ coins: 4000, wanted: 5000, covered: 4, short: 1 })
+  })
+
+  it('sets coins aside for the ones above: the one you put last misses out, whenever they decide', () => {
+    let s = fiveFor(42)
+    // Put the first to decide at the bottom of your list.
+    for (let k = 0; k < 4; k++) s = moveProspect(s, 'p0', 1, T0)
+    expect(courtedPeople(s, T0).map((p) => p.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p0'])
+    s = settle(s, T0 + 6 * 3600_000)
+    expect(s.player.roster.map((c) => c.id)).toEqual(expect.arrayContaining(['p1', 'p2', 'p3', 'p4']))
+    expect(s.player.roster.some((c) => c.id === 'p0')).toBe(false)
+    expect(s.player.coins).toBe(0)
+    expect(s.log.some((e) => /Prospect 0 chose you.*set aside/.test(e.text))).toBe(true)
+  })
+
+  it('never pays for a prospect you passed on', () => {
+    let s = fiveFor(43)
+    s = passOnProspect(s, 'p1', true)
+    expect(courtedPeople(s, T0).find((p) => p.id === 'p1')!.budget.status).toBe('passed')
+    expect(courtedPeople(s, T0).find((p) => p.id === 'p4')!.budget.status).toBe('covered')
+    s = settle(s, T0 + 6 * 3600_000)
+    expect(s.player.roster.some((c) => c.id === 'p1')).toBe(false)
+    expect(s.player.roster.some((c) => c.id === 'p4')).toBe(true)
   })
 })
