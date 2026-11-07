@@ -1,7 +1,7 @@
 // One captain: where they are right now, what's known of them, and their logbook.
 
 import { useState } from 'react'
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native'
 import type { GameState } from '../../../src/game/types'
 import { boatOfCaptain, boatsManagedBy, captainViewById, managerRole, promotionOptions } from '../../../src/game/crew'
 import { coins } from '../../../src/format'
@@ -31,6 +31,8 @@ const VERDICT = { sleeper: 'Sleeper', 'all-talk': 'All talk', 'true-to-form': 'T
 
 export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFire, onTakeOver, onManagerCrewing, onPromote }: Props) {
   const t = useTheme()
+  const { width: screenW } = useWindowDimensions()
+  const sceneH = Math.round(Math.min(320, screenW * 0.62))
   const [panel, setPanel] = useState<'skills' | 'badges' | 'record' | 'log' | 'orders'>('skills')
   const c = captainViewById(game, captainId)
   if (!c) return <Muted>That captain has moved on.</Muted>
@@ -47,8 +49,12 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
       : `Ashore, at ${homeTavern(game).name}`
 
   return (
-    <View style={{ flex: 1, gap: 8 }}>
+    // The page scrolls: badges, the record and the log can run long. The scene keeps a fixed
+    // height so it isn't squeezed by what's below it.
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 8, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+      <View style={{ height: sceneH }}>
       <Measure>{(w, h) => <CaptainScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={lookFor(c.id, c.rare, c.region, c.persona?.id)} place={atSea ? 'helm' : 'port'} />}</Measure>
+      </View>
 
       <Card>
         <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
@@ -189,7 +195,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
       </Row>
       )}
       </View>
-    </View>
+    </ScrollView>
   )
 }
 

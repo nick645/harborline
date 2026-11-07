@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
@@ -86,10 +86,11 @@ export function CaptainsScreen({
   onPassProspect: (id: string, pass: boolean) => void
 }) {
   return (
-    <View style={{ flex: 1, gap: 10 }}>
+    // Scrolls, so a long list of prospects is never squeezed.
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 10, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
       <Roster game={game} now={now} onOpenCaptain={onOpenCaptain} />
       <Courting game={game} now={now} onOpen={onOpenCourted} onMove={onMoveProspect} onPass={onPassProspect} />
-    </View>
+    </ScrollView>
   )
 }
 
@@ -543,14 +544,18 @@ function Moment({ c, action, tavern }: { c: CaptainView; action: ScoutAction; ta
 
 function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; onOpenCaptain: (id: string) => void }) {
   const t = useTheme()
+  const { width: screenW } = useWindowDimensions()
+  const sceneH = Math.round(Math.min(300, screenW * 0.6))
   const roster = rosterViews(game)
   if (roster.length === 0) return <Muted>No captains yet. Find one on the quay in the Ports tab.</Muted>
   const moored = game.player.ownedBoats.find((b) => b.state === 'idle') ?? game.player.ownedBoats[0]
   return (
-    <View style={{ flex: 1, gap: 10 }}>
+    <View style={{ gap: 10 }}>
+      <View style={{ height: sceneH }}>
       <Measure>
         {(w, h) => <WorkScene width={Math.min(w, 720)} height={h} light={lightAt(now)} cls={moored ? getBoatClass(moored.classId) : null} captains={roster} onOpen={onOpenCaptain} />}
       </Measure>
+      </View>
       <Strip>
         {roster.map((c) => {
           const boat = boatOfCaptain(game, c.id)
