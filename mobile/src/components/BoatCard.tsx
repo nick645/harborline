@@ -176,7 +176,12 @@ function CrewLine({ game, boat, now, onCaptain, onManage, onFindHands, onMoveHan
         </Pressable>
       ) : boat.state === 'sunk' ? null : (
         <Text style={{ color: t.bad, fontFamily: fonts.bold, fontSize: 13 }}>
-          No captain aboard: she can’t sail.{spare.length === 0 ? ' Hire one in Captains.' : ''}
+          No captain aboard: she can’t sail.
+          {spare.length === 0
+            ? game.player.roster.some((c) => c.role === 'sailing')
+              ? ' Every captain is on another boat: step one ashore from their page, or win one over at a quay.'
+              : ' Win one over at a quay in Ports.'
+            : ''}
         </Text>
       )}
       <Hands game={game} boat={boat} onFindHands={onFindHands} onMoveHand={onMoveHand} />

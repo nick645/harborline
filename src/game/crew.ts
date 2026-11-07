@@ -82,7 +82,8 @@ export function availableCaptains(state: GameState, boatId: string): CaptainView
   const tier = getBoatClass(getBoat(state, boatId).classId).sizeTier
   return state.player.roster
     .filter((c) => c.role === 'sailing' && !c.bonded && willSail(c, tier))
-    .filter((c) => !state.player.ownedBoats.some((b) => b.state !== 'idle' && (b.captainId === c.id || b.mateId === c.id)))
+    // Only those not already captaining (or mate on) a boat: to move one, step them ashore first.
+    .filter((c) => !state.player.ownedBoats.some((b) => b.captainId === c.id || b.mateId === c.id))
     .map(captainView)
 }
 

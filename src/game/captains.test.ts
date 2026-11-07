@@ -15,6 +15,8 @@ import {
   setManagerCrewing,
   setManaged,
   takeOverCaptain,
+  availableCaptains,
+  unassignCaptain,
 } from './crew'
 import { captainMods, captainView, generateCaptain, migrateCaptain, newRecruit, recordVoyage, unknownBands, verdictFor } from './captains'
 import { createRng } from './rolls'
@@ -544,5 +546,17 @@ describe('badges, rating and potential', () => {
     const g = captainView(c).growth
     expect(g.known).toBe('close')
     expect(g.band[1] - g.band[0]).toBeLessThanOrEqual(6)
+  })
+})
+
+describe('putting a captain aboard', () => {
+  it('offers only captains not already aboard a boat, docked or not', () => {
+    const s = harbourGame(51, T0)
+    const [dinghy, taxi] = s.player.ownedBoats
+    // The starting captain is aboard the dinghy, docked: not offered for the taxi.
+    expect(availableCaptains(s, taxi.id).some((c) => c.id === dinghy.captainId)).toBe(false)
+    // Ashore, they're offered.
+    const ashore = unassignCaptain(s, dinghy.captainId!)
+    expect(availableCaptains(ashore, taxi.id).some((c) => c.id === dinghy.captainId)).toBe(true)
   })
 })
