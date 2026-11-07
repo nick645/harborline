@@ -18,14 +18,16 @@ export function RatingBlock({ c }: { c: CaptainView }) {
   const pos = (v: number) => `${Math.max(0, Math.min(100, v))}%` as const
   const growthText =
     g.known === 'unknown'
-      ? 'How far they could go: unknown yet. Scout them, or sail with them.'
-      : g.known === 'close'
-        ? `Could grow to about ${Math.round((g.band[0] + g.band[1]) / 2)}`
+      ? `How far they could go: no more than ${g.ordinaryMax} if ordinary; Legend or beyond if they have it in them. Scout them, or sail with them.`
+      : g.known === 'exact'
+        ? g.band[1] <= r.guess
+          ? `At their peak: ${g.band[1]} is as high as they go`
+          : `The highest they can reach: ${g.band[1]}`
         : g.band[1] >= 96
-          ? `Could grow to ${g.band[0]}–${g.band[1]}: Mythic territory`
+          ? `Could grow to about ${g.band[0]}–${g.band[1]}: Mythic territory`
           : g.band[1] >= 90
-            ? `Could grow to ${g.band[0]}–${g.band[1]}: Legend territory`
-            : `Could grow to ${g.band[1]} at most`
+            ? `Could grow to about ${g.band[0]}–${g.band[1]}: Legend territory`
+            : `Could grow to about ${g.band[0]}–${g.band[1]}`
   return (
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
@@ -58,8 +60,8 @@ export function RatingBlock({ c }: { c: CaptainView }) {
             opacity: g.known === 'unknown' ? 0.12 : 0.28,
           }}
         />
-        {g.known !== 'unknown' && g.band[1] - g.band[0] > 0 && (
-          <View style={{ position: 'absolute', top: 0, bottom: 0, left: pos(g.band[0]), width: `${g.band[1] - g.band[0]}%`, backgroundColor: t.accent, opacity: 0.25 }} />
+        {g.known !== 'unknown' && (
+          <View style={{ position: 'absolute', top: 0, bottom: 0, left: pos(g.band[0]), width: `${Math.max(1, g.band[1] - g.band[0])}%`, backgroundColor: t.accent, opacity: g.known === 'exact' ? 0.9 : 0.25 }} />
         )}
         {/* Where they are now */}
         <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: pos(r.guess), backgroundColor: t.accent, borderRadius: 7 }} />

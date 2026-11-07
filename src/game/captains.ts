@@ -67,7 +67,7 @@ import {
 import { nextFloat, nextInt, rollChance, rollNormal, rollPick, rollWeighted } from './rolls'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS, type PersonaDef } from './data/personas'
 import { newCourting, termsFee } from './courting'
-import { BADGES, CEILING_KNOWN_AFTER, GRADES, GRADE_KNOWN_AFTER, type GradeId, LONG_TRIP, STEADY_HULL, badgeLevel, badgeValue, type BadgeId } from './data/badges'
+import { BADGES, CEILING_KNOWN_AFTER, GRADES, ROUGH_CEILING_AFTER, ROUGH_CEILING_SPREAD, GRADE_KNOWN_AFTER, type GradeId, LONG_TRIP, STEADY_HULL, badgeLevel, badgeValue, type BadgeId } from './data/badges'
 import { KEEN_DECIDES_MS, KEEN_FEE_SHARE, KEEN_RIVAL_FINISH, KEEN_UNTIL_CAPTAINS, KEEN_YOURS } from './data/courting'
 
 const traitsById = new Map(TRAITS.map((t) => [t.id, t]))
@@ -670,7 +670,7 @@ export interface CaptainView {
   /** Their sea rating (the five skills' average): your best guess, and whether you're sure of it. */
   rating: { guess: number; band: [number, number]; sure: boolean; from: 'skills' | 'reputation' }
   /** How high they could grow, as far as you know: a band on the 1–100 scale, and how well it's known. */
-  growth: { band: [number, number]; known: 'unknown' | 'rough' | 'close' }
+  growth: { band: [number, number]; known: 'unknown' | 'rough' | 'exact'; ordinaryMax: number }
   /** Badges, earned and still to earn, with progress. */
   badges: { id: BadgeId; name: string; mark: string; earn: string; level: 0 | 1 | 2 | 3; count: number; next: number | null; bonus: string | null; bonuses: [string, string, string] }[]
   /** Their grade once you know them well enough (null until then), and voyages until it shows. */
@@ -724,20 +724,32 @@ function ratingOf(c: Captain): CaptainView['rating'] {
 }
 
 /**
- * How high they could grow, as you'd judge it: nothing beyond their rating until their potential
- * shows (scouting, or enough voyages), then the band that potential allows, and close to the
- * truth once you've sailed long enough with them to know.
+ * How high they could grow, as you'd judge it. From the start you know the rule: an ordinary
+ * captain gains at most CEILING_HEADROOM on what they are now, and never passes ORDINARY_CEILING
+ * (`ordinaryMax`). Scouting their potential, or ROUGH_CEILING_AFTER voyages together, gives a
+ * rough range round their true ceiling (off-centre by a fixed amount, so its middle isn't the
+ * answer); after CEILING_KNOWN_AFTER voyages you know it exactly.
  */
 function growthOf(c: Captain): CaptainView['growth'] {
-  const lo = ratingOf(c).band[0]
-  if (c.voyageCount >= CEILING_KNOWN_AFTER) {
-    const at = Math.round(c.ceiling)
-    return { band: [Math.max(lo, at - 3), Math.min(100, at + 3)], known: 'close' }
+  const r = ratingOf(c)
+  // Floor at what their skills are known to be (a reputation guess can sit above the truth).
+  const lo = Math.round(SKILL_IDS.reduce((n, id) => n + c.bands[id][0], 0) / SKILL_IDS.length)
+  const ordinaryMax = Math.max(lo, Math.min(ORDINARY_CEILING, r.band[1] + CEILING_HEADROOM))
+  const at = Math.round(c.ceiling)
+  if (c.voyageCount >= CEILING_KNOWN_AFTER) return { band: [Math.max(lo, at), Math.max(lo, at)], known: 'exact', ordinaryMax }
+  if (c.potentialKnown || c.voyageCount >= ROUGH_CEILING_AFTER) {
+    const shift = (hashString(c.id) % (2 * ROUGH_CEILING_SPREAD - 1)) - (ROUGH_CEILING_SPREAD - 1)
+    const top = c.potential === 'none' ? ORDINARY_CEILING : 100
+    const mid = at + shift
+    return { band: [Math.max(lo, Math.min(top, mid - ROUGH_CEILING_SPREAD)), Math.max(lo, Math.min(top, mid + ROUGH_CEILING_SPREAD))], known: 'rough', ordinaryMax }
   }
-  if (!c.potentialKnown) return { band: [lo, 100], known: 'unknown' }
-  if (c.potential === 'mythic') return { band: [Math.max(lo, MYTHIC_CEILING[0]), MYTHIC_CEILING[1]], known: 'rough' }
-  if (c.potential === 'legend') return { band: [Math.max(lo, LEGEND_CEILING[0]), LEGEND_CEILING[1]], known: 'rough' }
-  return { band: [lo, Math.max(lo, ORDINARY_CEILING)], known: 'rough' }
+  return { band: [lo, 100], known: 'unknown', ordinaryMax }
+}
+
+const hashString = (id: string) => {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return h
 }
 
 /**

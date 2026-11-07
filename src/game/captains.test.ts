@@ -24,7 +24,7 @@ import { fleetCap, scoutLevel } from './upgrades'
 import { naturalWeather } from './weather'
 import { getPart } from './parts'
 import { getBoatClass } from './economy'
-import { HIRE_FEE, LEGEND_AT, SCOUT_ACCURACY, SCOUT_BAND_WIDTH, SKILL_IDS, skillToAnchors, WATCHES_BASE } from './data/captains'
+import { CEILING_HEADROOM, HIRE_FEE, LEGEND_AT, ORDINARY_CEILING, SCOUT_ACCURACY, SCOUT_BAND_WIDTH, SKILL_IDS, skillToAnchors, WATCHES_BASE } from './data/captains'
 import { WEATHER_SLOT_MS } from './data/weather'
 import { ROUTES } from './data/routes'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS } from './data/personas'
@@ -534,18 +534,27 @@ describe('badges, rating and potential', () => {
     const v = captainView(c)
     expect(v.rating.band[0]).toBeLessThanOrEqual(v.rating.guess)
     expect(v.rating.band[1]).toBeGreaterThanOrEqual(v.rating.guess)
-    // Nothing known: they could grow anywhere above what you can see.
-    expect(v.growth).toEqual({ band: [v.rating.band[0], 100], known: 'unknown' })
+    // Nothing known: they could grow anywhere above what you can see, but the rule caps an
+    // ordinary captain at their rating plus the headroom.
+    expect(v.growth).toMatchObject({ band: [expect.any(Number), 100], known: 'unknown' })
+    expect(v.growth.ordinaryMax).toBe(Math.min(ORDINARY_CEILING, v.rating.band[1] + CEILING_HEADROOM))
     expect(v.rankGoals.map((g) => g.open)).toEqual(['unknown', 'unknown'])
-    // Their potential shows: an ordinary captain tops out below Legend.
+    // Their potential shows: a rough range round their true ceiling, below Legend.
     c.potentialKnown = true
-    expect(captainView(c).growth.band[1]).toBeLessThan(LEGEND_AT)
+    const rough = captainView(c).growth
+    expect(rough.known).toBe('rough')
+    expect(rough.band[1]).toBeLessThan(LEGEND_AT)
+    expect(rough.band[1] - rough.band[0]).toBeLessThanOrEqual(10)
+    expect(Math.round(c.ceiling)).toBeGreaterThanOrEqual(rough.band[0])
+    expect(Math.round(c.ceiling)).toBeLessThanOrEqual(rough.band[1])
     expect(captainView(c).rankGoals.map((g) => g.open)).toEqual(['no', 'no'])
-    // Long enough at sea together, you know it to within a few points.
+    // Twenty voyages together tell you as much, even unscouted.
+    c.potentialKnown = false
+    c.voyageCount = 20
+    expect(captainView(c).growth.known).toBe('rough')
+    // Forty, and you know their highest exactly.
     c.voyageCount = 40
-    const g = captainView(c).growth
-    expect(g.known).toBe('close')
-    expect(g.band[1] - g.band[0]).toBeLessThanOrEqual(6)
+    expect(captainView(c).growth).toMatchObject({ band: [Math.round(c.ceiling), Math.round(c.ceiling)], known: 'exact' })
   })
 })
 

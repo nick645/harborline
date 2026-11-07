@@ -97,8 +97,12 @@ export function badgeValue(marks: Partial<Record<BadgeId, number>> | undefined, 
   return lv === 0 ? 1 : def.value[lv - 1]
 }
 
-/** How well a captain's potential is known after this many voyages, if nothing showed it sooner. */
+/** Voyages together before you know exactly how high a captain can grow. */
 export const CEILING_KNOWN_AFTER = 40
+/** Voyages together before you can judge their ceiling roughly (as a scout's verdict on potential does). */
+export const ROUGH_CEILING_AFTER = 20
+/** How wide that rough judgement is, either side. */
+export const ROUGH_CEILING_SPREAD = 5
 
 /** A captain's grade shows once their rating is sure and they've sailed this many voyages. */
 export const GRADE_KNOWN_AFTER = 20
