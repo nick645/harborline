@@ -546,7 +546,8 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
   const t = useTheme()
   const { width: screenW } = useWindowDimensions()
   const sceneH = Math.round(Math.min(300, screenW * 0.6))
-  const roster = rosterViews(game)
+  // Best first: by sea rating as far as you know it, reputation breaking ties.
+  const roster = rosterViews(game).sort((a, b) => b.rating.guess - a.rating.guess || b.reputation - a.reputation)
   if (roster.length === 0) return <Muted>No captains yet. Find one on the quay in the Ports tab.</Muted>
   const moored = game.player.ownedBoats.find((b) => b.state === 'idle') ?? game.player.ownedBoats[0]
   return (
@@ -577,6 +578,7 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
                 <Standing c={c} size={11} />
                 {c.potential && (!c.rank || (c.rank === 'legend' && c.potential === 'mythic')) && <Lodestone potential={c.potential} size={14} />}
               </Row>
+              <SkillLine c={c} />
               <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
                 {where}
               </Text>
@@ -584,6 +586,26 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
           )
         })}
       </Strip>
+    </View>
+  )
+}
+
+/** Their sea rating in a line: the number (~ while it's a guess) and a bar, with the room they
+ *  could still grow faintly past it once that's known. */
+function SkillLine({ c }: { c: CaptainView }) {
+  const t = useTheme()
+  const r = c.rating
+  const top = c.growth.known === 'unknown' ? r.guess : Math.max(r.guess, c.growth.band[1])
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityLabel={`Sea rating ${r.sure ? '' : 'about '}${r.guess}`}>
+      <Text style={{ width: 26, color: t.accent, fontFamily: fonts.semibold, fontSize: 12 }}>
+        {r.sure ? '' : '~'}
+        {r.guess}
+      </Text>
+      <View style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: t.border, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, top)}%`, backgroundColor: t.accent, opacity: 0.25 }} />
+        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, r.guess)}%`, backgroundColor: t.accent, opacity: r.sure ? 1 : 0.7 }} />
+      </View>
     </View>
   )
 }
