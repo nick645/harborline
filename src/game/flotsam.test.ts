@@ -26,3 +26,13 @@ describe('flotsam', () => {
     expect(s.player.coins).toBe(before.coins)
   })
 })
+
+import { weatherUpside } from './upside'
+describe('what bad weather is good for', () => {
+  it('says calm is safe and storms pay and find the most', () => {
+    expect(weatherUpside('calm', 1)).toEqual([])
+    expect(weatherUpside('storm', 1)).toEqual(expect.arrayContaining(['+60% pay', 'rare parts', 'mythic parts']))
+    // Managed boats find nothing better than fittings, so only pay and charting are offered.
+    expect(weatherUpside('storm', 1, true).some((x) => /parts|keepsakes/.test(x))).toBe(false)
+  })
+})

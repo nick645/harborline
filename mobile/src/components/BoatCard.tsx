@@ -1,6 +1,7 @@
+import { weatherUpside } from '../../../src/game/upside'
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import type { Boat, GameState } from '../../../src/game/types'
+import type { Boat, GameState, Weather } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../../../src/game/economy'
 import { adriftDeadline, getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
 import { abilityOf } from '../../../src/game/abilities'
@@ -356,6 +357,7 @@ function Docked({ game, boat, now, onAssign }: Props) {
                   {trips} × {duration(q.durationMs)} · −{q.worstDamage} worst
                   {q.lossRisk > 0 ? ` · ${percent(q.lossRisk)} lose cargo` : ''}
                 </Muted>
+                <Upside weather={q.weather} tier={getBoatClass(boat.classId).sizeTier} automated={isAutomated(game, boat)} />
                 {q.canSink && <Text style={{ color: t.bad, fontSize: 11, fontFamily: fonts.bold }}>Could sink</Text>}
                 <Button small label={q.blocked ?? 'Send'} disabled={!!q.blocked} onPress={() => onAssign(r.id, trips)} />
               </Card>
@@ -397,3 +399,14 @@ const styles = StyleSheet.create({
   chip: { width: 132, borderWidth: 1, borderRadius: 14, padding: 8, gap: 3, alignItems: 'flex-start' },
   routeCard: { padding: 8, gap: 4 },
 })
+
+/** What this weather has going for it: pay, finds and charting (calm: the safe choice). */
+export function Upside({ weather, tier, automated = false }: { weather: Weather; tier: number; automated?: boolean }) {
+  const t = useTheme()
+  const up = weatherUpside(weather, tier, automated)
+  return (
+    <Text style={{ color: up.length ? t.good : t.muted, fontSize: 11, fontFamily: fonts.semibold, lineHeight: 15 }}>
+      {up.length ? up.join(' · ') : 'Safe and steady: no special finds'}
+    </Text>
+  )
+}

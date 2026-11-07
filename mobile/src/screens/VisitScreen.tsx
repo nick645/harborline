@@ -20,6 +20,7 @@ import { REGION_STYLE } from '../art/regionStyle'
 import { homeTavern } from '../homeTavern'
 import { useTheme } from '../theme'
 import { HiringScreen, type CaptainsView } from '../components/CaptainsScreen'
+import { Upside } from '../components/BoatCard'
 import { Body, Button, Card, Measure, Muted, Row, Strip, Tag, Tile, Title } from '../components/ui'
 
 export type VisitPage = 'menu' | 'quay' | 'tavern' | 'send' | 'office'
@@ -98,6 +99,7 @@ export function VisitScreen(props: Props) {
                     {coins(q.payout)}c a trip · {trips} × {duration(q.durationMs)}
                   </Muted>
                   <Muted>−{q.worstDamage} hull at worst</Muted>
+                  <Upside weather={q.weather} tier={cls.sizeTier} />
                   <Button small label={q.blocked ?? `Send ×${trips}`} disabled={!!q.blocked} onPress={() => onSend(b.id, route.id, trips)} />
                 </Card>
               )
