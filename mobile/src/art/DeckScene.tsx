@@ -1,4 +1,4 @@
-// On deck, at sea: you're standing aboard. Your captain at the wheel by the wheelhouse, close
+// On deck, at sea: you're standing aboard. Your captain at the helm in the wheelhouse, close
 // enough to know; passengers strolling the deck under the awning and at the rail (a passenger
 // boat), or the cargo lashed down with the hands working it (a cargo boat). Past the rail the
 // sea runs by and the coast slides past; everything rolls with the swell, harder as the weather
@@ -106,7 +106,15 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
   const hills = 'M-460 0 C -380 -24, -300 -30, -220 -14 C -150 -30, -60 -26, 20 -10 C 90 -22, 180 -34, 260 -16 C 330 -28, 400 -20, 460 -6 L 460 4 L -460 4 Z'
 
   // Who's aboard, and where.
-  const capX = 274
+  // The wheelhouse in the right foreground, and where the captain stands in it.
+  const WH_X = 246
+  const WH_ROOF = FOOT - 196
+  const CAP_X = 280
+  const CAP_FOOT = FOOT - 10
+  const WHEEL_X = CAP_X + 28
+  const WHEEL_Y = FOOT - 72
+  const MAST_X = 330
+  const capX = CAP_X
   const walkers = passengers ? Math.min(6, 3 + cls.sizeTier) : 0
   const workers = passengers ? Math.min(hands, 1) : Math.max(1, Math.min(3, hands + 1))
   const awning = AWNINGS[(seed >>> 7) % AWNINGS.length]
@@ -160,30 +168,15 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
             ))}
             <Path path={`M-20 ${DECK + 34} H ${SCENE_W + 20} M-20 ${DECK + 72} H ${SCENE_W + 20}`} color={lit(shade(deckWood, 0.22))} style="stroke" strokeWidth={0.6} opacity={0.6} />
 
-            {/* The wheelhouse on the right, its windows lit after dark */}
-            <Rect x={292} y={RAIL - 70} width={90} height={DECK - RAIL + 70} color={lit('#efe3d2')} />
-            <Rect x={288} y={RAIL - 76} width={98} height={8} color={lit(shade('#3d5a73', 0.1))} />
-            <RoundedRect x={302} y={RAIL - 58} width={30} height={22} r={3} color={night ? light.window : g(mix(light.window, '#3a4a58', 0.3))} />
-            <RoundedRect x={338} y={RAIL - 58} width={30} height={22} r={3} color={night ? light.window : g(mix(light.window, '#3a4a58', 0.3))} />
-            {/* Mast and the line's flag */}
-            <Rect x={318} y={RAIL - 150} width={3} height={76} color={lit('#4a2e22')} />
-            <Group transform={flag} origin={{ x: 321, y: RAIL - 146 }}>
-              <Path path={`M321 ${RAIL - 150} L 346 ${RAIL - 145} L 321 ${RAIL - 138} Z`} color={lit('#c2452a')} />
-            </Group>
-            <Group>
-              <RoundedRect x={315} y={RAIL - 124} width={9} height={9} r={2} color={light.lamp} opacity={flicker} />
-              {night && <Circle cx={319.5} cy={RAIL - 119} r={18} color={light.lamp} opacity={0.2} />}
-            </Group>
-
             {passengers ? (
               <>
                 {/* An awning over the benches */}
-                <Path path={`M8 ${RAIL - 66} H 250`} color={lit('#5a3a2a')} style="stroke" strokeWidth={2} />
-                {Array.from({ length: 15 }, (_, i) => (
+                <Path path={`M8 ${RAIL - 66} H 238`} color={lit('#5a3a2a')} style="stroke" strokeWidth={2} />
+                {Array.from({ length: 14 }, (_, i) => (
                   <Rect key={i} x={8 + i * 16.1} y={RAIL - 76} width={16.1} height={10} color={lit(i % 2 ? '#f3e7d8' : awning)} />
                 ))}
                 <Path path={`M8 ${RAIL - 66} ${'q 4 5 8 0 '.repeat(30)}`} color={lit(awning)} />
-                {[14, 244].map((x) => (
+                {[14, 232].map((x) => (
                   <Rect key={x} x={x} y={RAIL - 66} width={3} height={DECK - RAIL + 66 + 26} color={lit('#5a3a2a')} />
                 ))}
               </>
@@ -249,24 +242,46 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
                 )
               })}
 
-            {/* Your captain at the wheel */}
+            {/* The wheelhouse, open toward you in the right foreground: windows behind, your captain
+                at the helm console with the wheel on its face, the mast and its lamp on the roof */}
+            <Group>
+              <Rect x={WH_X} y={WH_ROOF} width={SCENE_W - WH_X + 30} height={FOOT - WH_ROOF} color={lit('#d9cbb4')} />
+              {/* The far wall's windows look out over the sea */}
+              <RoundedRect x={WH_X + 12} y={WH_ROOF + 16} width={SCENE_W - WH_X - 4} height={46} r={3} color={night ? light.window : g(mix(light.sky, light.window, 0.5))} />
+              <Path path={`M${WH_X + 12} ${WH_ROOF + 46} q 20 -4 40 0 t 40 0 t 40 0`} color={g(light.seaLine)} style="stroke" strokeWidth={1.2} opacity={night ? 0 : 0.7} />
+              {[WH_X + 52, WH_X + 92].map((x) => (
+                <Rect key={x} x={x} y={WH_ROOF + 16} width={4} height={46} color={lit('#8a7a68')} />
+              ))}
+              <Rect x={WH_X} y={FOOT - 6} width={SCENE_W - WH_X + 30} height={8} color={lit(shade(deckWood, 0.35))} />
+            </Group>
             {captain && (
-              <Group>
-                <Figure look={captain} x={capX - 8} y={FOOT - FIGURE_FULL_H * 1.08} scale={1.08} clock={clock} wind={weather !== 'calm'} legs rimLight={night ? light.lamp : undefined} />
-                {/* The wheel, at their hands, turning a little with the sea */}
-                {/* The helm stand: a pedestal on the deck, the wheel on top, under their hands */}
-                <Path path={`M${capX - 12} ${FOOT - 2} L ${capX - 8} ${FOOT - 76} L ${capX + 2} ${FOOT - 76} L ${capX + 6} ${FOOT - 2} Z`} color={lit('#5a3a2a')} />
-                <Rect x={capX - 16} y={FOOT - 6} width={26} height={6} color={lit('#3a2420')} />
-                <Group transform={wheelTurn} origin={{ x: capX - 3, y: FOOT - 84 }}>
-                  <Circle cx={capX - 3} cy={FOOT - 84} r={15} color={lit('#6e4733')} style="stroke" strokeWidth={3.5} />
-                  {Array.from({ length: 8 }, (_, k) => {
-                    const a = (k / 8) * Math.PI * 2
-                    return <Path key={k} path={`M${capX - 3} ${FOOT - 84} l ${Math.cos(a) * 21} ${Math.sin(a) * 21}`} color={lit('#6e4733')} style="stroke" strokeWidth={2.6} strokeCap="round" />
-                  })}
-                </Group>
-                <Circle cx={capX - 3} cy={FOOT - 84} r={4} color={lit('#e9b23c')} />
-              </Group>
+              <Figure look={captain} x={CAP_X} y={CAP_FOOT - FIGURE_FULL_H} scale={1} clock={clock} wind={weather !== 'calm'} legs rimLight={night ? light.lamp : undefined} />
             )}
+            {/* The helm console, the wheel mounted on its face under the captain's hands */}
+            <Group>
+              <Rect x={WH_X + 6} y={FOOT - 60} width={SCENE_W - WH_X + 20} height={60} color={lit('#6e4733')} />
+              <Rect x={WH_X + 2} y={FOOT - 66} width={SCENE_W - WH_X + 26} height={8} color={lit('#8a5a3a')} />
+              <Path path={`M${WH_X + 6} ${FOOT - 32} H ${SCENE_W + 30}`} color={lit(shade('#6e4733', 0.3))} style="stroke" strokeWidth={1} />
+              <RoundedRect x={WHEEL_X + 30} y={FOOT - 56} width={20} height={14} r={2} color={lit('#2e2a33')} />
+              <Circle cx={WHEEL_X + 40} cy={FOOT - 49} r={4} color={lit('#e9b23c')} opacity={0.8} />
+              <Group transform={wheelTurn} origin={{ x: WHEEL_X, y: WHEEL_Y }}>
+                <Circle cx={WHEEL_X} cy={WHEEL_Y} r={18} color={lit('#8a5a3a')} style="stroke" strokeWidth={4} />
+                {Array.from({ length: 8 }, (_, k) => {
+                  const a = (k / 8) * Math.PI * 2
+                  return <Path key={k} path={`M${WHEEL_X} ${WHEEL_Y} l ${Math.cos(a) * 25} ${Math.sin(a) * 25}`} color={lit('#8a5a3a')} style="stroke" strokeWidth={3} strokeCap="round" />
+                })}
+              </Group>
+              <Circle cx={WHEEL_X} cy={WHEEL_Y} r={6} color={lit('#c99a2e')} />
+            </Group>
+            {/* Its corner post and roof, framing the helm */}
+            <Rect x={WH_X - 4} y={WH_ROOF - 2} width={9} height={FOOT - WH_ROOF + 2} color={lit('#efe3d2')} />
+            <Rect x={WH_X - 10} y={WH_ROOF - 12} width={SCENE_W - WH_X + 40} height={12} color={lit(shade('#3d5a73', 0.1))} />
+            <Rect x={MAST_X} y={WH_ROOF - 84} width={3} height={72} color={lit('#4a2e22')} />
+            <Group transform={flag} origin={{ x: MAST_X + 3, y: WH_ROOF - 80 }}>
+              <Path path={`M${MAST_X + 3} ${WH_ROOF - 84} L ${MAST_X + 28} ${WH_ROOF - 79} L ${MAST_X + 3} ${WH_ROOF - 72} Z`} color={lit('#c2452a')} />
+            </Group>
+            <RoundedRect x={MAST_X - 3} y={WH_ROOF - 58} width={9} height={9} r={2} color={light.lamp} opacity={flicker} />
+            {night && <Circle cx={MAST_X + 1.5} cy={WH_ROOF - 53} r={18} color={light.lamp} opacity={0.2} />}
           </Group>
 
           {/* The weather over it all */}
@@ -285,7 +300,7 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
           onPress={onOpenCaptain}
           accessibilityRole="button"
           accessibilityLabel={captainName ? `Open Captain ${captainName}` : 'Open captain'}
-          style={{ position: 'absolute', left: (capX - 10) * s, top: (FOOT - FIGURE_FULL_H * 1.08) * s, width: 90 * s, height: FIGURE_FULL_H * 1.08 * s }}
+          style={{ position: 'absolute', left: (CAP_X - 4) * s, top: (CAP_FOOT - FIGURE_FULL_H) * s, width: 66 * s, height: FIGURE_FULL_H * s }}
         />
       )}
     </View>
