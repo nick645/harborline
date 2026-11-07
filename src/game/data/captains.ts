@@ -127,6 +127,10 @@ export const LEGEND_CEILING: [number, number] = [90, 97]
 export const MYTHIC_CEILING: [number, number] = [96, 100]
 /** Overall skill (the average of the five) that makes a Legend, or a Mythic. */
 export const LEGEND_AT = 90
+
+/** What a sea rating is called, a title for every ten points (names are Claude's picks). */
+export const RATING_TITLES = ['Landlubber', 'Bilge Rat', 'Greenhand', 'Rope-wise', 'Steady Oar', 'Weatherworn', 'Wavecutter', 'Tidemaster', 'Sea Wolf', 'Stormborn'] as const
+export const ratingTitle = (rating: number) => RATING_TITLES[Math.min(9, Math.max(0, Math.floor(rating / 10)))]
 export const MYTHIC_AT = 96
 /** A captain's own potential shows after this many voyages, if scouting hasn't turned it up. */
 export const POTENTIAL_KNOWN_AFTER = 20

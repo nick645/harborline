@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-na
 import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
+import { ratingTitle } from '../../../src/game/data/captains'
 import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtedPeople, courtingOf, managerRole, prospectBudget, portPeople, quayInfo, recruitViewById, rosterViews } from '../../../src/game/crew'
 import { termsFee } from '../../../src/game/courting'
 import { COURT_ACTIONS, TERMS_MAX, type CourtAction } from '../../../src/game/data/courting'
@@ -597,7 +598,8 @@ function SkillLine({ c }: { c: CaptainView }) {
   const r = c.rating
   const top = c.growth.known === 'unknown' ? r.guess : Math.max(r.guess, c.growth.band[1])
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityLabel={`Overall ${r.guess}${r.sure ? '' : ', a guess so far'}`}>
+    <View style={{ gap: 2 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityLabel={`Overall ${r.guess}, ${ratingTitle(r.guess)}${r.sure ? '' : ', a guess so far'}`}>
       <Text style={{ color: t.accent, fontFamily: fonts.semibold, fontSize: 12 }}>
         {r.guess} <Text style={{ color: t.muted, fontSize: 10 }}>OVR</Text>
       </Text>
@@ -605,6 +607,10 @@ function SkillLine({ c }: { c: CaptainView }) {
         <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, top)}%`, backgroundColor: t.accent, opacity: 0.25 }} />
         <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, r.guess)}%`, backgroundColor: t.accent, opacity: r.sure ? 1 : 0.7 }} />
       </View>
+    </View>
+      <Text numberOfLines={1} style={{ color: t.accent, fontFamily: fonts.body, fontSize: 11, opacity: r.sure ? 1 : 0.75 }}>
+        {ratingTitle(r.guess)}
+      </Text>
     </View>
   )
 }

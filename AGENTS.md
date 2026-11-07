@@ -181,7 +181,9 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   from what you've learned, by reputation until then) and a potential bar marking Legend 90 and
   Mythic 96 that narrows as you learn them (`growthOf` in captains.ts; user-approved 2026-11-07):
   at first the most an ordinary captain could reach (rating + 40, at most 88), then a rough ±5
-  range once scouted or after 20 voyages, then their exact highest at 40. Badges (`data/badges.ts`):
+  range once scouted or after 20 voyages, then their exact highest at 40. Every ten points of
+  rating has a title (`RATING_TITLES` in data/captains.ts, Claude's names): Landlubber 0–9 …
+  Stormborn 90+. Badges (`data/badges.ts`):
   Storm Hand, Long Hauler, Market Trader, Steady Keel, Old Salt, Chart-maker, three levels each,
   earned at sea, never hidden. Grades once known: Pearl of the fleet, Seasoned, Able, Driftwood,
   Barnacle. Tabs: Skills, Badges, Record, Log, Orders. Numbers and names are Claude's picks. Sim

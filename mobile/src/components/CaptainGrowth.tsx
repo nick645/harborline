@@ -4,6 +4,7 @@
 
 import { Text, View } from 'react-native'
 import type { CaptainView } from '../../../src/game/captains'
+import { ratingTitle } from '../../../src/game/data/captains'
 import { fonts, useTheme } from '../theme'
 
 const ROMAN = ['', 'I', 'II', 'III']
@@ -21,13 +22,13 @@ export function RatingBlock({ c }: { c: CaptainView }) {
       ? `How far they could go: no more than ${g.ordinaryMax} if ordinary; Legend or beyond if they have it in them. Scout them, or sail with them.`
       : g.known === 'exact'
         ? g.band[1] <= r.guess
-          ? `At their peak: ${g.band[1]} is as high as they go`
-          : `The highest they can reach: ${g.band[1]}`
+          ? `At their peak: ${g.band[1]} (${ratingTitle(g.band[1])}) is as high as they go`
+          : `The highest they can reach: ${g.band[1]}, ${ratingTitle(g.band[1])}`
         : g.band[1] >= 96
           ? `Could grow to about ${g.band[0]}–${g.band[1]}: Mythic territory`
           : g.band[1] >= 90
             ? `Could grow to about ${g.band[0]}–${g.band[1]}: Legend territory`
-            : `Could grow to about ${g.band[0]}–${g.band[1]}`
+            : `Could grow to about ${g.band[0]}–${g.band[1]}: ${ratingTitle(g.band[0]) === ratingTitle(g.band[1]) ? ratingTitle(g.band[1]) : `${ratingTitle(g.band[0])} to ${ratingTitle(g.band[1])}`}`
   return (
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
@@ -36,7 +37,9 @@ export function RatingBlock({ c }: { c: CaptainView }) {
           {r.guess}
         </Text>
         <View style={{ paddingBottom: 5, flexShrink: 1 }}>
-          <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 14 }}>Sea rating</Text>
+          <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 14 }}>
+            {ratingTitle(r.guess)} <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>· overall</Text>
+          </Text>
           <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
             {r.sure
               ? 'The average of their five skills'
