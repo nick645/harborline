@@ -194,10 +194,10 @@ export function Tile({ label, sub, onPress, accent, disabled }: { label: string;
 }
 
 /** A box that takes the space left on the page and tells its child how big that is. */
-export function Measure({ children }: { children: (w: number, h: number) => ReactNode }) {
+export function Measure({ children, top }: { children: (w: number, h: number) => ReactNode; top?: boolean }) {
   const [box, setBox] = useState<{ w: number; h: number } | null>(null)
   return (
-    <View style={{ flex: 1, minHeight: 80, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+    <View style={{ flex: 1, minHeight: 80, alignItems: 'center', justifyContent: top ? 'flex-start' : 'center', overflow: 'hidden' }} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
       {box && box.w > 0 && children(Math.floor(box.w), Math.floor(box.h))}
     </View>
   )

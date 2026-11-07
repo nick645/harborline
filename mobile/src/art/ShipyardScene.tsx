@@ -60,11 +60,18 @@ type Props = {
   coins: number
   focused: string | null
   onFocus: (classId: string) => void
+  /** Tap the slipway shed to go into the Workshop; `ready` lights its sign. */
+  onWorkshop?: () => void
+  ready?: boolean
 }
 
-export function ShipyardScene({ width, height, light, classes, coins: purse, focused, onFocus }: Props) {
+export function ShipyardScene({ width, height: room, light, classes, coins: purse, focused, onFocus, onWorkshop, ready = false }: Props) {
   const clock = useSceneClock()
   const list = useMemo(() => berths(classes), [classes])
+  // No taller than the yard itself needs (shed roof to front pier at full width): past that the
+  // frame would only add empty sky over smaller boats.
+  const span = Math.min(YARD_W, Math.max(...list.map((b) => b.x + b.w)) + 70) - Math.max(0, Math.min(...list.map((b) => b.x)) - 70)
+  const height = Math.min(room, Math.round((width * (YARD_H - 30)) / span))
   const night = light.stars > 0
   const lit = (c: string) => mix(c, light.silhouette, light.dim * 0.8)
 
@@ -103,6 +110,7 @@ export function ShipyardScene({ width, height, light, classes, coins: purse, foc
 
   const waves = useDerivedValue(() => [{ translateX: -((clock.value / 80) % 36) }])
   const flicker = useDerivedValue(() => 0.85 + 0.15 * Math.sin(clock.value / 300))
+  const signGlow = useDerivedValue(() => 0.75 + 0.25 * Math.sin(clock.value / 350))
   // The crane's trolley runs along the jib; the crate swings under it.
   const trolley = useDerivedValue(() => 600 + Math.sin(clock.value / 4200) * 50)
   const crate = useDerivedValue(() => [{ translateX: trolley.value + Math.sin(clock.value / 700) * 3 }, { translateY: 128 + Math.sin(clock.value / 3100) * 18 }])
@@ -180,6 +188,10 @@ export function ShipyardScene({ width, height, light, classes, coins: purse, foc
             ))}
             <Path path="M54 186 L 170 186" color={lit('#c9a27a')} style="stroke" strokeWidth={3} />
             <Rect x={100} y={72} width={20} height={14} color={night ? light.lamp : lit('#3a2420')} opacity={night ? 0.9 : 1} />
+            {/* The Workshop's sign over the door, lit when a boat is ready to build */}
+            <RoundedRect x={58} y={92} width={104} height={20} r={4} color={lit('#2e1c19')} />
+            <RoundedRect x={61} y={95} width={98} height={14} r={3} color={ready ? '#e9b23c' : lit('#c9a27a')} opacity={ready ? signGlow : 1} />
+            <SkText x={110 - signFont.measureText('WORKSHOP').width / 2} y={105.5} text="WORKSHOP" font={signFont} color="#2e1c19" />
           </Group>
 
           {/* The crane */}
@@ -263,6 +275,21 @@ export function ShipyardScene({ width, height, light, classes, coins: purse, foc
             />
           )
         })}
+      {/* Tap the slipway shed to go into the Workshop (over the boats: a back-row berth reaches into its corner) */}
+      {!focused && onWorkshop && (
+        <Pressable
+          onPress={onWorkshop}
+          accessibilityRole="button"
+          accessibilityLabel="Go into the Workshop"
+          style={{
+            position: 'absolute',
+            left: width / 2 + (18 + shedShift - whole.cx) * whole.z,
+            top: height / 2 + (50 - whole.cy) * whole.z,
+            width: 184 * whole.z,
+            height: (WATER - 50) * whole.z,
+          }}
+        />
+      )}
     </View>
   )
 }

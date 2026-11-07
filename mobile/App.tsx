@@ -42,7 +42,8 @@ import type { VisitPage } from './src/screens/VisitScreen'
 import { ShipyardScreen } from './src/components/ShipyardScreen'
 import { BoatGallery } from './src/components/BoatGallery'
 import { PersonaGallery } from './src/components/PersonaGallery'
-import { Upgrades, Workshop } from './src/components/PortScreen'
+import { Upgrades } from './src/components/PortScreen'
+import { Workshop as NewWorkshop } from './src/components/Workshop'
 import { BoatScreen } from './src/screens/BoatScreen'
 import { CaptainScreen } from './src/screens/CaptainScreen'
 import { PortsScreen } from './src/screens/PortsScreen'
@@ -100,8 +101,8 @@ function Harbor() {
   const [gallery, setGallery] = useState(false)
   const [portsSel, setPortsSel] = useState<string | null>(null)
   const [portsPage, setPortsPage] = useState<VisitPage>('menu')
-  // A page of Home to open on (a find banner opens the Workshop).
-  const [homePage, setHomePage] = useState<'workshop' | null>(null)
+  // Where the Shipyard opens: the yard, or its Workshop (a find banner opens the Workshop).
+  const [shipyardStart, setShipyardStart] = useState<'yard' | 'workshop'>('yard')
   const confirm = useConfirm()
   // Someone to have selected when a quay or tavern opens (from the Captains tab's courting list).
   const [focusId, setFocusId] = useState<string | null>(null)
@@ -261,8 +262,8 @@ function Harbor() {
             onPress={() => {
               clearFinds()
               setStack([])
-              setHomePage('workshop')
-              setTab('home')
+              setShipyardStart('workshop')
+              setTab('shipyard')
             }}
             accessibilityRole="button"
             accessibilityHint="Opens the Workshop"
@@ -410,8 +411,27 @@ function Harbor() {
 
             {tab === 'shipyard' && (
               <ShipyardScreen
+                key={shipyardStart}
+                startOn={shipyardStart}
                 game={game}
                 now={now}
+                workshop={(w) => (
+                      <NewWorkshop
+                        width={w}
+                    game={game}
+                    onCraft={(id) => void ask({ title: `Build ${getBoatClass(id).name}?`, body: 'Every piece of her set goes into her.', label: 'Build her' }, (g, at) => craftBoat(g, id, at))}
+                    onScrap={() => {
+                      const n = game.player.partInventory.filter((id) => getPart(id).rarity === 'standard').length
+                      void ask({ title: `Scrap ${plural(n, 'standard fitting')}?`, label: `Scrap · +${coins(n * STANDARD_SCRAP_VALUE)}c` }, (g) => scrapStandardParts(g))
+                    }}
+                    onMelt={(rarity, slot, track) =>
+                      void ask(
+                        { title: `Melt ${MELT_COST} spares?`, body: `${MELT_COST} spare ${rarity} ${slotName(slot, track).toLowerCase()} pieces become one new ${rarity} piece.`, label: 'Melt them' },
+                        (g, at) => meltSpares(g, rarity, slot, track, at),
+                      )
+                    }
+                  />
+                )}
                 onBuy={(id) => {
                   const c = getBoatClass(id)
                   const hands = handsNeeded(c)
@@ -425,8 +445,6 @@ function Harbor() {
 
             {tab === 'home' && !homeShut && (
               <HomeScreen
-                key={homePage ?? 'menu'}
-                startPage={homePage ?? undefined}
                 deed={step?.id === 'home' ? { price: HOME_START_PRICE, onBuy: () => void ask({ title: 'Buy the cottage on the quay?', body: 'Your home in the harbour, and your own tavern with it.', label: `Buy it · ${coins(HOME_START_PRICE)}c` }, (g, at) => buyHome(g, at)) } : undefined}
                 game={game}
                 now={now}
@@ -440,22 +458,6 @@ function Harbor() {
                       const q = upgradeQuote(game, id)
                       void ask({ title: `Build ${u.name}?`, body: `Level ${q.level + 1}: ${u.describe(u.levels[q.level])}.`, label: `Build · ${coins(q.cost ?? 0)}c` }, (g, at) => buyUpgrade(g, id, at))
                     }}
-                  />
-                }
-                workshop={
-                  <Workshop
-                    game={game}
-                    onCraft={(id) => void ask({ title: `Build ${getBoatClass(id).name}?`, body: 'Every piece of her set goes into her.', label: 'Build her' }, (g, at) => craftBoat(g, id, at))}
-                    onScrap={() => {
-                      const n = game.player.partInventory.filter((id) => getPart(id).rarity === 'standard').length
-                      void ask({ title: `Scrap ${plural(n, 'standard fitting')}?`, label: `Scrap · +${coins(n * STANDARD_SCRAP_VALUE)}c` }, (g) => scrapStandardParts(g))
-                    }}
-                    onMelt={(rarity, slot, track) =>
-                      void ask(
-                        { title: `Melt ${MELT_COST} spares?`, body: `${MELT_COST} spare ${rarity} ${slotName(slot, track).toLowerCase()} pieces become one new ${rarity} piece.`, label: 'Melt them' },
-                        (g, at) => meltSpares(g, rarity, slot, track, at),
-                      )
-                    }
                   />
                 }
                 alerts={
@@ -585,6 +587,7 @@ function Harbor() {
                 disabled={shut}
                 onPress={() => {
                   if (x.id !== tab) play('tap')
+                  if (x.id === 'shipyard') setShipyardStart('yard')
                   setTab(x.id)
                 }}
                 style={[styles.tab, lit && { backgroundColor: t.surface2, borderTopWidth: 2, borderTopColor: t.accent, marginTop: -1 }]}

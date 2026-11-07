@@ -3,9 +3,10 @@
 // button sit underneath, with the next boat along a tap away.
 
 import { useState } from 'react'
-import { Text, View } from 'react-native'
+import { ScrollView, Text, View } from 'react-native'
 import type { GameState } from '../../../src/game/types'
-import { shopClasses, topTier } from '../../../src/game/state'
+import { craftableClasses, shopClasses, topTier } from '../../../src/game/state'
+import { countParts, getPart } from '../../../src/game/parts'
 import { getAbility } from '../../../src/game/abilities'
 import { hasParts, partName } from '../../../src/game/parts'
 import { fleetCap } from '../../../src/game/upgrades'
@@ -16,7 +17,53 @@ import { lightAt } from '../art/light'
 import { fonts, useTheme } from '../theme'
 import { Body, Button, Card, Measure, Muted, Row, Segments, Tag, Title } from './ui'
 
-export function ShipyardScreen({ game, now, onBuy }: { game: GameState; now: number; onBuy: (classId: string) => void }) {
+export function ShipyardScreen({
+  game,
+  now,
+  onBuy,
+  workshop,
+  startOn = 'yard',
+}: {
+  game: GameState
+  now: number
+  onBuy: (classId: string) => void
+  /** The Workshop, drawn at a given width (it lives in the yard's slipway shed). */
+  workshop: (width: number) => React.ReactNode
+  startOn?: 'yard' | 'workshop'
+}) {
+  const [place, setPlace] = useState<'yard' | 'workshop'>(startOn)
+  const counts = countParts(game.player.partInventory)
+  const owned = new Set(game.player.ownedBoats.map((b) => b.classId))
+  const ready = craftableClasses().some((c) => !owned.has(c.id) && c.requiredParts.every((id) => counts.has(id)))
+  const pieces = game.player.partInventory.filter((id) => getPart(id).rarity !== 'standard').length
+  const switcher = (
+    <Segments
+      items={[
+        { id: 'yard', label: 'For sale' },
+        { id: 'workshop', label: ready ? 'Workshop ✦' : pieces ? `Workshop · ${pieces}` : 'Workshop' },
+      ]}
+      value={place}
+      onChange={(v) => setPlace(v as 'yard' | 'workshop')}
+    />
+  )
+  if (place === 'workshop' && !(game.player.ownedBoats.length === 0)) {
+    return (
+      <View style={{ flex: 1, gap: 10 }}>
+        {switcher}
+        <Measure>
+          {(w, h) => (
+            <ScrollView style={{ width: w, height: h }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+              {workshop(w)}
+            </ScrollView>
+          )}
+        </Measure>
+      </View>
+    )
+  }
+  return <Yard game={game} now={now} onBuy={onBuy} switcher={game.player.ownedBoats.length ? switcher : null} onWorkshop={() => setPlace('workshop')} ready={ready} />
+}
+
+function Yard({ game, now, onBuy, switcher, onWorkshop, ready }: { game: GameState; now: number; onBuy: (classId: string) => void; switcher: React.ReactNode; onWorkshop: () => void; ready: boolean }) {
   const t = useTheme()
   const top = topTier(game)
   // A new harbour's first boat is a starter; the tiers open up after that.
@@ -32,6 +79,7 @@ export function ShipyardScreen({ game, now, onBuy }: { game: GameState; now: num
 
   return (
     <View style={{ flex: 1, gap: 10 }}>
+      {switcher}
       {tiers.length > 1 && (
         <Segments
           items={tiers.map((x) => ({ id: String(x), label: `Tier ${x}` }))}
@@ -42,60 +90,62 @@ export function ShipyardScreen({ game, now, onBuy }: { game: GameState; now: num
           }}
         />
       )}
-      <Measure>
+      <Measure top>
         {(w, h) => (
-          <View style={{ borderRadius: 16, overflow: 'hidden' }}>
-            <ShipyardScene width={w} height={h} light={lightAt(now)} classes={classes} coins={game.player.coins} focused={focused} onFocus={setFocused} />
-          </View>
+          <ScrollView style={{ width: w, height: h }} contentContainerStyle={{ gap: 10, paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
+            <View style={{ borderRadius: 16, overflow: 'hidden' }}>
+              <ShipyardScene width={w} height={Math.max(200, h - 250)} light={lightAt(now)} classes={classes} coins={game.player.coins} focused={focused} onFocus={setFocused} onWorkshop={switcher ? onWorkshop : undefined} ready={ready} />
+            </View>
+          {c ? (
+            <Card accent={c.rarity === 'rare' ? t.rare : undefined} style={{ gap: 4, padding: 12 }}>
+              <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+                <Row style={{ flexShrink: 1 }}>
+                  <Title size={24}>{c.name}</Title>
+                  {c.rarity === 'rare' && <Tag label="RARE" color={t.rare} />}
+                </Row>
+                <Muted>
+                  {at + 1} of {classes.length}
+                </Muted>
+              </Row>
+              <Muted>
+                {c.track === 'cargo' ? 'Cargo' : 'Passengers'} · carries {c.capacity} · fuel for {c.fuelTankTrips} trips
+              </Muted>
+              {getAbility(c.abilityId) && <Muted>{getAbility(c.abilityId)!.description}</Muted>}
+              {handsNeeded(c) > 0 && (
+                <Muted>
+                  Needs {handsNeeded(c)} deckhand{handsNeeded(c) === 1 ? '' : 's'} · {coins(handFee(c))}c each, once
+                </Muted>
+              )}
+              {c.requiredParts.length > 0 && (
+                <Text style={{ color: hasParts(game.player.partInventory, c.requiredParts) ? t.good : t.muted, fontFamily: fonts.body, fontSize: 13 }}>
+                  {hasParts(game.player.partInventory, c.requiredParts) ? '✓ ' : 'Needs '}
+                  {c.requiredParts.map(partName).join(', ')}
+                </Text>
+              )}
+              <Row style={{ flexWrap: 'nowrap', marginTop: 4 }}>
+                <Button small kind="secondary" label="‹" onPress={() => step(-1)} />
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label={`Buy for ${coins(c.price)}c`}
+                    disabled={game.player.coins < c.price || !hasParts(game.player.partInventory, c.requiredParts)}
+                    onPress={() => onBuy(c.id)}
+                  />
+                </View>
+                <Button small kind="secondary" label="›" onPress={() => step(1)} />
+              </Row>
+              <Button small kind="secondary" label="‹ The whole yard" onPress={() => setFocused(null)} />
+            </Card>
+          ) : (
+            <Card style={{ gap: 2, padding: 12 }}>
+              <Body style={{ fontWeight: '700' }}>{first ? 'Your first boat' : `Tier ${tier} boats for sale`}</Body>
+              <Muted>
+                Tap a boat to look her over. Harbour: {game.player.ownedBoats.length}/{fleetCap(game)} boats{full ? ' · full (a tier up still fits)' : ''}.
+              </Muted>
+            </Card>
+          )}
+          </ScrollView>
         )}
       </Measure>
-      {c ? (
-        <Card accent={c.rarity === 'rare' ? t.rare : undefined} style={{ gap: 4, padding: 12 }}>
-          <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-            <Row style={{ flexShrink: 1 }}>
-              <Title size={24}>{c.name}</Title>
-              {c.rarity === 'rare' && <Tag label="RARE" color={t.rare} />}
-            </Row>
-            <Muted>
-              {at + 1} of {classes.length}
-            </Muted>
-          </Row>
-          <Muted>
-            {c.track === 'cargo' ? 'Cargo' : 'Passengers'} · carries {c.capacity} · fuel for {c.fuelTankTrips} trips
-          </Muted>
-          {getAbility(c.abilityId) && <Muted>{getAbility(c.abilityId)!.description}</Muted>}
-          {handsNeeded(c) > 0 && (
-            <Muted>
-              Needs {handsNeeded(c)} deckhand{handsNeeded(c) === 1 ? '' : 's'} · {coins(handFee(c))}c each, once
-            </Muted>
-          )}
-          {c.requiredParts.length > 0 && (
-            <Text style={{ color: hasParts(game.player.partInventory, c.requiredParts) ? t.good : t.muted, fontFamily: fonts.body, fontSize: 13 }}>
-              {hasParts(game.player.partInventory, c.requiredParts) ? '✓ ' : 'Needs '}
-              {c.requiredParts.map(partName).join(', ')}
-            </Text>
-          )}
-          <Row style={{ flexWrap: 'nowrap', marginTop: 4 }}>
-            <Button small kind="secondary" label="‹" onPress={() => step(-1)} />
-            <View style={{ flex: 1 }}>
-              <Button
-                label={`Buy for ${coins(c.price)}c`}
-                disabled={game.player.coins < c.price || !hasParts(game.player.partInventory, c.requiredParts)}
-                onPress={() => onBuy(c.id)}
-              />
-            </View>
-            <Button small kind="secondary" label="›" onPress={() => step(1)} />
-          </Row>
-          <Button small kind="secondary" label="‹ The whole yard" onPress={() => setFocused(null)} />
-        </Card>
-      ) : (
-        <Card style={{ gap: 2, padding: 12 }}>
-          <Body style={{ fontWeight: '700' }}>{first ? 'Your first boat' : `Tier ${tier} boats for sale`}</Body>
-          <Muted>
-            Tap a boat to look her over. Harbour: {game.player.ownedBoats.length}/{fleetCap(game)} boats{full ? ' · full (a tier up still fits)' : ''}.
-          </Muted>
-        </Card>
-      )}
     </View>
   )
 }

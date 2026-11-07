@@ -1,5 +1,6 @@
 // The Home tab on one screen: your harbour as you've made it, and tiles that each open a page:
-// its look, your tavern, the decorations you've earned, port upgrades, the workshop and the log.
+// its look, your tavern, the decorations you've earned, port upgrades and the log. (The Workshop
+// is in the Shipyard's slipway shed.)
 
 import { useState, type ReactNode } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
@@ -34,7 +35,6 @@ import { decorUnlocked, type styleHome } from '../../../src/game/home'
 import { looksOpen, whereFound } from '../../../src/game/keepsakes'
 import { KEEPSAKES, lookKey, type KeepsakeGroup } from '../../../src/game/data/keepsakes'
 import { portPeople, UPGRADES } from '../../../src/game/crew'
-import { getPart } from '../../../src/game/parts'
 import { TavernScene } from '../art/TavernScene'
 import { homeTavern } from '../homeTavern'
 import { boatOfCaptain } from '../../../src/game/crew'
@@ -52,13 +52,10 @@ type Props = {
   onStyle: (patch: Parameters<typeof styleHome>[1]) => void
   onPlace: (slot: number, id: DecorId | null) => void
   upgrades: ReactNode
-  workshop: ReactNode
   /** The storm alerts switch, shown with the log. */
   alerts: ReactNode
   /** Play-test tools (development builds only). */
   dev?: ReactNode
-  /** Open on this page instead of the menu (a find banner opens the Workshop). */
-  startPage?: 'workshop'
   /** A new harbour's cottage, still to buy: shown instead of everything else until it's yours. */
   deed?: { price: number; onBuy: () => void }
 }
@@ -108,7 +105,7 @@ function Choices<T extends string>({
   )
 }
 
-type Page = 'menu' | 'look' | 'tavern' | 'decor' | 'upgrades' | 'workshop' | 'log' | 'dev'
+type Page = 'menu' | 'look' | 'tavern' | 'decor' | 'upgrades' | 'log' | 'dev'
 
 function Swatches({
   colors,
@@ -163,9 +160,9 @@ function Swatches({
   )
 }
 
-export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, alerts, dev, deed, startPage }: Props) {
+export function HomeScreen({ game, now, onStyle, onPlace, upgrades, alerts, dev, deed }: Props) {
   const t = useTheme()
-  const [page, setPage] = useState<Page>(startPage ?? 'menu')
+  const [page, setPage] = useState<Page>('menu')
   const home = getPortDef(homeOf(game))
   const st = REGION_STYLE[home.region]
   const style = game.player.homeStyle ?? {}
@@ -475,11 +472,11 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
       </View>
     )
 
-  if (page === 'upgrades' || page === 'workshop')
+  if (page === 'upgrades')
     return (
       <View style={{ flex: 1, gap: 10 }}>
         {back(page === 'upgrades' ? 'Port upgrades' : 'Workshop')}
-        {page === 'upgrades' ? upgrades : workshop}
+        {upgrades}
       </View>
     )
 
@@ -503,7 +500,6 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
       </View>
     )
 
-  const rares = game.player.partInventory.filter((id) => getPart(id).rarity !== 'standard').length
   const built = Object.values(game.player.portUpgrades).reduce((n, l) => n + l, 0)
   const placed = decor.filter(Boolean).length
   return (
@@ -521,7 +517,6 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, al
         <Tile label={tavern.name} sub={`Your tavern · ${people.hands.length} hands in`} onPress={() => setPage('tavern')} />
         <Tile label="Decorations" sub={`${placed} of ${DECOR_SLOTS} spots filled`} onPress={() => setPage('decor')} />
         <Tile label="Port upgrades" sub={`${built} of ${3 * UPGRADES.length} levels built`} onPress={() => setPage('upgrades')} />
-        <Tile label="Workshop" sub={rares ? `${rares} set piece${rares === 1 ? '' : 's'}` : 'Scrap, sets, spares'} onPress={() => setPage('workshop')} />
         <Tile label="Harbour log" sub={game.log[0] ? `${duration(now - game.log[0].at)} ago: ${game.log[0].text}` : 'Nothing yet'} onPress={() => setPage('log')} />
       </Row>
     </View>
