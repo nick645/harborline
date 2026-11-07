@@ -2,7 +2,7 @@
 // the input is never mutated. All timers are absolute timestamps, so catching up after
 // any gap is a single settle pass, never a tick loop.
 
-import type { AwayReport, Boat, Captain, Deckhand, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage } from './types'
+import type { AwayReport, Boat, Captain, Deckhand, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage, Find } from './types'
 import { BOAT_CLASSES } from './data/boats'
 import { ROUTES, routesFrom } from './data/routes'
 import { NICKNAMES } from './data/nicknames'
@@ -54,7 +54,7 @@ import { handBerths, handCount, handMods, migrateHands, recordHands, refreshTave
 import { migrateKeepsakes, rollKeepsake } from './keepsakes'
 import { chartTrip, getPortDef, homeOf, portOpen, refreshPortPools } from './regions'
 import { marketDay, portDemandMult } from './portLife'
-import { badgeValue } from './data/badges'
+import { badgeValue, getBadge } from './data/badges'
 import { getRegion, HOME_PRICE } from './data/ports'
 import type { Milestone } from './data/home'
 import { countParts, dropChances, getPart, hasParts, partName, pickPart, takeParts } from './parts'
@@ -806,7 +806,10 @@ export function reservedAbove(s: GameState, id: string): number {
  * every rival (and the coins and a berth are there, beyond what's set aside for prospects above
  * them on your list), else with the rival they lean toward most.
  */
-function decide(s: GameState, id: string, at: number) {
+/** What settling turned up for the welcome-back summary (mutated as it goes). */
+type SettleNews = { tripPay: number; signed: string[]; wentElsewhere: string[]; risen: string[]; charted: string[] }
+
+function decide(s: GameState, id: string, at: number, news?: SettleNews) {
   const found = seekers(s).find((p) => p.person.id === id)
   if (!found?.person.courting) return
   const c = found.person.courting
@@ -823,6 +826,7 @@ function decide(s: GameState, id: string, at: number) {
   const name = found.person.name
   if (yes && passed) {
     log(s, at, found.kind === 'captain' ? 'captain' : 'info', `You passed on ${name}: they signed with ${rival}`)
+    news?.wentElsewhere.push(name)
     return
   }
   if (found.kind === 'captain') {
@@ -833,10 +837,14 @@ function decide(s: GameState, id: string, at: number) {
       s.player.coins -= fee
       s.player.roster.push(cap)
       log(s, at, 'captain', `${cap.name} chose your line and signed on for ${fee.toLocaleString('en-US')}c`)
+      news?.signed.push(cap.name)
       return
     }
     const short = s.player.coins >= fee ? ': your coins were set aside for prospects above them on your list' : ": you couldn't pay their fee"
-    if (courted) log(s, at, 'captain', yes ? `${cap.name} chose you, but they went to ${rival}${short}` : `${cap.name} signed with ${rival}`)
+    if (courted) {
+      log(s, at, 'captain', yes ? `${cap.name} chose you, but they went to ${rival}${short}` : `${cap.name} signed with ${rival}`)
+      news?.wentElsewhere.push(cap.name)
+    }
     return
   }
   const hand = found.person as Deckhand
@@ -850,11 +858,13 @@ function decide(s: GameState, id: string, at: number) {
     const waiting = berth.state !== 'idle'
     ;(s.player.deckhands ??= []).push({ ...hand, boatId: berth.id, ...(waiting ? { waiting } : {}) })
     log(s, at, 'info', `${hand.name} chose your line and signed on with ${berth.nickname}${waiting ? ', waiting at home for her to dock' : ''}`)
+    news?.signed.push(hand.name)
     return
   }
   if (courted) {
     const why = !yes ? '' : !berth ? ': none of your boats had a berth for them' : s.player.coins >= fee ? ': your coins were set aside for prospects above them on your list' : ": you couldn't pay their fee"
     log(s, at, 'info', `${hand.name} signed with ${rival}${why}`)
+    news?.wentElsewhere.push(hand.name)
   }
 }
 
@@ -885,11 +895,13 @@ function settleInPlace(s: GameState, now: number) {
   const lost: string[] = []
   const parts: string[] = []
   const keepsakes: string[] = []
+  const finds: Find[] = []
+  const news: SettleNews = { tripPay: 0, signed: [], wentElsewhere: [], risen: [], charted: [] }
   // Each trip has at most two events, runs are capped by the fuel tank, and managed boats
   // depart at most once per trip, so this is bounded by the voyages that fit before `now`.
   for (let ev = nextEvent(s, now); ev; ev = nextEvent(s, now)) {
     if (ev.kind === 'decide') {
-      decide(s, ev.key.slice(1), ev.at)
+      decide(s, ev.key.slice(1), ev.at, news)
       continue
     }
     const boat = getBoat(s, ev.key)
@@ -924,7 +936,7 @@ function settleInPlace(s: GameState, now: number) {
         log(s, ev.at, 'lost', `${boat.nickname} lost her cargo in ${WEATHER[ctx.weather].name.toLowerCase()} seas`)
         if (h.instantReturnOnLoss) {
           s.voyages = s.voyages.filter((x) => x !== v)
-          recordCaptains(s, boat, ctx, ev.at)
+          recordCaptains(s, boat, ctx, ev.at, news)
           dockBoat(boat, ev.at)
         } else {
           boat.state = 'returning'
@@ -950,6 +962,7 @@ function settleInPlace(s: GameState, now: number) {
 
       // Cargo delivered at the far port: get paid, and the port's demand reshuffles.
       s.player.coins += v.payout
+      news.tripPay += v.payout
       const route = getRoute(s, v.routeId)
       route.demandCargo = rollDemand(s.rng, h.demandRerollFloor)
       route.demandPassenger = rollDemand(s.rng, h.demandRerollFloor)
@@ -962,10 +975,11 @@ function settleInPlace(s: GameState, now: number) {
         v.partRollResult = rollTripParts(s, ctx, mods)
         for (const id of v.partRollResult) {
           parts.push(id)
+          finds.push({ at: ev.at, boatId: boat.id, boat: boat.nickname, part: id })
           if (getPart(id).rarity !== 'standard') log(s, ev.at, 'part', `${boat.nickname} found ${partName(id)}`)
         }
       }
-      recordCaptains(s, boat, ctx, ev.at)
+      recordCaptains(s, boat, ctx, ev.at, news)
       if (!v.lost) {
         recordHands(s, boat)
         if (ctx.weather === 'storm') {
@@ -976,6 +990,7 @@ function settleInPlace(s: GameState, now: number) {
         const keepsake = isAutomated(s, boat) ? null : rollKeepsake(s, getPortDef(getRoute(s, v.routeId).portB).region, ctx.weather)
         if (keepsake) {
           keepsakes.push(keepsake.id)
+          finds.push({ at: ev.at, boatId: boat.id, boat: boat.nickname, keepsake: keepsake.id })
           log(s, ev.at, 'part', `${boat.nickname} brought home ${keepsake.name}: something new for home`)
         }
         // Chart-makers aboard chart new waters faster.
@@ -984,6 +999,7 @@ function settleInPlace(s: GameState, now: number) {
         if (opened) {
           ensureRoutes(s)
           log(s, ev.at, 'info', `${boat.nickname} finished charting ${opened}: new waters to sail`)
+          news.charted.push(opened)
         }
       }
 
@@ -998,7 +1014,7 @@ function settleInPlace(s: GameState, now: number) {
     }
   }
   const captainsLost = loseAdrift(s, now)
-  return { tripsCompleted, sunk, lost, parts, keepsakes, captainsLost }
+  return { tripsCompleted, sunk, lost, parts, keepsakes, finds, captainsLost, ...news }
 }
 
 /** When a sunk boat's captain will be lost unless she's raised first, or null if no one's at risk. */
@@ -1105,7 +1121,7 @@ function manageCrew(s: GameState, boat: Boat, manager: Captain, at: number) {
 }
 
 /** Every captain aboard gains the voyage's experience; tell the log what came to light. */
-function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number) {
+function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number, summary?: SettleNews) {
   const revealEvery = hooksOf(boat).traitRevealEvery
   for (const c of captainsAboard(s, boat)) {
     const taken = s.player.roster.flatMap((x) => (x.persona ? [x.persona] : []))
@@ -1113,10 +1129,20 @@ function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number) 
     for (const id of news.proven) log(s, at, 'captain', `${c.name} showed what they're made of: ${getTrait(id).name}`)
     for (const id of news.disproven) log(s, at, 'captain', `Turns out ${c.name} isn't ${getTrait(id).name.toLowerCase()} after all`)
     if (news.developmentRevealed) log(s, at, 'captain', `You're getting the measure of ${c.name}`)
-    if (news.reputationChange > 0) log(s, at, 'captain', `Word is getting round about ${c.name}: reputation up to ${c.reputation} anchors`)
+    if (news.reputationChange > 0) {
+      log(s, at, 'captain', `Word is getting round about ${c.name}: reputation up to ${c.reputation} anchors`)
+      summary?.risen.push(`${c.name}: up to ${c.reputation} anchors`)
+    }
     if (news.reputationChange < 0) log(s, at, 'captain', `${c.name}'s reputation has slipped to ${c.reputation} anchor${c.reputation === 1 ? '' : 's'}`)
     if (news.potentialRevealed) log(s, at, 'captain', `${c.name} has the makings of ${c.potential === 'mythic' ? 'something the sea has rarely seen' : 'a Legend'}`)
+    for (const b of news.badges) {
+      const def = getBadge(b.id)
+      const roman = ['', 'I', 'II', 'III'][b.level]
+      log(s, at, 'captain', `${c.name} earned ${def.name} ${roman}: ${def.bonus[b.level - 1].toLowerCase()}`)
+      summary?.risen.push(`${c.name} earned ${def.name} ${roman}`)
+    }
     if (news.rankUp) {
+      summary?.risen.push(`${c.name}: now ${news.rankUp.rank === 'mythic' ? 'Mythic' : 'a Legend'}`)
       const a = [...LEGEND_ABILITIES, ...MYTHIC_ABILITIES].find((x) => x.id === news.rankUp!.ability)!
       const who = PERSONAS.find((p) => p.id === c.persona)
       log(s, at, 'captain', `${c.name} is ${news.rankUp.rank === 'mythic' ? 'Mythic' : 'a Legend'} now${who ? `: ${who.name}` : ''}. ${a.name}: ${a.description.toLowerCase()}`)

@@ -24,6 +24,7 @@ function cueFor(e: LogEntry): Sfx | null {
     case 'captain':
       if (/ now(:|\.)/.test(e.text) && /Mythic|Legend/.test(e.text)) return 'rankup'
       if (/has the makings/.test(e.text)) return 'find'
+      if (/ earned .+ (I|II|III):/.test(e.text)) return 'bell'
       if (/chose your line|signed on|hired|came aboard/.test(e.text)) return 'signed'
       return null
     case 'info':

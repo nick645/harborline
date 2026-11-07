@@ -121,3 +121,14 @@ export function pickPart(
   if (!setId) return null
   return slot ? `${setId}-${slot}` : rollPick(rng, classesById.get(setId)!.requiredParts)
 }
+
+/** Where a part stands in its boat's set: for a legendary or mythic set, how many of its pieces you hold. */
+export function setProgress(inventory: string[], partId: string): { boat: string; have: number; need: number } | null {
+  const part = getPart(partId)
+  if (part.rarity === 'standard') return null
+  const cls = classesById.get(part.setId)
+  if (!cls) return null
+  const need = cls.requiredParts.length
+  const have = cls.requiredParts.filter((id) => inventory.includes(id)).length
+  return { boat: cls.name, have, need }
+}

@@ -57,6 +57,8 @@ type Props = {
   alerts: ReactNode
   /** Play-test tools (development builds only). */
   dev?: ReactNode
+  /** Open on this page instead of the menu (a find banner opens the Workshop). */
+  startPage?: 'workshop'
   /** A new harbour's cottage, still to buy: shown instead of everything else until it's yours. */
   deed?: { price: number; onBuy: () => void }
 }
@@ -161,9 +163,9 @@ function Swatches({
   )
 }
 
-export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, alerts, dev, deed }: Props) {
+export function HomeScreen({ game, now, onStyle, onPlace, upgrades, workshop, alerts, dev, deed, startPage }: Props) {
   const t = useTheme()
-  const [page, setPage] = useState<Page>('menu')
+  const [page, setPage] = useState<Page>(startPage ?? 'menu')
   const home = getPortDef(homeOf(game))
   const st = REGION_STYLE[home.region]
   const style = game.player.homeStyle ?? {}

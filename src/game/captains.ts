@@ -534,6 +534,8 @@ export interface VoyageNews {
   potentialRevealed: boolean
   /** They rose to a new rank on this voyage, with its signature ability. */
   rankUp: { rank: 'legend' | 'mythic'; ability: string } | null
+  /** Badges that reached a new level on this voyage. */
+  badges: { id: BadgeId; level: 1 | 2 | 3 }[]
 }
 
 /**
@@ -542,7 +544,8 @@ export interface VoyageNews {
  * rumours put to rest. `revealEvery` is shorter aboard boats that bring traits out faster.
  */
 export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealEvery = REVEAL_EVERY, takenPersonas: string[] = []): VoyageNews {
-  const news: VoyageNews = { proven: [], disproven: [], developmentRevealed: false, reputationChange: 0, potentialRevealed: false, rankUp: null }
+  const news: VoyageNews = { proven: [], disproven: [], developmentRevealed: false, reputationChange: 0, potentialRevealed: false, rankUp: null, badges: [] }
+  const levelsBefore = BADGES.map((b) => badgeLevel(b, marksOf(c)[b.id] ?? 0))
   c.voyageCount++
   // What this voyage counts toward their badges.
   const mk = (c.marks ??= {})
@@ -573,6 +576,12 @@ export function recordVoyage(rng: RngState, c: Captain, trip: TripFacts, revealE
     }
     syncOverall(c)
   }
+
+  // Badges that reached a new level on this voyage.
+  BADGES.forEach((b, k) => {
+    const lv = badgeLevel(b, marksOf(c)[b.id] ?? 0)
+    if (lv > levelsBefore[k]) news.badges.push({ id: b.id, level: lv as 1 | 2 | 3 })
+  })
 
   // At the top of the scale, those with the potential become Legends, and then Mythics.
   if (!c.rank && c.potential !== 'none' && c.trueSkill >= LEGEND_AT) {

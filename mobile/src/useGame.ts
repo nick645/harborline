@@ -4,8 +4,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AppState } from 'react-native'
-import type { AwayReport, GameState } from '../../src/game/types'
+import type { AwayReport, Find, GameState } from '../../src/game/types'
 import { GameError, newGame, settle, settleAway } from '../../src/game/state'
+import { getPart } from '../../src/game/parts'
 import { randomSeed } from '../../src/game/rolls'
 import { clearSave, loadGame, saveGame } from './storage'
 import { upcomingAlerts, type UpcomingAlert } from '../../src/game/alerts'
@@ -16,7 +17,8 @@ import { markAct, play } from './sound/sound'
 const TICK_MS = 1000
 const AUTOSAVE_MS = 5000
 
-export const worthReporting = (r: AwayReport) => r.tripsCompleted > 0 || r.keepsakes.length > 0 || r.sunk.length > 0 || r.lost.length > 0 || r.captainsLost.length > 0
+export const worthReporting = (r: AwayReport) =>
+  r.tripsCompleted > 0 || r.keepsakes.length > 0 || r.sunk.length > 0 || r.lost.length > 0 || r.captainsLost.length > 0 || r.signed.length > 0 || r.wentElsewhere.length > 0 || r.risen.length > 0 || r.charted.length > 0
 
 export function useGame() {
   const [game, setGame] = useState<GameState | null>(null)
@@ -24,6 +26,7 @@ export function useGame() {
   const [report, setReport] = useState<AwayReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [alerts, setAlerts] = useState<UpcomingAlert[]>([])
+  const [finds, setFinds] = useState<Find[]>([])
   const ref = useRef<GameState | null>(null)
   /** When the tick last looked for storm alerts; 0 until the first tick. */
   const lastTick = useRef(0)
@@ -72,7 +75,11 @@ export function useGame() {
       if (found.length) setAlerts(found)
       lastTick.current = t
       setNow(t)
-      commit(settle(ref.current, t))
+      const { state, report } = settleAway(ref.current, t)
+      commit(state)
+      // Notable finds while you're playing get a banner of their own.
+      const notable = report.finds.filter((f) => f.keepsake || (f.part && getPart(f.part).rarity !== 'standard'))
+      if (notable.length) setFinds((prev) => [...prev, ...notable].slice(-3))
     }, TICK_MS)
     return () => clearInterval(id)
   }, [commit])
@@ -149,5 +156,7 @@ export function useGame() {
     alerts,
     clearAlerts: () => setAlerts([]),
     reset,
+    finds,
+    clearFinds: () => setFinds([]),
   }
 }

@@ -191,6 +191,13 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   for a small find (`src/game/flotsam.ts`: 5–15% of the trip's pay, sometimes a fitting, rarely
   a keepsake, better in storms, one per boat per 10 min). Numbers are Claude's picks.
 
+- Telling the player (user-approved 2026-11-06): the welcome-back card is a full summary (trips'
+  pay and spending, finds by name with set progress, fittings counted, who signed or went to
+  rivals, prospects leaning your way, badges and rank/reputation rises, charting, losses). While
+  playing, rare-or-better finds get a banner that opens the Workshop. Find alerts (their own
+  switch) notify while away: the seeded game is run forward on a copy to see what comes home when.
+  Send cards show what each weather is good for (`src/game/upside.ts`).
+
 ## Originality
 
 The user does not want this to read as a copy of Pocket Planes or of EA's college football

@@ -7,7 +7,7 @@ import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold
 import type { Boat, GameState } from '../src/game/types'
 import { assignRoute, buyBoat, buyHome, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, moveHome, sellBoat, settle } from '../src/game/state'
 import { assignCaptain, moveProspect, passOnProspect, boatToShowTo, buyUpgrade, captainViewById, court, courtingOf, hireHand, moveHand, recruitViewById, tavernHandView, UPGRADES, upgradeQuote, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
-import { getPart, partName, slotName } from '../src/game/parts'
+import { getPart, partName, setProgress, slotName } from '../src/game/parts'
 import { getKeepsake, KEEPSAKES } from '../src/game/data/keepsakes'
 import { getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../src/game/economy'
 import { quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
@@ -31,7 +31,8 @@ import { chartingNext, homeOf } from '../src/game/regions'
 import { useGame } from './src/useGame'
 import { ConfirmProvider } from './src/confirm'
 import { useConfirm, type Ask } from './src/confirmContext'
-import { alertsWanted, alertText, previewAlert, setAlertsWanted } from './src/notify'
+import { alertsWanted, alertText, findAlertsWanted, previewAlert, setAlertsWanted, setFindAlertsWanted } from './src/notify'
+import { AwaySummary } from './src/components/AwaySummary'
 import { fonts, useTheme } from './src/theme'
 import { lightAt } from './src/art/light'
 import { HarborMap } from './src/components/HarborMap'
@@ -92,13 +93,15 @@ export default function App() {
 
 function Harbor() {
   const t = useTheme()
-  const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset } = useGame()
+  const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset, finds, clearFinds } = useGame()
   useSoundscape(game, now, alerts.length)
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
   const [gallery, setGallery] = useState(false)
   const [portsSel, setPortsSel] = useState<string | null>(null)
   const [portsPage, setPortsPage] = useState<VisitPage>('menu')
+  // A page of Home to open on (a find banner opens the Workshop).
+  const [homePage, setHomePage] = useState<'workshop' | null>(null)
   const confirm = useConfirm()
   // Someone to have selected when a quay or tavern opens (from the Captains tab's courting list).
   const [focusId, setFocusId] = useState<string | null>(null)
@@ -139,7 +142,6 @@ function Harbor() {
   const homeShut = homeLocked(game, now)
   // Home is shut until the walk-through reaches it (a new game can start with Home open).
   if (homeShut && tab === 'home') setTab('fleet')
-  const finds = report?.parts.filter((id) => getPart(id).rarity !== 'standard') ?? []
 
   /** Ask first, then act. Resolves to whether the action went ahead. */
   const ask = async (a: Ask, fn: (g: GameState, at: number) => GameState) => (await confirm(a)) && act(fn)
@@ -253,19 +255,38 @@ function Harbor() {
       </View>
 
       <View style={styles.content}>
-        {report && (
-          <Pressable onPress={clearReport}>
-            <Card accent={report.sunk.length + report.lost.length + report.captainsLost.length ? t.bad : t.accent}>
-              <Body>
-                <Text style={{ fontFamily: fonts.bold }}>Welcome back.</Text> While you were away ({duration(report.awayMs)}), your fleet finished{' '}
-                {report.tripsCompleted} trip{report.tripsCompleted === 1 ? '' : 's'} for {coins(report.coinsEarned)}c.
-                {finds.length ? ` Found: ${finds.map(partName).join(', ')}.` : ''}
-                {report.keepsakes.length ? ` Brought home for the house: ${report.keepsakes.map((id) => getKeepsake(id)?.name).join(', ')}.` : ''}
-                {report.lost.length ? ` Cargo lost: ${report.lost.join(', ')}.` : ''}
-                {report.sunk.length ? ` Sunk: ${report.sunk.join(', ')}.` : ''}
-                {report.captainsLost.length ? ` Lost at sea: ${report.captainsLost.join(', ')}.` : ''}
-              </Body>
-              <Muted>Tap to dismiss</Muted>
+        {report && <AwaySummary report={report} game={game} now={now} onDismiss={clearReport} />}
+        {finds.length > 0 && (
+          <Pressable
+            onPress={() => {
+              clearFinds()
+              setStack([])
+              setHomePage('workshop')
+              setTab('home')
+            }}
+            accessibilityRole="button"
+            accessibilityHint="Opens the Workshop"
+          >
+            <Card accent={t.legendary}>
+              {finds.map((f, i) => {
+                const set = f.part ? setProgress(game.player.partInventory, f.part) : null
+                return (
+                  <Body key={i}>
+                    <Text style={{ color: t.legendary, fontFamily: fonts.bold }}>✦ </Text>
+                    {f.keepsake ? (
+                      <>
+                        {f.boat} brought home <Text style={{ fontFamily: fonts.bold }}>{getKeepsake(f.keepsake)?.name}</Text>
+                      </>
+                    ) : (
+                      <>
+                        {f.boat} found <Text style={{ fontFamily: fonts.bold }}>{partName(f.part!)}</Text>
+                        {set && set.need > 1 ? ` · ${set.have} of ${set.need} for the ${set.boat}` : ''}
+                      </>
+                    )}
+                  </Body>
+                )
+              })}
+              <Muted>Tap to see it in the Workshop</Muted>
             </Card>
           </Pressable>
         )}
@@ -404,6 +425,8 @@ function Harbor() {
 
             {tab === 'home' && !homeShut && (
               <HomeScreen
+                key={homePage ?? 'menu'}
+                startPage={homePage ?? undefined}
                 deed={step?.id === 'home' ? { price: HOME_START_PRICE, onBuy: () => void ask({ title: 'Buy the cottage on the quay?', body: 'Your home in the harbour, and your own tavern with it.', label: `Buy it · ${coins(HOME_START_PRICE)}c` }, (g, at) => buyHome(g, at)) } : undefined}
                 game={game}
                 now={now}
@@ -439,6 +462,7 @@ function Harbor() {
                   <>
                     <SoundToggles />
                     <StormAlertsToggle />
+                    <FindAlertsToggle />
                   </>
                 }
                 dev={__DEV__ ? <View style={{ flex: 1, gap: 8 }}>
@@ -598,6 +622,33 @@ function SoundToggles() {
         {row('Music', p.music, () => setPrefs({ music: !p.music }))}
         {row('Sounds', p.effects, () => setPrefs({ effects: !p.effects }))}
       </Row>
+    </Card>
+  )
+}
+
+/** Find alerts: a notification when a boat brings home something rare (or a keepsake) while you're away. */
+function FindAlertsToggle() {
+  const t = useTheme()
+  const [on, setOn] = useState<boolean | null>(null)
+  useEffect(() => {
+    void findAlertsWanted().then(setOn)
+  }, [])
+  const toggle = async () => {
+    const want = !on
+    const now = await setFindAlertsWanted(want)
+    setOn(now)
+    if (want && !now) Alert.alert('Notifications are off', 'Allow notifications for Harborline in Settings to get find alerts.')
+  }
+  if (on === null) return null
+  return (
+    <Card>
+      <Pressable onPress={toggle} accessibilityRole="switch" accessibilityState={{ checked: on }} style={styles.toggleRow}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Body style={{ fontWeight: '700' }}>Find alerts</Body>
+          <Muted>A notification when a boat brings home a rare, legendary or mythic part, or a keepsake, while you're away.</Muted>
+        </View>
+        <Switch value={on} onValueChange={() => void toggle()} trackColor={{ true: t.accent, false: t.muted }} ios_backgroundColor={t.muted} importantForAccessibility="no" />
+      </Pressable>
     </Card>
   )
 }

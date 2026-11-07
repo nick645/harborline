@@ -355,6 +355,15 @@ export interface GameState {
 }
 
 /** What happened while the player was away. */
+/** Something a boat brought home: a part (any rarity) or a keepsake. */
+export interface Find {
+  at: number
+  boatId: string
+  boat: string
+  part?: string
+  keepsake?: string
+}
+
 export interface AwayReport {
   awayMs: number
   coinsEarned: number
@@ -367,6 +376,17 @@ export interface AwayReport {
   parts: string[]
   /** Keepsake ids brought home. */
   keepsakes: string[]
+  /** Every find in order, with when and which boat brought it home. */
+  finds: Find[]
+  /** What the trips themselves paid (coinsEarned is the change in coins, after any spending). */
+  tripPay: number
+  /** People who chose your line, and prospects who went to a rival instead. */
+  signed: string[]
+  wentElsewhere: string[]
+  /** Captains who rose: in reputation, or to Legend or Mythic. */
+  risen: string[]
+  /** Regions charted open. */
+  charted: string[]
   /** Names of captains lost at sea waiting for their boat to be raised. */
   captainsLost: string[]
 }

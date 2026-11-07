@@ -6,7 +6,9 @@ import * as Notifications from 'expo-notifications'
 import type { GameState } from '../../src/game/types'
 import type { StormAlert } from '../../src/game/weather'
 import { upcomingAlerts } from '../../src/game/alerts'
-import { adriftDeadline } from '../../src/game/state'
+import { adriftDeadline, settleAway } from '../../src/game/state'
+import { getPart, partName, setProgress } from '../../src/game/parts'
+import { getKeepsake } from '../../src/game/data/keepsakes'
 import { getPort } from '../../src/game/economy'
 import { WEATHER } from '../../src/game/data/weather'
 import { WEATHER_WORDS, getRegion } from '../../src/game/data/ports'
@@ -18,6 +20,9 @@ const PREF_KEY = 'harborline.stormAlerts'
 const HORIZON_MS = 24 * 60 * 60 * 1000
 /** Scheduled storm alerts carry this id prefix, so withdrawing them leaves anything else alone. */
 const ALERT_ID = 'storm-'
+/** Find alerts: their own switch, and their own prefix. */
+const FIND_PREF_KEY = 'harborline.findAlerts'
+const FIND_ID = 'find-'
 
 // Show notifications that arrive while the app is open (scheduled alerts are withdrawn on
 // return, so in practice this is the dev preview).
@@ -60,9 +65,54 @@ export function alertText(state: GameState, alert: StormAlert): { title: string;
   }
 }
 
+export async function findAlertsWanted(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(FIND_PREF_KEY)) === 'on'
+  } catch {
+    return false
+  }
+}
+
+/** Turning find alerts on asks for permission. Resolves to whether they're on afterwards. */
+export async function setFindAlertsWanted(on: boolean): Promise<boolean> {
+  if (on) {
+    const current = await Notifications.getPermissionsAsync()
+    const granted = current.granted || (current.canAskAgain && (await Notifications.requestPermissionsAsync()).granted)
+    if (!granted) on = false
+  }
+  await AsyncStorage.setItem(FIND_PREF_KEY, on ? 'on' : 'off').catch(() => undefined)
+  return on
+}
+
+/**
+ * What the fleet will bring home while you're away that's worth a notification: rare, legendary
+ * and mythic parts, and keepsakes. The game's rolls are seeded, so running the queued trips
+ * forward on a copy says exactly what comes home, and when, if nothing changes.
+ */
+function upcomingFinds(state: GameState, now: number): { at: number; title: string; body: string }[] {
+  return settleAway(state, now + HORIZON_MS)
+    .report.finds.filter((f) => f.keepsake || (f.part && getPart(f.part).rarity !== 'standard'))
+    .map((f) => {
+      if (f.keepsake) return { at: f.at, title: `${f.boat} brought something home`, body: `${getKeepsake(f.keepsake)?.name}: something new for your house.` }
+      const part = getPart(f.part!)
+      const set = setProgress(state.player.partInventory.concat(f.part!), f.part!)
+      const rare = part.rarity === 'mythic' ? 'A mythic find!' : part.rarity === 'legendary' ? 'A legendary find!' : 'A rare find'
+      return { at: f.at, title: `${rare} ${f.boat} found ${partName(f.part!)}`, body: set && set.need > 1 ? `${set.have} of ${set.need} for the ${set.boat}.` : 'Open Harborline to see it in your Workshop.' }
+    })
+}
+
 /** Replace whatever was scheduled with the alerts due between now and the horizon. */
 export async function scheduleAlerts(state: GameState, now: number): Promise<void> {
   await cancelAlerts()
+  if (await findAlertsWanted()) {
+    for (const f of upcomingFinds(state, now)) {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `${FIND_ID}${f.at}-${f.title.length}`,
+        content: { title: f.title, body: f.body },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: f.at },
+      })
+    }
+  }
   if (!(await alertsWanted())) return
   await scheduleAdrift(state, now)
   for (const alert of upcomingAlerts(state, now, now + HORIZON_MS)) {
@@ -95,7 +145,7 @@ export async function cancelAlerts(): Promise<void> {
   try {
     const pending = await Notifications.getAllScheduledNotificationsAsync()
     await Promise.all(
-      pending.filter((n) => n.identifier.startsWith(ALERT_ID)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+      pending.filter((n) => n.identifier.startsWith(ALERT_ID) || n.identifier.startsWith(FIND_ID)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
     )
   } catch {
     // Nothing scheduled, or notifications unavailable.
