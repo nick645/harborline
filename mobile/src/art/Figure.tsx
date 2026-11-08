@@ -123,8 +123,13 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const torsoClip = useMemo(() => Skia.Path.MakeFromSVGString(torso)!, [torso])
   const base = look.coatStyle === 'stripes' ? CREAM : look.coat
   const wide = look.build === 'stocky' ? 2.5 : 0
+  // Empty hands for everyone but Legends and Mythics: a held thing swinging up to the face
+  // passed through the body. They wave and walk instead. A persona's signature item is held
+  // still (its raise-to-use moves off).
+  const prop: Prop = look.persona ? look.prop : 'none'
+  const acting: Prop | null = look.persona ? null : prop
   const [hl, hr]: [[number, number], [number, number]] =
-    legs && look.prop === 'none' ? [[15 - wide, 101], [41 + wide, 101]] : HANDS[look.prop]
+    legs && prop === 'none' ? [[15 - wide, 101], [41 + wide, 101]] : HANDS[prop]
   const shoulderL: [number, number] = legs ? [15 - wide, 66] : [11 - wide, 70]
   const shoulderR: [number, number] = legs ? [41 + wide, 66] : [45 + wide, 70]
   const sleeveW = legs ? 5.6 : 7.5
@@ -132,7 +137,6 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const still = useSharedValue(0)
   const stride = motion?.stride ?? still
   const act = motion?.act ?? still
-  const prop = look.prop
   const fx = look.fx ?? []
   const brassArm = fx.includes('brass-arm')
   const lanternHead = fx.includes('lantern-head')
@@ -154,7 +158,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
     let px = 0
     let py = st * -1
     let rot = 0
-    switch (prop) {
+    switch (acting) {
       case 'spyglass':
         lx += 6 * a; ly -= 40 * a; rx += 4 * a; ry -= 40 * a; px = 5 * a; py += -40 * a; rot = 0.35 * a
         break
@@ -386,7 +390,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
         ))}
       {look.title !== undefined && <InsigniaFront look={look} shoulders={[shoulderL, shoulderR]} />}
       <Group transform={propT} origin={propOrigin}>
-        <PropArt prop={look.prop} hands={[hl, hr]} clock={clock} offset={offset} />
+        <PropArt prop={prop} hands={[hl, hr]} clock={clock} offset={offset} />
       </Group>
       <Circle cx={handLx} cy={handLy} r={handR} color={skinShadow} />
       <Circle cx={handRx} cy={handRy} r={handR} color={brassArm ? '#e6c27a' : look.skin} />
