@@ -157,10 +157,11 @@ export function HarborMap({
     flyTo({ cx: fx, cy: fy, z: 1.4 }, 900)
     play('rankup')
     veil.set(withTiming(0, { duration: REVEAL_MS, easing: Easing.inOut(Easing.quad) }))
+    // Remembered as it starts, so leaving partway through doesn't replay it.
+    const all = [...regions]
+    void AsyncStorage.setItem(CHART_SEEN_KEY, JSON.stringify(all)).catch(() => undefined)
     const done = setTimeout(() => {
-      const all = [...regions]
       setSeen(all)
-      void AsyncStorage.setItem(CHART_SEEN_KEY, JSON.stringify(all)).catch(() => undefined)
       flyTo({ cx: base.cx, cy: base.cy, z: 1 }, 900)
     }, REVEAL_MS + 900)
     const off = setTimeout(() => setRevealing(null), REVEAL_MS + 3200)

@@ -241,6 +241,14 @@ violet with magenta lightning, a deliberate contrast to the warm harbour. Scenes
 Living scenes: your boat live, your captain (helm at sea / tavern ashore, traits as a logbook), the
 scouting quay. Mockups: https://claude.ai/artifact/84vbBnBj5FVLDaowMeJxys
 
+Captain art library (2026-11-07, first batch): `mobile/src/art/parts/` holds modular Skia parts
+(registry.ts ids and region pools, Parts.tsx drawings, upgrade.ts choices), guided by the
+storybook references in `assets/art-references/`. `lookFor()` is unchanged and every existing
+captain looks exactly as before (`parts/looks.test.ts` checks 400 captains against
+`looks.baseline.json`); `storybookLookFor()` adds parts by salted hashes of the id (`~sb-<slot>`),
+never by list position, and is only used in the dev Captain art gallery until switched on.
+Figure draws a part in place of its classic piece; DeckFigure doesn't draw parts yet.
+
 ## Working with the user
 
 - Commit when a piece of work is done; push to `main` only when the user says so (they usually do).

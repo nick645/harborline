@@ -6,6 +6,7 @@ import { hash } from './paint'
 import type { RegionId } from '../../../src/game/data/ports'
 import { REGION_STYLE } from './regionStyle'
 import { PERSONA_LOOKS } from './personas'
+import type { StorybookParts } from './parts/registry'
 
 export type HatKind =
   | 'cap' | 'souwester' | 'beanie' | 'brim' | 'bun' | 'bare' | 'tricorn'
@@ -59,6 +60,8 @@ export interface Look {
   capeColor?: string
   /** Their title (RATING_TITLES index): each one adds to how they dress (Figure's `Insignia`). */
   title?: number
+  /** Storybook parts (parts/registry.ts), set only by parts/upgrade.ts: each replaces its classic drawing. */
+  parts?: StorybookParts
 }
 
 /** Hat and hair shapes in figure space: a 56 × 100 standing figure, head centred at (28, 40). */

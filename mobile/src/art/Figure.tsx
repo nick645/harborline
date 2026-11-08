@@ -9,6 +9,8 @@ import type { SharedValue } from 'react-native-reanimated'
 import { useDerivedValue, useSharedValue } from 'react-native-reanimated'
 import { HAT_PATHS, type HairStyle, type Look, type Prop } from './looks'
 import { shade, tint } from './paint'
+import { ACCESSORY_LAYER, COAT_HAS_BELT } from './parts/registry'
+import { BeardArt, ChestAccessory, CoatBody, CoatCollar, HairBack, HairFront, HatPartArt, HeadAccessory } from './parts/Parts'
 import { BackFx, BodyFx, FrontFx, Goggles, HatExtras, HeadFx, LanternHead } from './Flourish'
 
 type Props = {
@@ -135,6 +137,9 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
   const brassArm = fx.includes('brass-arm')
   const lanternHead = fx.includes('lantern-head')
   const floating = fx.includes('float')
+  // Storybook parts (parts/), each in place of its classic drawing.
+  const sb = look.parts
+  const hatless = !sb?.hat && (look.hat === 'bare' || look.hat === 'bun' || look.hat === 'none')
 
   // Where the hands and the prop go right now: rest pose, plus a swing while walking, plus
   // the prop's action as `act` rises.
@@ -309,7 +314,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             <Rect x={-2} y={107} width={60} height={2.4} color="#e6a53a" />
           </>
         )}
-        {look.coatStyle === 'peacoat' && (
+        {look.coatStyle === 'peacoat' && !sb?.coat && (
           <>
             <Path path="M28 79 V 100" color={shade(look.coat, 0.4)} style="stroke" strokeWidth={0.8} />
             <Path path="M21.5 61 L 28 80 L 24.4 84 L 16.6 66.5 Z" color={shade(look.coat, 0.25)} />
@@ -331,7 +336,8 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             {fine && [70, 77, 84, 91].map((ry) => <Path key={ry} path={`M${8 + (ry - 70) * 0.18} ${ry} H ${48 - (ry - 70) * 0.18}`} color={shade(look.coat, 0.3)} opacity={0.5} style="stroke" strokeWidth={0.7} />)}
           </>
         )}
-        {look.title !== undefined && <InsigniaCoat look={look} legs={legs} />}
+        {sb?.coat && <CoatBody part={sb.coat} look={look} legs={legs} />}
+        {look.title !== undefined && <InsigniaCoat look={look} legs={legs} ownBelt={!!sb?.coat && COAT_HAS_BELT[sb.coat]} />}
         </Group>
       </Group>
 
@@ -343,6 +349,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
       {look.hairStyle === 'braid' &&
         BRAID.map((b, i) => <Oval key={i} x={b.x - 2.2} y={b.y - 2.6} width={4.4} height={5.2} color={i % 2 ? look.hair : shade(look.hair, 0.15)} />)}
       {BACK_HAIR[look.hairStyle] && <Path path={BACK_HAIR[look.hairStyle]!} color={shade(look.hair, 0.12)} />}
+      {sb?.hair && <HairBack part={sb.hair} look={look} hatless={hatless} />}
 
       {/* Neck and scarf */}
       <Rect x={23} y={48} width={10} height={14} color={skinShadow} />
@@ -362,6 +369,9 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
           <Circle cx={24} cy={64} r={2.8} color={shade(look.scarf, 0.08)} />
         </>
       )}
+
+      {sb?.coat && <CoatCollar part={sb.coat} look={look} />}
+      {sb?.accessory && ACCESSORY_LAYER[sb.accessory] === 'chest' && <ChestAccessory part={sb.accessory} legs={legs} />}
 
       {/* Arms and whatever they're holding */}
       <Path path={sleeveL} color={shade(base, 0.12)} style="stroke" strokeWidth={sleeveW} strokeCap="round" />
@@ -435,6 +445,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
           </>
         )}
 
+        {sb?.beard && <BeardArt part={sb.beard} look={look} />}
         {look.extra === 'pipe' && (
           <>
             <Path path="M30.4 48.8 L 37 50.6" color="#4a2e22" style="stroke" strokeWidth={1.3} strokeCap="round" />
@@ -448,13 +459,16 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
         {fx.length > 0 && <HeadFx look={look} clock={clock} offset={offset} />}
 
         {/* Hair, then hat over it */}
-        {look.hat !== 'bare' && look.hat !== 'bun' && look.hat !== 'helmet' && look.hat !== 'none' && <Path path={FRONT_HAIR[look.hairStyle]} color={look.hair} />}
-        <Path path={HAT_PATHS[look.hat]} color={look.hatColor} fillType={look.hat === 'helmet' ? 'evenOdd' : 'winding'} />
-        <HatExtras look={look} clock={clock} offset={offset} />
+        {sb?.accessory && ACCESSORY_LAYER[sb.accessory] === 'head' && <HeadAccessory part={sb.accessory} />}
+        {!sb?.hair && !sb?.hat && look.hat !== 'bare' && look.hat !== 'bun' && look.hat !== 'helmet' && look.hat !== 'none' && <Path path={FRONT_HAIR[look.hairStyle]} color={look.hair} />}
+        {sb?.hair && <HairFront part={sb.hair} look={look} hatless={hatless} />}
+        {!sb?.hat && <Path path={HAT_PATHS[look.hat]} color={look.hatColor} fillType={look.hat === 'helmet' ? 'evenOdd' : 'winding'} />}
+        {!sb?.hat && <HatExtras look={look} clock={clock} offset={offset} />}
+        {sb?.hat && <HatPartArt part={sb.hat} look={look} />}
         {fx.includes('goggles') && <Goggles />}
-        {(look.title ?? 0) >= 4 && !['bare', 'bun', 'none', 'helmet', 'tricorn', 'hood'].includes(look.hat) && <CapAnchor />}
-        {look.hat === 'bare' || look.hat === 'bun' || look.hat === 'none' ? (
-          <Path path="M19 27.6 C 22 24.2, 30 23.4, 35 25.6" color={tint(look.hair, 0.25)} opacity={0.6} style="stroke" strokeWidth={0.9} strokeCap="round" />
+        {!sb?.hat && (look.title ?? 0) >= 4 && !['bare', 'bun', 'none', 'helmet', 'tricorn', 'hood'].includes(look.hat) && <CapAnchor />}
+        {sb?.hat ? null : look.hat === 'bare' || look.hat === 'bun' || look.hat === 'none' ? (
+          !sb?.hair && <Path path="M19 27.6 C 22 24.2, 30 23.4, 35 25.6" color={tint(look.hair, 0.25)} opacity={0.6} style="stroke" strokeWidth={0.9} strokeCap="round" />
         ) : (
           hatTrim && (
             <>
@@ -623,7 +637,7 @@ const GOLD = '#f2c75a'
 const STORM = '#7f8cff'
 
 /** On the coat itself (drawn inside the torso's clip). */
-function InsigniaCoat({ look, legs }: { look: Look; legs: boolean }) {
+function InsigniaCoat({ look, legs, ownBelt = false }: { look: Look; legs: boolean; ownBelt?: boolean }) {
   const t = look.title ?? 0
   const beltY = legs ? 92 : 90
   return (
@@ -634,7 +648,7 @@ function InsigniaCoat({ look, legs }: { look: Look; legs: boolean }) {
           <Path path="M13.4 79 h 6.2 v 6.2 h -6.2 Z" color={shade(look.coat, 0.35)} style="stroke" strokeWidth={0.5} opacity={0.8} />
         </>
       )}
-      {t >= 1 && t <= 5 && (
+      {t >= 1 && t <= 5 && !ownBelt && (
         <>
           <Rect x={0} y={beltY} width={56} height={3.4} color="#c9a26a" />
           <Path path={Array.from({ length: 14 }, (_, i) => `M${i * 4} ${beltY + 3.4} l 3 -3.4`).join(' ')} color="#8a6a3a" style="stroke" strokeWidth={0.7} />

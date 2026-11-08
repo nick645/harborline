@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, BackHandler, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, BackHandler, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
@@ -47,6 +47,7 @@ import type { VisitPage } from './src/screens/VisitScreen'
 import { ShipyardScreen } from './src/components/ShipyardScreen'
 import { BoatGallery } from './src/components/BoatGallery'
 import { PersonaGallery } from './src/components/PersonaGallery'
+import { CaptainGallery } from './src/components/CaptainGallery'
 import { Upgrades } from './src/components/PortScreen'
 import { Workshop as NewWorkshop } from './src/components/Workshop'
 import { BoatScreen } from './src/screens/BoatScreen'
@@ -107,6 +108,7 @@ function Harbor() {
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
   const [gallery, setGallery] = useState(false)
+  const [captainArt, setCaptainArt] = useState(false)
   const [portsSel, setPortsSel] = useState<string | null>(null)
   const [portsPage, setPortsPage] = useState<VisitPage>('menu')
   // Where the Shipyard opens: the yard, or its Workshop (a find banner opens the Workshop).
@@ -526,7 +528,7 @@ function Harbor() {
                     <FindAlertsToggle />
                   </>
                 }
-                dev={__DEV__ ? <View style={{ flex: 1, gap: 8 }}>
+                dev={__DEV__ ? <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 8, paddingBottom: 24 }}>
                   <Card>
                     <Muted>Play-test tools (development builds only)</Muted>
                     <Row>
@@ -698,12 +700,14 @@ function Harbor() {
                         }
                       />
                       <Button small kind="secondary" label={gallery ? 'Hide galleries' : 'Boat and Legend galleries'} onPress={() => setGallery(!gallery)} />
+                      <Button small kind="secondary" label={captainArt ? 'Hide captain art' : 'Captain art gallery'} onPress={() => setCaptainArt(!captainArt)} />
                       <Button small kind="danger" label="Reset game" onPress={() => void reset()} />
                     </Row>
                   </Card>
+                {captainArt && <CaptainGallery />}
                 {gallery && <PersonaGallery />}
                 {gallery && <BoatGallery />}
-              </View> : undefined}
+              </ScrollView> : undefined}
               />
             )}
           </>
