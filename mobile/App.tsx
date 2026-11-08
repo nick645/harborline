@@ -10,7 +10,7 @@ import { assignCaptain, moveProspect, passOnProspect, boatToShowTo, buyUpgrade, 
 import { getPart, partName, setProgress, slotName } from '../src/game/parts'
 import { getKeepsake, KEEPSAKES } from '../src/game/data/keepsakes'
 import { getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../src/game/economy'
-import { quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
+import { GameError, quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
 import { HOME_START_PRICE, MELT_COST, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE } from '../src/game/data/economy'
 import { SCOUT_ACTIONS } from '../src/game/data/captains'
 import { COURT_ACTIONS, type CourtAction } from '../src/game/data/courting'
@@ -26,7 +26,7 @@ import { devMakeLegend } from './src/devTools'
 import { getPrefs, onPrefs, play, setPrefs } from './src/sound/sound'
 import { useSoundscape } from './src/sound/useSoundscape'
 import { TAVERN_RARE_BOOST } from '../src/game/data/hands'
-import { generateCaptain } from '../src/game/captains'
+import { generateCaptain, steadfast } from '../src/game/captains'
 import { chartingNext, homeOf } from '../src/game/regions'
 import { useGame } from './src/useGame'
 import { ConfirmProvider } from './src/confirm'
@@ -98,7 +98,7 @@ export default function App() {
 
 function Harbor() {
   const t = useTheme()
-  const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset, finds, clearFinds } = useGame()
+  const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset, finds, clearFinds, crewNews, clearCrewNews } = useGame()
   useSoundscape(game, now, alerts.length)
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
@@ -295,6 +295,19 @@ function Harbor() {
             </Card>
           </Pressable>
         )}
+        {crewNews.length > 0 && (
+          <Pressable onPress={clearCrewNews} accessibilityRole="button" accessibilityHint="Dismisses the crew news">
+            <Card accent={t.bad}>
+              {crewNews.map((line, i) => (
+                <Body key={i}>
+                  <Text style={{ color: t.bad, fontFamily: fonts.bold }}>✗ </Text>
+                  {line}
+                </Body>
+              ))}
+              <Muted>Tap to dismiss</Muted>
+            </Card>
+          </Pressable>
+        )}
         {alerts.length > 0 && (
           <Pressable onPress={clearAlerts} accessibilityRole="button" accessibilityHint="Dismisses the storm alert">
             <Card accent={t.storm}>
@@ -486,6 +499,21 @@ function Harbor() {
                             const sets = craftableClasses().filter((c) => !g.player.ownedBoats.some((b) => b.classId === c.id))
                             const pick = sets[Math.floor(Math.random() * sets.length)]
                             return { ...g, player: { ...g.player, partInventory: [...g.player.partInventory, ...pick.requiredParts] } }
+                          })
+                        }
+                      />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Make a captain quit"
+                        onPress={() =>
+                          act((g) => {
+                            // Morale to nothing: they resign as soon as they're ashore.
+                            const s = structuredClone(g)
+                            const c = s.player.roster.find((x) => !steadfast(x))
+                            if (!c) throw new GameError('Every captain is bonded, a Legend or a Mythic: none of them would quit')
+                            c.morale = 0
+                            return s
                           })
                         }
                       />

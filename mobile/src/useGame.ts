@@ -27,6 +27,8 @@ export function useGame() {
   const [error, setError] = useState<string | null>(null)
   const [alerts, setAlerts] = useState<UpcomingAlert[]>([])
   const [finds, setFinds] = useState<Find[]>([])
+  // Captains resigning or close to quitting while you're playing.
+  const [crewNews, setCrewNews] = useState<string[]>([])
   const ref = useRef<GameState | null>(null)
   /** When the tick last looked for storm alerts; 0 until the first tick. */
   const lastTick = useRef(0)
@@ -80,6 +82,11 @@ export function useGame() {
       // Notable finds while you're playing get a banner of their own.
       const notable = report.finds.filter((f) => f.keepsake || (f.part && getPart(f.part).rarity !== 'standard'))
       if (notable.length) setFinds((prev) => [...prev, ...notable].slice(-3))
+      const crew = [
+        ...report.resigned.map((x) => `${x.name} resigned and signed with ${x.rival}`),
+        ...report.shaken.filter((x) => !report.resigned.some((q) => q.name === x.name)).map((x) => `${x.name} is close to quitting`),
+      ]
+      if (crew.length) setCrewNews((prev) => [...prev, ...crew].slice(-3))
     }, TICK_MS)
     return () => clearInterval(id)
   }, [commit])
@@ -158,5 +165,7 @@ export function useGame() {
     reset,
     finds,
     clearFinds: () => setFinds([]),
+    crewNews,
+    clearCrewNews: () => setCrewNews([]),
   }
 }
