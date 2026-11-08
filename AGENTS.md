@@ -176,6 +176,11 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   fjord, and islands for the other ports (`mobile/src/map/geography.ts`; shapes are Claude's).
   Ports keep their positions; islands fit themselves clear of every lane from Saltmarsh, and
   `scripts/check-map.ts` checks it. Uncharted regions lie under cloud. Pinch to zoom, drag to pan.
+  Since 2026-11-07 (user-approved) the map is mostly still for speed: land and cloud are drawn
+  once into pictures per light and charted waters (`mobile/src/map/snapshot.tsx`: the world soft,
+  the known waters sharp) and only moved on the GPU; routes, ports and boats are Skia over them.
+  Boats sail their lanes live; tapping a port opens its card (weather, market day, your boats,
+  Visit / Send); a newly charted region rolls its cloud back with a banner.
 
 - Captain growth (user-approved 2026-11-06): the captain page leads with a sea rating (best guess
   from what you've learned, by reputation until then) and a potential bar marking Legend 90 and

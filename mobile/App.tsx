@@ -28,7 +28,9 @@ import { getPrefs, onPrefs, play, setPrefs } from './src/sound/sound'
 import { useSoundscape } from './src/sound/useSoundscape'
 import { TAVERN_RARE_BOOST } from '../src/game/data/hands'
 import { generateCaptain, steadfast } from '../src/game/captains'
-import { chartingNext, homeOf } from '../src/game/regions'
+import { chartingNext, homeOf, openPorts } from '../src/game/regions'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { CHART_SEEN_KEY } from './src/map/snapshot'
 import { useGame } from './src/useGame'
 import { ConfirmProvider } from './src/confirm'
 import { useConfirm, type Ask } from './src/confirmContext'
@@ -364,7 +366,7 @@ function Harbor() {
                 <Measure>
                   {(w, h) => (
                     <View style={{ width: w, height: h, borderRadius: 16, overflow: 'hidden' }}>
-                      <HarborMap game={game} now={now} onOpenPort={(id) => goToPort(id)} box={{ w, h }} />
+                      <HarborMap game={game} now={now} onOpenPort={(id, page) => goToPort(id, page)} onOpenBoat={(id) => open({ kind: 'boat', id })} box={{ w, h }} />
                       {game.player.guide && <ChartFog width={w} height={h} light={lightAt(now)} hidden={fogged} />}
                     </View>
                   )}
@@ -524,6 +526,16 @@ function Harbor() {
                             return { ...g, player: { ...g.player, partInventory: [...g.player.partInventory, ...pick.requiredParts] } }
                           })
                         }
+                      />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Replay a charting"
+                        onPress={() => {
+                          // The map forgets the last region it saw charted, and reveals it again next time it opens.
+                          const seen = [...new Set(openPorts(game).map((p) => p.region))]
+                          void AsyncStorage.setItem(CHART_SEEN_KEY, JSON.stringify(seen.slice(0, -1))).then(() => setTab('fleet'))
+                        }}
                       />
                       <Button
                         small

@@ -1,12 +1,11 @@
-// The sea chart's land, sea and cloud, drawn on the GPU (Skia) under the ports and routes:
+// The sea chart's land, sea and cloud, drawn once into pictures (Skia) under the ports and routes:
 // the sea and its swell, pale shallows along every shore, each piece of land in its climate's
 // colour, rivers, a beach line and the coast's ink, the trees, pines, palms, peaks, mesas and
 // dunes (merged into a handful of shapes per region, so thousands cost no more than a few),
 // region names, and cloud over everything not yet charted. Drawn in map units under the camera.
 
-import { useMemo } from 'react'
 import { Platform } from 'react-native'
-import { Canvas, Group, Path, PathOp, Rect, Skia, Text as SkText, matchFont, type SkPath } from '@shopify/react-native-skia'
+import { Group, Path, PathOp, Rect, Skia, Text as SkText, matchFont, type SkPath } from '@shopify/react-native-skia'
 import type { Climate, RegionId } from '../../../src/game/data/ports'
 import { REGIONS } from '../../../src/game/data/ports'
 import type { Light } from '../art/light'
@@ -113,54 +112,55 @@ const REGION_LABEL: Record<string, { x: number; y: number }> = {
 }
 const labelFont = matchFont({ fontFamily: Platform.select({ ios: 'Georgia', default: 'serif' }), fontSize: 70, fontStyle: 'italic', fontWeight: 'bold' })
 
-type View = { x: number; y: number; w: number; h: number }
+/** The waters you know: clear of cloud. */
+export type Clearing = { x: number; y: number; r: number }
 
-export function ChartBase({ width, height, view, light, openRegions, clear }: { width: number; height: number; view: View; light: Light; openRegions: Set<RegionId>; clear: { x: number; y: number; r: number }[] }) {
+/** The cloud over everything outside the waters you know. */
+function fogFor(clear: Clearing[]) {
+  const world = Skia.Path.Make()
+  world.addRect(Skia.XYWHRect(-8000, -8000, 16000, 16000))
+  const known = Skia.Path.Make()
+  for (const h of clear) known.addCircle(h.x, h.y, h.r)
+  const cloud = Skia.Path.MakeFromOp(world, known, PathOp.Difference) ?? world
+  // Billows over the whole bank, and puffs piled along its edge.
+  const billow = Skia.Path.Make()
+  const billowHi = Skia.Path.Make()
+  const step = 220
+  for (let y = -3000; y < 3200; y += step * 0.8) {
+    for (let x = -2400; x < 4600; x += step) {
+      const h = Math.abs(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1
+      ;(h > 0.5 ? billowHi : billow).addCircle(x + (h - 0.5) * step * 0.6, y + (((h * 7) % 1) - 0.5) * step * 0.5, step * (0.55 + h * 0.4))
+    }
+  }
+  const edge = Skia.Path.Make()
+  const outside = (x: number, y: number) => clear.every((k) => Math.hypot(k.x - x, k.y - y) > k.r - 10)
+  for (const k of clear) {
+    if (k.r < 300) continue
+    for (let a = 0; a < 26; a++) {
+      const x = k.x + Math.cos((a / 26) * Math.PI * 2) * k.r
+      const y = k.y + Math.sin((a / 26) * Math.PI * 2) * k.r
+      if (outside(x, y)) edge.addCircle(x, y, 70 + ((a * 37) % 30))
+    }
+  }
+  return { cloud, billow, billowHi, edge }
+}
+
+/**
+ * Land, sea and cloud in map units, for drawing once into a picture (see useChartImages): the
+ * chart's base never changes while you look at it, only when you chart new waters or the light turns.
+ */
+export function ChartLayers({ light, openRegions, clear }: { light: Light; openRegions: Set<RegionId>; clear: Clearing[] }) {
   const night = light.stars > 0
   const c = (hex: string, t = 0.55) => mix(hex, light.silhouette, light.dim * t)
   const shallow = mix(light.sea, '#ffffff', night ? 0.08 : 0.22)
-  const s = width / view.w
-
-  // The cloud: everything outside the waters you know, built once per change of what you know.
-  const clearKey = clear.map((h) => `${Math.round(h.x)},${Math.round(h.y)},${h.r}`).join(';')
-  const fog = useMemo(() => {
-    const world = Skia.Path.Make()
-    world.addRect(Skia.XYWHRect(-8000, -8000, 16000, 16000))
-    const known = Skia.Path.Make()
-    for (const h of clear) known.addCircle(h.x, h.y, h.r)
-    const cloud = Skia.Path.MakeFromOp(world, known, PathOp.Difference) ?? world
-    // Billows over the whole bank, and puffs piled along its edge.
-    const billow = Skia.Path.Make()
-    const billowHi = Skia.Path.Make()
-    const step = 170
-    for (let y = -5200; y < 5600; y += step * 0.8) {
-      for (let x = -4600; x < 6400; x += step) {
-        const h = Math.abs(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1
-        ;(h > 0.5 ? billowHi : billow).addCircle(x + (h - 0.5) * step * 0.6, y + (((h * 7) % 1) - 0.5) * step * 0.5, step * (0.55 + h * 0.4))
-      }
-    }
-    const edge = Skia.Path.Make()
-    const outside = (x: number, y: number) => clear.every((k) => Math.hypot(k.x - x, k.y - y) > k.r - 10)
-    for (const k of clear) {
-      if (k.r < 300) continue
-      for (let a = 0; a < 26; a++) {
-        const x = k.x + Math.cos((a / 26) * Math.PI * 2) * k.r
-        const y = k.y + Math.sin((a / 26) * Math.PI * 2) * k.r
-        if (outside(x, y)) edge.addCircle(x, y, 70 + ((a * 37) % 30))
-      }
-    }
-    return { cloud, billow, billowHi, edge }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearKey])
-
+  const fog = fogFor(clear)
   const cloudBase = night ? '#3a2e46' : '#dcd6e0'
   const cloudHi = night ? '#4a3c58' : '#f2eef4'
   const cloudShade = night ? '#2e2438' : '#c6bfcc'
 
   return (
-    <Canvas style={{ width, height, position: 'absolute', left: 0, top: 0 }}>
-      <Rect x={0} y={0} width={width} height={height} color={light.sea} />
-      <Group transform={[{ scale: s }, { translateX: -view.x }, { translateY: -view.y }]}>
+    <Group>
+        <Rect x={-8000} y={-8000} width={16000} height={16000} color={light.sea} />
         {/* Swell on the open sea */}
         {Array.from({ length: 22 }, (_, i) => -3200 + i * 300).map((y) => (
           <Path key={y} path={`M-3000 ${y} ${'q 60 -14 120 0 '.repeat(70)}`} color={light.seaLine} style="stroke" strokeWidth={3} opacity={0.22} />
@@ -227,7 +227,6 @@ export function ChartBase({ width, height, view, light, openRegions, clear }: { 
         </Group>
         <Path path={fog.edge} color={cloudShade} opacity={0.35} transform={[{ translateX: 12 }, { translateY: 16 }]} />
         <Path path={fog.edge} color={cloudHi} opacity={0.95} />
-      </Group>
-    </Canvas>
+    </Group>
   )
 }
