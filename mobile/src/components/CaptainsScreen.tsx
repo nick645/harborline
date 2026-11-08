@@ -571,7 +571,7 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
               accessibilityLabel={`Open Captain ${c.name}`}
               style={({ pressed }) => ({ width: 132, padding: 8, gap: 4, borderRadius: 14, borderWidth: 1, borderColor: c.rare ? t.legendary : t.border, backgroundColor: t.surface, opacity: pressed ? 0.8 : 1 })}
             >
-              <Portrait id={c.id} rare={c.rare} region={c.region} persona={c.persona?.id} />
+              <Portrait id={c.id} rare={c.rare} region={c.region} persona={c.persona?.id} title={c.title} />
               <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 17 }}>
                 {c.name}
               </Text>
@@ -616,14 +616,14 @@ function SkillLine({ c }: { c: CaptainView }) {
 }
 
 /** A small head-and-shoulders portrait under lamplight. */
-function Portrait({ id, rare, region, persona, small }: { id: string; rare: boolean; region: RegionId; persona?: string; small?: boolean }) {
+function Portrait({ id, rare, region, persona, small, title }: { id: string; rare: boolean; region: RegionId; persona?: string; small?: boolean; title?: number }) {
   const clock = useSceneClock()
   const k = small ? 0.6 : 1
   return (
     <Canvas style={{ width: 56 * k, height: 64 * k }}>
       <Group transform={[{ scale: k }]} clip={rrect(rect(0, 0, 56, 64), 10, 10)}>
         <Rect x={0} y={0} width={56} height={64} color="#433145" />
-        <Figure look={lookFor(id, rare, region, persona)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
+        <Figure look={lookFor(id, rare, region, persona, title)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
       </Group>
     </Canvas>
   )

@@ -57,6 +57,8 @@ export interface Look {
   aura?: string
   /** A cape's colour, when the coat is a cape. */
   capeColor?: string
+  /** Their title (RATING_TITLES index): each one adds to how they dress (Figure's `Insignia`). */
+  title?: number
 }
 
 /** Hat and hair shapes in figure space: a 56 × 100 standing figure, head centred at (28, 40). */
@@ -94,9 +96,11 @@ const GREY = '#b9aea6'
  * A captain's look. Rare tavern finds keep their face but dress like no one else on the coast;
  * Legends and Mythics keep their face too, and become their persona.
  */
-export function lookFor(id: string, rare = false, region: RegionId = 'bay', persona?: string | null): Look {
-  const look = regional(baseLook(id), id, region)
-  if (persona && PERSONA_LOOKS[persona]) return { ...look, ...PERSONA_LOOKS[persona], persona, rare: true }
+export function lookFor(id: string, rare = false, region: RegionId = 'bay', persona?: string | null, title?: number): Look {
+  const look: Look = { ...regional(baseLook(id), id, region), title }
+  if (persona && PERSONA_LOOKS[persona]) return { ...look, ...PERSONA_LOOKS[persona], persona, rare: true, title: undefined }
+  // Stormborn: a faint storm-light about them (a Legend's amber aura outshines it).
+  if (title === 9) look.aura = '#9aa6ff'
   if (!rare) return look
   return {
     ...look,

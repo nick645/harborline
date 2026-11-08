@@ -2,6 +2,7 @@
 // background (see upcomingAlerts), and withdrawn when it comes back.
 
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { RATING_TITLES, TITLE_MARKS } from '../../src/game/data/captains'
 import * as Notifications from 'expo-notifications'
 import type { GameState } from '../../src/game/types'
 import type { StormAlert } from '../../src/game/weather'
@@ -86,12 +87,13 @@ export async function setFindAlertsWanted(on: boolean): Promise<boolean> {
 
 /**
  * What the fleet will bring home while you're away that's worth a notification: rare, legendary
- * and mythic parts, and keepsakes. The game's rolls are seeded, so running the queued trips
+ * and mythic parts, keepsakes, and captains rising to a new title. The game's rolls are seeded, so running the queued trips
  * forward on a copy says exactly what comes home, and when, if nothing changes.
  */
 function upcomingFinds(state: GameState, now: number): { at: number; title: string; body: string }[] {
-  return settleAway(state, now + HORIZON_MS)
-    .report.finds.filter((f) => f.keepsake || (f.part && getPart(f.part).rarity !== 'standard'))
+  const { report } = settleAway(state, now + HORIZON_MS)
+  const titles = report.titles.map((x) => ({ at: x.at, title: `${x.name} is now a ${RATING_TITLES[x.to]}!`, body: `A new title, and ${TITLE_MARKS[x.to].toLowerCase()} to show for it. Come and see.` }))
+  return report.finds.filter((f) => f.keepsake || (f.part && getPart(f.part).rarity !== 'standard'))
     .map((f) => {
       if (f.keepsake) return { at: f.at, title: `${f.boat} brought something home`, body: `${getKeepsake(f.keepsake)?.name}: something new for your house.` }
       const part = getPart(f.part!)
@@ -99,6 +101,7 @@ function upcomingFinds(state: GameState, now: number): { at: number; title: stri
       const rare = part.rarity === 'mythic' ? 'A mythic find!' : part.rarity === 'legendary' ? 'A legendary find!' : 'A rare find'
       return { at: f.at, title: `${rare} ${f.boat} found ${partName(f.part!)}`, body: set && set.need > 1 ? `${set.have} of ${set.need} for the ${set.boat}.` : 'Open Harborline to see it in your Workshop.' }
     })
+    .concat(titles)
 }
 
 /** Replace whatever was scheduled with the alerts due between now and the horizon. */

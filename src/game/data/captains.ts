@@ -130,7 +130,21 @@ export const LEGEND_AT = 90
 
 /** What a sea rating is called, a title for every ten points (names are Claude's picks). */
 export const RATING_TITLES = ['Landlubber', 'Bilge Rat', 'Greenhand', 'Rope-wise', 'Steady Oar', 'Weatherworn', 'Wavecutter', 'Tidemaster', 'Sea Wolf', 'Stormborn'] as const
-export const ratingTitle = (rating: number) => RATING_TITLES[Math.min(9, Math.max(0, Math.floor(rating / 10)))]
+export const titleIndex = (rating: number) => Math.min(RATING_TITLES.length - 1, Math.max(0, Math.floor(rating / 10)))
+export const ratingTitle = (rating: number) => RATING_TITLES[titleIndex(rating)]
+/** What each title adds to how a captain dresses (the phone draws it; names are Claude's picks). */
+export const TITLE_MARKS = [
+  'A patched coat',
+  'A rope belt',
+  'A brass collar pin',
+  "A bosun's whistle",
+  'An anchor badge on the cap',
+  'A braided shoulder cord',
+  'Brass shoulder boards',
+  'A sash across the chest',
+  'Gold epaulettes and a medal',
+  'Storm-blue braid, a second medal, and a glow about them',
+] as const
 export const MYTHIC_AT = 96
 /** A captain's own potential shows after this many voyages, if scouting hasn't turned it up. */
 export const POTENTIAL_KNOWN_AFTER = 20

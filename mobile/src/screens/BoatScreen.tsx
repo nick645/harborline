@@ -47,7 +47,7 @@ export function BoatScreen(props: BoatProps) {
   const [panel, setPanel] = useState<Panel>(boat.captainId || boat.state === 'sunk' ? 'send' : 'crew')
   // Dev only: preview the scene in any weather.
   const [preview, setPreview] = useState<Weather | null>(null)
-  const look = captain ? lookFor(captain.id, captain.rare, captain.region, captain.persona?.id) : null
+  const look = captain ? lookFor(captain.id, captain.rare, captain.region, captain.persona?.id, captain.title) : null
   // At sea, three views: the whole ship, on deck among the passengers, and at the helm.
   const [view, setView] = useState<'ship' | 'deck' | 'helm'>('deck')
   const atSea = mode === 'sailing' || mode === 'returning'

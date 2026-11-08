@@ -53,7 +53,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
     // height so it isn't squeezed by what's below it.
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 8, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
       <View style={{ height: sceneH }}>
-      <Measure>{(w, h) => <CaptainScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={lookFor(c.id, c.rare, c.region, c.persona?.id)} place={atSea ? 'helm' : 'port'} />}</Measure>
+      <Measure>{(w, h) => <CaptainScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={lookFor(c.id, c.rare, c.region, c.persona?.id, c.title)} place={atSea ? 'helm' : 'port'} />}</Measure>
       </View>
 
       <Card>

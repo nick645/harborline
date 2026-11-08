@@ -37,6 +37,7 @@ import { KEEPSAKES, lookKey, type KeepsakeGroup } from '../../../src/game/data/k
 import { portPeople, UPGRADES } from '../../../src/game/crew'
 import { TavernScene } from '../art/TavernScene'
 import { homeTavern } from '../homeTavern'
+import { titleOf } from '../../../src/game/captains'
 import { boatOfCaptain } from '../../../src/game/crew'
 import { getPortDef, homeOf } from '../../../src/game/regions'
 import { HomeScene } from '../art/HomeScene'
@@ -239,7 +240,7 @@ export function HomeScreen({ game, now, onStyle, onPlace, upgrades, alerts, dev,
         const b = boatOfCaptain(game, c.id)
         return !b || b.state === 'idle'
       })
-      .map((c) => ({ id: c.id, rare: !!c.rare, region: c.region ?? 'bay', persona: c.persona })),
+      .map((c) => ({ id: c.id, rare: !!c.rare, region: c.region ?? 'bay', persona: c.persona, title: titleOf(c) })),
   }
   const scene = <Measure>{(w, h) => <HomeScene width={Math.min(w, 720)} height={h} light={lightAt(now)} look={look} />}</Measure>
   const back = (title: string) => (

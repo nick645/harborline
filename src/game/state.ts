@@ -2,7 +2,7 @@
 // the input is never mutated. All timers are absolute timestamps, so catching up after
 // any gap is a single settle pass, never a tick loop.
 
-import type { AwayReport, Boat, Captain, Deckhand, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage, Find } from './types'
+import type { AwayReport, Boat, Captain, Deckhand, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage, Find, TitleRise } from './types'
 import { BOAT_CLASSES } from './data/boats'
 import { ROUTES, routesFrom } from './data/routes'
 import { NICKNAMES } from './data/nicknames'
@@ -43,7 +43,7 @@ import {
   shortHandedMult,
   voyagePayout,
 } from './economy'
-import { LEGEND_ABILITIES, MYTHIC_ABILITIES } from './data/captains'
+import { LEGEND_ABILITIES, MYTHIC_ABILITIES, RATING_TITLES, TITLE_MARKS } from './data/captains'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS } from './data/personas'
 import { leadingRival, leaning, rivalName, termsFee } from './courting'
 import { MANAGER_RIVAL_MAX } from './data/courting'
@@ -73,6 +73,7 @@ import {
   severance,
   willSail,
   type CaptainMods,
+  titleOf,
 } from './captains'
 import { fleetCap, scoutLevel, upgradeValue } from './upgrades'
 
@@ -807,7 +808,7 @@ export function reservedAbove(s: GameState, id: string): number {
  * them on your list), else with the rival they lean toward most.
  */
 /** What settling turned up for the welcome-back summary (mutated as it goes). */
-type SettleNews = { tripPay: number; signed: string[]; wentElsewhere: string[]; risen: string[]; charted: string[] }
+type SettleNews = { tripPay: number; signed: string[]; wentElsewhere: string[]; risen: string[]; charted: string[]; titles: TitleRise[] }
 
 function decide(s: GameState, id: string, at: number, news?: SettleNews) {
   const found = seekers(s).find((p) => p.person.id === id)
@@ -896,7 +897,7 @@ function settleInPlace(s: GameState, now: number) {
   const parts: string[] = []
   const keepsakes: string[] = []
   const finds: Find[] = []
-  const news: SettleNews = { tripPay: 0, signed: [], wentElsewhere: [], risen: [], charted: [] }
+  const news: SettleNews = { tripPay: 0, signed: [], wentElsewhere: [], risen: [], charted: [], titles: [] }
   // Each trip has at most two events, runs are capped by the fuel tank, and managed boats
   // depart at most once per trip, so this is bounded by the voyages that fit before `now`.
   for (let ev = nextEvent(s, now); ev; ev = nextEvent(s, now)) {
@@ -1014,6 +1015,8 @@ function settleInPlace(s: GameState, now: number) {
     }
   }
   const captainsLost = loseAdrift(s, now)
+  // Anything else that moved what you know of them (a scout, a signing) shows here.
+  noteTitles(s, now, s.player.roster, news)
   return { tripsCompleted, sunk, lost, parts, keepsakes, finds, captainsLost, ...news }
 }
 
@@ -1147,7 +1150,36 @@ function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number, 
       const who = PERSONAS.find((p) => p.id === c.persona)
       log(s, at, 'captain', `${c.name} is ${news.rankUp.rank === 'mythic' ? 'Mythic' : 'a Legend'} now${who ? `: ${who.name}` : ''}. ${a.name}: ${a.description.toLowerCase()}`)
     }
+    noteTitles(s, at, [c], summary)
   }
+}
+
+/**
+ * A captain whose rating, as far as you know it, reaches a new title gets a celebration (queued
+ * for the phone to show), a line in the log and the welcome back. The first look at a captain
+ * just notes where they stand; a title only celebrates once, even if a scout later marks them down.
+ */
+export function noteTitles(s: GameState, at: number, captains: Captain[], summary?: SettleNews) {
+  for (const c of captains) {
+    const t = titleOf(c)
+    if (c.titleSeen === undefined || t <= c.titleSeen) {
+      c.titleSeen = Math.max(c.titleSeen ?? t, t)
+      continue
+    }
+    const rise: TitleRise = { captainId: c.id, name: c.name, from: c.titleSeen, to: t, at }
+    c.titleSeen = t
+    ;(s.player.celebrations ??= []).push(rise)
+    log(s, at, 'captain', `${c.name} rose to ${RATING_TITLES[t]}: ${TITLE_MARKS[t].toLowerCase()} to show for it`)
+    summary?.titles.push(rise)
+    summary?.risen.push(`${c.name}: now a ${RATING_TITLES[t]}`)
+  }
+}
+
+/** The player has seen a captain's new title. */
+export function dismissCelebration(state: GameState, captainId: string): GameState {
+  const s = structuredClone(state)
+  s.player.celebrations = (s.player.celebrations ?? []).filter((x) => x.captainId !== captainId)
+  return s
 }
 
 /** Roll for parts at the end of a completed trip. Returns the ids found (already added). */

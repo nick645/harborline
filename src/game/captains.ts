@@ -63,6 +63,7 @@ import {
   type Potential,
   type SkillId,
   type TraitDef,
+  titleIndex,
 } from './data/captains'
 import { nextFloat, nextInt, rollChance, rollNormal, rollPick, rollWeighted } from './rolls'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS, type PersonaDef } from './data/personas'
@@ -669,6 +670,8 @@ export interface CaptainView {
   skills: { id: SkillId; name: string; description: string; band: [number, number]; known: boolean; guess: number }[]
   /** Their sea rating (the five skills' average): your best guess, and whether you're sure of it. */
   rating: { guess: number; band: [number, number]; sure: boolean; from: 'skills' | 'reputation' }
+  /** Their title by that rating: an index into RATING_TITLES, which also dresses them. */
+  title: number
   /** How high they could grow, as far as you know: a band on the 1–100 scale, and how well it's known. */
   growth: { band: [number, number]; known: 'unknown' | 'rough' | 'exact'; ordinaryMax: number }
   /** Badges, earned and still to earn, with progress. */
@@ -710,6 +713,9 @@ export interface CaptainView {
   /** Where they're from, which shows in how they dress. */
   region: import('./data/ports').RegionId
 }
+
+/** Their title (an index into RATING_TITLES), by their sea rating as far as you know it. */
+export const titleOf = (c: Captain) => titleIndex(ratingOf(c).guess)
 
 /** Their sea rating as far as you know it: the average of the five skill ranges. */
 function ratingOf(c: Captain): CaptainView['rating'] {
@@ -796,6 +802,7 @@ export function captainView(c: Captain): CaptainView {
       guess: Math.round((c.bands[d.id][0] + c.bands[d.id][1]) / 2),
     })),
     rating: ratingOf(c),
+    title: titleOf(c),
     growth: growthOf(c),
     grade: gradeOf(c),
     gradeIn: Math.max(0, GRADE_KNOWN_AFTER - c.voyageCount),

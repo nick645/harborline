@@ -5,7 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { useFonts, Cormorant_600SemiBold_Italic, Cormorant_700Bold } from '@expo-google-fonts/cormorant'
 import { Barlow_400Regular, Barlow_500Medium, Barlow_600SemiBold, Barlow_700Bold } from '@expo-google-fonts/barlow'
 import type { Boat, GameState } from '../src/game/types'
-import { assignRoute, buyBoat, buyHome, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, moveHome, sellBoat, settle } from '../src/game/state'
+import { assignRoute, buyBoat, buyHome, dismissCelebration, craftableClasses, shopClasses, craftBoat, meltSpares, recallBoat, repairBoat, salvageBoat, scrapStandardParts, moveHome, sellBoat, settle } from '../src/game/state'
 import { assignCaptain, moveProspect, passOnProspect, boatToShowTo, buyUpgrade, captainViewById, court, courtingOf, hireHand, moveHand, recruitViewById, tavernHandView, UPGRADES, upgradeQuote, fireCaptain, hireCaptain, promoteCaptain, scoutRecruit, setManaged, setManagerCrewing, takeOverCaptain, unassignCaptain } from '../src/game/crew'
 import { getPart, partName, setProgress, slotName } from '../src/game/parts'
 import { getKeepsake, KEEPSAKES } from '../src/game/data/keepsakes'
@@ -33,6 +33,7 @@ import { ConfirmProvider } from './src/confirm'
 import { useConfirm, type Ask } from './src/confirmContext'
 import { alertsWanted, alertText, findAlertsWanted, previewAlert, setAlertsWanted, setFindAlertsWanted } from './src/notify'
 import { AwaySummary } from './src/components/AwaySummary'
+import { TitleUp } from './src/components/TitleUp'
 import { fonts, useTheme } from './src/theme'
 import { lightAt } from './src/art/light'
 import { HarborMap } from './src/components/HarborMap'
@@ -67,6 +68,9 @@ const TABS: { id: Tab; label: string }[] = [
 
 /** A screen opened on top of the tabs. */
 type Detail = { kind: 'boat'; id: string } | { kind: 'captain'; id: string } | null
+
+/** Dev only: which title the play-test celebration shows next. */
+const devTitle = { next: 0 }
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -488,6 +492,23 @@ function Harbor() {
                       <Button
                         small
                         kind="secondary"
+                        label="Celebrate a title"
+                        onPress={() =>
+                          act((g, at) => {
+                            // The first captain steps up a title, each press the next one round (looks only:
+                            // their rating is unchanged).
+                            const c = g.player.roster[0]
+                            if (!c) return g
+                            const s = structuredClone(g)
+                            const to = (devTitle.next = (devTitle.next + 1) % 10)
+                            s.player.celebrations = [...(s.player.celebrations ?? []), { captainId: c.id, name: c.name, from: to === 0 ? 9 : to - 1, to, at }]
+                            return s
+                          })
+                        }
+                      />
+                      <Button
+                        small
+                        kind="secondary"
                         label="Manager setup"
                         onPress={() =>
                           act((g, at) => {
@@ -603,6 +624,28 @@ function Harbor() {
           })}
         </SafeAreaView>
       )}
+      {(() => {
+        // A captain rose to a new title: the whole screen stops for it, one at a time.
+        // (Anyone let go since waits forever unseen: skip them.)
+        const queue = (game.player.celebrations ?? []).filter((x) => captainViewById(game, x.captainId))
+        const rise = queue[0]
+        const c = rise && captainViewById(game, rise.captainId)
+        if (!rise || !c) return null
+        return (
+          <TitleUp
+            key={`${rise.captainId}-${rise.to}`}
+            rise={rise}
+            captain={c}
+            more={queue.length - 1}
+            onDone={() => act((g) => dismissCelebration(g, rise.captainId))}
+            onOpen={() => {
+              act((g) => dismissCelebration(g, rise.captainId))
+              setTab('captains')
+              open({ kind: 'captain', id: rise.captainId })
+            }}
+          />
+        )
+      })()}
     </SafeAreaView>
   )
 }
@@ -648,7 +691,7 @@ function FindAlertsToggle() {
       <Pressable onPress={toggle} accessibilityRole="switch" accessibilityState={{ checked: on }} style={styles.toggleRow}>
         <View style={{ flex: 1, gap: 2 }}>
           <Body style={{ fontWeight: '700' }}>Find alerts</Body>
-          <Muted>A notification when a boat brings home a rare, legendary or mythic part, or a keepsake, while you're away.</Muted>
+          <Muted>A notification when a boat brings home a rare, legendary or mythic part or a keepsake, or a captain rises to a new title, while you're away.</Muted>
         </View>
         <Switch value={on} onValueChange={() => void toggle()} trackColor={{ true: t.accent, false: t.muted }} ios_backgroundColor={t.muted} importantForAccessibility="no" />
       </Pressable>

@@ -40,7 +40,7 @@ export interface HomeLookProps {
   upgrades: Record<string, number>
   region: RegionId
   /** Your captains ashore. */
-  captains: { id: string; rare: boolean; region: RegionId; persona?: string }[]
+  captains: { id: string; rare: boolean; region: RegionId; persona?: string; title?: number }[]
   build: HouseBuild
   roofStyle: RoofStyle
   siding: Siding
@@ -275,7 +275,7 @@ export function HomeScene({ width, height, light, look }: { width: number; heigh
         {shown.map((c, i) => (
           <Walker
             key={c.id}
-            look={lookFor(c.id, c.rare, c.region, c.persona)}
+            look={lookFor(c.id, c.rare, c.region, c.persona, c.title)}
             clock={clock}
             x0={16 + i * 66}
             x1={46 + i * 66}

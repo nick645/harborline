@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Captain, GameState, Weather } from './types'
-import { assignRoute, buyBoat, craftBoat, quoteVoyage, settle, settleAway, getBoat, isAutomated } from './state'
+import { assignRoute, buyBoat, craftBoat, dismissCelebration, quoteVoyage, settle, settleAway, getBoat, isAutomated } from './state'
 import {
   assignCaptain,
   buyUpgrade,
@@ -555,6 +555,29 @@ describe('badges, rating and potential', () => {
     // Forty, and you know their highest exactly.
     c.voyageCount = 40
     expect(captainView(c).growth).toMatchObject({ band: [Math.round(c.ceiling), Math.round(c.ceiling)], known: 'exact' })
+  })
+})
+
+describe('titles', () => {
+  it('celebrates a captain reaching a new title once, and not on first sight', () => {
+    let s = harbourGame(52, T0)
+    const c = s.player.roster[0]
+    // First look: just note where they stand.
+    s = settle(s, T0 + 1000)
+    const seen = s.player.roster[0].titleSeen!
+    expect(seen).toBe(captainView(s.player.roster[0]).title)
+    expect(s.player.celebrations ?? []).toEqual([])
+    // What you know of them rises two titles.
+    const up = structuredClone(s)
+    const cap = up.player.roster[0]
+    for (const id of SKILL_IDS) cap.bands[id] = [Math.min(99, seen * 10 + 20), Math.min(100, seen * 10 + 22)]
+    const after = settle(up, T0 + 2000)
+    expect(after.player.celebrations).toEqual([{ captainId: c.id, name: c.name, from: seen, to: captainView(after.player.roster[0]).title, at: T0 + 2000 }])
+    expect(after.player.celebrations![0].to).toBeGreaterThan(seen)
+    // Seen once: the next settle doesn't celebrate again, and dismissing clears it.
+    const again = settle(after, T0 + 3000)
+    expect(again.player.celebrations).toHaveLength(1)
+    expect(dismissCelebration(again, c.id).player.celebrations).toEqual([])
   })
 })
 

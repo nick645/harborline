@@ -183,7 +183,13 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   at first the most an ordinary captain could reach (rating + 40, at most 88), then a rough ±5
   range once scouted or after 20 voyages, then their exact highest at 40. Every ten points of
   rating has a title (`RATING_TITLES` in data/captains.ts, Claude's names): Landlubber 0–9 …
-  Stormborn 90+. Badges (`data/badges.ts`):
+  Stormborn 90+.
+- Titles you can see (user-approved 2026-11-07): each title adds to how a captain dresses
+  (`TITLE_MARKS`; Figure's `Insignia*`: patched coat, rope belt, collar pin, bosun's whistle, cap
+  anchor, shoulder cord, shoulder boards, sash, epaulettes and medal, storm braid and glow; Legend
+  and Mythic personas replace it). Reaching a new title (`noteTitles` in state.ts, by the rating
+  you know, once per title) stops the screen for a celebration (`TitleUp.tsx`), logs it, joins
+  the welcome back, and is a find alert while away. Looks and names are Claude's picks. Badges (`data/badges.ts`):
   Storm Hand, Long Hauler, Market Trader, Steady Keel, Old Salt, Chart-maker, three levels each,
   earned at sea, never hidden. Grades once known: Pearl of the fleet, Seasoned, Able, Driftwood,
   Barnacle. Tabs: Skills, Badges, Record, Log, Orders. Numbers and names are Claude's picks. Sim

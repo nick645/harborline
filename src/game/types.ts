@@ -142,6 +142,8 @@ export type Exposure = Record<Weather | 'cargo' | 'passenger' | 'night', number>
  */
 export interface Captain {
   id: string
+  /** The highest title of theirs you've seen (data/captains.ts RATING_TITLES), for the celebration when it rises. */
+  titleSeen?: number
   name: string
   homePort: string
   /** Public 1–5 anchors. Usually right, sometimes not. */
@@ -259,6 +261,8 @@ export interface RecruitPool {
 
 export interface Player {
   coins: number
+  /** Captains who rose to a new title, waiting for the player to see it. */
+  celebrations?: TitleRise[]
   /** The harbourmaster is still walking a new player through their first boat and captain. */
   guide?: boolean
   /** When each boat last fished something out of the water (flotsam.ts). */
@@ -385,8 +389,19 @@ export interface AwayReport {
   wentElsewhere: string[]
   /** Captains who rose: in reputation, or to Legend or Mythic. */
   risen: string[]
+  /** Captains whose rating reached a new title, and when. */
+  titles: TitleRise[]
   /** Regions charted open. */
   charted: string[]
   /** Names of captains lost at sea waiting for their boat to be raised. */
   captainsLost: string[]
+}
+
+/** A captain's rating reaching a new title (an index into RATING_TITLES). */
+export interface TitleRise {
+  captainId: string
+  name: string
+  from: number
+  to: number
+  at: number
 }

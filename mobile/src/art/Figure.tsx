@@ -331,6 +331,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             {fine && [70, 77, 84, 91].map((ry) => <Path key={ry} path={`M${8 + (ry - 70) * 0.18} ${ry} H ${48 - (ry - 70) * 0.18}`} color={shade(look.coat, 0.3)} opacity={0.5} style="stroke" strokeWidth={0.7} />)}
           </>
         )}
+        {look.title !== undefined && <InsigniaCoat look={look} legs={legs} />}
         </Group>
       </Group>
 
@@ -373,6 +374,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
             <Path path={`M${ex - 4} ${ey} v 3 M${ex - 1.5} ${ey} v 3.4 M${ex + 1} ${ey} v 3.4 M${ex + 3.5} ${ey} v 3`} color="#f2c75a" style="stroke" strokeWidth={0.8} />
           </Group>
         ))}
+      {look.title !== undefined && <InsigniaFront look={look} shoulders={[shoulderL, shoulderR]} />}
       <Group transform={propT} origin={propOrigin}>
         <PropArt prop={look.prop} hands={[hl, hr]} clock={clock} offset={offset} />
       </Group>
@@ -450,6 +452,7 @@ export function Figure({ look, x, y, scale = 1, clock, offset = 0, rimLight, win
         <Path path={HAT_PATHS[look.hat]} color={look.hatColor} fillType={look.hat === 'helmet' ? 'evenOdd' : 'winding'} />
         <HatExtras look={look} clock={clock} offset={offset} />
         {fx.includes('goggles') && <Goggles />}
+        {(look.title ?? 0) >= 4 && !['bare', 'bun', 'none', 'helmet', 'tricorn', 'hood'].includes(look.hat) && <CapAnchor />}
         {look.hat === 'bare' || look.hat === 'bun' || look.hat === 'none' ? (
           <Path path="M19 27.6 C 22 24.2, 30 23.4, 35 25.6" color={tint(look.hair, 0.25)} opacity={0.6} style="stroke" strokeWidth={0.9} strokeCap="round" />
         ) : (
@@ -609,4 +612,103 @@ function CoinArt({ hr, clock, offset }: { hr: [number, number]; clock: SharedVal
       <Circle cx={hr[0]} cy={hr[1] - 6} r={1.6} color="#d9a441" />
     </Group>
   )
+}
+
+// What a captain's title adds to how they dress, a piece at a time (RATING_TITLES / TITLE_MARKS):
+// 0 a patched coat; 1 a rope belt; 2 a brass collar pin; 3 a bosun's whistle; 4 an anchor on the
+// cap; 5 a braided shoulder cord; 6 brass shoulder boards; 7 a sash; 8 gold epaulettes and a
+// medal; 9 storm-blue braid, a second medal, and a glow (the aura, in looks.ts).
+const BRASS = '#e6b85a'
+const GOLD = '#f2c75a'
+const STORM = '#7f8cff'
+
+/** On the coat itself (drawn inside the torso's clip). */
+function InsigniaCoat({ look, legs }: { look: Look; legs: boolean }) {
+  const t = look.title ?? 0
+  const beltY = legs ? 92 : 90
+  return (
+    <>
+      {t === 0 && (
+        <>
+          <RoundedRect x={12.5} y={78} width={8} height={8} r={1} color={tint(look.coat, 0.22)} />
+          <Path path="M13.4 79 h 6.2 v 6.2 h -6.2 Z" color={shade(look.coat, 0.35)} style="stroke" strokeWidth={0.5} opacity={0.8} />
+        </>
+      )}
+      {t >= 1 && t <= 5 && (
+        <>
+          <Rect x={0} y={beltY} width={56} height={3.4} color="#c9a26a" />
+          <Path path={Array.from({ length: 14 }, (_, i) => `M${i * 4} ${beltY + 3.4} l 3 -3.4`).join(' ')} color="#8a6a3a" style="stroke" strokeWidth={0.7} />
+        </>
+      )}
+      {t >= 7 && (
+        // A sash from the right shoulder to the left hip, in their scarf's colour.
+        <>
+          <Path path="M38 60 L 44 64 L 18 98 L 11 94 Z" color={look.scarf} />
+          <Path path="M38 60 L 11 94" color={tint(look.scarf, 0.3)} style="stroke" strokeWidth={0.8} />
+        </>
+      )}
+      {t >= 9 && (
+        <>
+          <Rect x={-2} y={legs ? 106 : 97} width={60} height={2.2} color={STORM} />
+          <Path path="M21.5 61 L 28 80 L 34.5 61" color={STORM} style="stroke" strokeWidth={1.1} />
+        </>
+      )}
+    </>
+  )
+}
+
+/** Over the coat and arms: pins, whistle, shoulder pieces, medals. */
+function InsigniaFront({ look, shoulders }: { look: Look; shoulders: [number, number][] }) {
+  const t = look.title ?? 0
+  const greatcoat = look.coatStyle === 'greatcoat'
+  return (
+    <>
+      {t >= 2 && <Circle cx={34.4} cy={66.4} r={1.6} color={BRASS} />}
+      {t >= 2 && <Circle cx={34} cy={66} r={0.6} color="#fff3dc" opacity={0.7} />}
+      {t >= 3 && t <= 6 && (
+        <>
+          <Path path="M22 62 C 24 70, 28 75, 31 77" color={GOLD} style="stroke" strokeWidth={0.6} />
+          <RoundedRect x={30} y={76} width={5.4} height={2.2} r={1.1} color="#d8d2c4" />
+        </>
+      )}
+      {t === 5 && (
+        <Path path={`M${shoulders[0][0] + 1} ${shoulders[0][1] - 2} C ${shoulders[0][0] + 6} ${shoulders[0][1] + 8}, 18 72, 21 66`} color={GOLD} style="stroke" strokeWidth={1.4} strokeCap="round" />
+      )}
+      {!greatcoat &&
+        t >= 6 &&
+        shoulders.map(([sx, sy], i) => {
+          // Sat on the shoulder: a little in from the sleeve's start, and down onto the cloth.
+          const ex = sx + (i === 0 ? 3 : -3)
+          const ey = sy + 1.6
+          return t >= 8 ? (
+            <Group key={i}>
+              <RoundedRect x={ex - 5.5} y={ey - 4.4} width={11} height={4.4} r={2.2} color={GOLD} />
+              <Path path={`M${ex - 4.5} ${ey} v 3.4 M${ex - 1.5} ${ey} v 3.8 M${ex + 1.5} ${ey} v 3.8 M${ex + 4.5} ${ey} v 3.4`} color="#f6dc8e" style="stroke" strokeWidth={0.9} />
+            </Group>
+          ) : (
+            <Group key={i}>
+              <RoundedRect x={ex - 5} y={ey - 3.6} width={10} height={3.4} r={1} color="#2a2230" />
+              <Rect x={ex - 4} y={ey - 2.4} width={8} height={1} color={BRASS} />
+            </Group>
+          )
+        })}
+      {t >= 8 && <Medal x={19} y={71} ribbon={look.scarf} />}
+      {t >= 9 && <Medal x={24} y={71.6} ribbon={STORM} />}
+    </>
+  )
+}
+
+function Medal({ x, y, ribbon }: { x: number; y: number; ribbon: string }) {
+  return (
+    <>
+      <Path path={`M${x - 1.6} ${y} h 3.2 l -0.6 4 h -2 Z`} color={ribbon} />
+      <Circle cx={x} cy={y + 5.6} r={1.9} color={GOLD} />
+      <Circle cx={x - 0.5} cy={y + 5.1} r={0.6} color="#fff3dc" opacity={0.7} />
+    </>
+  )
+}
+
+/** A small brass anchor on the front of the hat. */
+function CapAnchor() {
+  return <Path path="M28 24.4 v 4.6 M26.4 25.6 h 3.2 M25.6 27.6 q 2.4 2.6 4.8 0" color={BRASS} style="stroke" strokeWidth={0.9} strokeCap="round" />
 }
