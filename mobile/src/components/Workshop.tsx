@@ -1,11 +1,12 @@
 // The Workshop, in the Shipyard's slipway shed: where the finds from bad weather become boats.
 // A lamplit shed with the set you're closest to taking shape on the stocks; how it works in three
-// steps; every set as three slots (hull, engine, specialty) that fill as pieces come home, with a
-// Build button once they're all in; rare parts and what they unlock; and the workbench, where
+// steps; every set with a drawing of her and three slots (hull, engine, specialty), each showing
+// the piece itself, filled in as it comes home (a pale ghost until then), with a Build button once
+// they're all in; rare parts and what they unlock; and the workbench, where
 // spare pieces melt into new ones and plain fittings are scrapped for coins.
 
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { type LayoutChangeEvent, Pressable, Text, View } from 'react-native'
 import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import type { BoatClass, GameState, PartRarity, PartType, Track } from '../../../src/game/types'
 import { craftableClasses, meltGroups } from '../../../src/game/state'
@@ -15,12 +16,11 @@ import { MELT_COST, STANDARD_SCRAP_VALUE } from '../../../src/game/data/economy'
 import { coins } from '../../../src/format'
 import { BoatArt } from '../art/BoatArt'
 import { boatWidth } from '../art/boatGeometry'
+import { PART_H, PART_W, PartArt } from '../art/PartArt'
 import { LIGHT } from '../art/light'
 import { useSceneClock } from '../art/clock'
 import { fonts, useTheme } from '../theme'
 import { Button, Row, Title } from './ui'
-
-const SLOT_MARK: Record<PartType, string> = { hull: '⛵︎', engine: '⚙︎', specialty: '✦' }
 
 /** The shed: beams, a lamp, tools on the wall, and a boat on the stocks as far along as `share`. */
 function Shed({ cls, share, width }: { cls: BoatClass | null; share: number; width: number }) {
@@ -77,14 +77,47 @@ function Shed({ cls, share, width }: { cls: BoatClass | null; share: number; wid
   )
 }
 
-/** One slot of a set: filled with the piece once you have it. */
-function Slot({ slot, track, got, color }: { slot: PartType; track: Track; got: boolean; color: string }) {
-  const t = useTheme()
+/** The boat a set builds, for its card: in full once she's built or ready, faint while pieces are missing. */
+function SetBoat({ cls, share }: { cls: BoatClass; share: number }) {
+  const scale = Math.min(104 / boatWidth(cls), 0.8)
+  const bw = boatWidth(cls) * scale
   return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2, paddingVertical: 6, borderRadius: 10, borderWidth: 1.5, borderStyle: got ? 'solid' : 'dashed', borderColor: got ? color : t.border, backgroundColor: got ? `${color}22` : 'transparent' }}>
-      <Text style={{ fontSize: 18, color: got ? color : t.muted, opacity: got ? 1 : 0.5 }}>{SLOT_MARK[slot]}</Text>
-      <Text style={{ color: got ? t.text : t.muted, fontFamily: fonts.semibold, fontSize: 11 }}>{slotName(slot, track)}</Text>
-      <Text style={{ color: got ? color : t.muted, fontFamily: fonts.body, fontSize: 10 }}>{got ? 'In hand' : 'Missing'}</Text>
+    <Canvas style={{ width: 112, height: 72 }}>
+      <Group opacity={0.45 + 0.55 * share}>
+        <BoatArt cls={cls} light={LIGHT.day} x={(112 - bw) / 2} y={54} scale={scale} />
+      </Group>
+    </Canvas>
+  )
+}
+
+const GAP = 6
+
+/** A set's three slots, each with its piece drawn above (one canvas for the row, to keep pages light). */
+function Slots({ cls, counts, color }: { cls: BoatClass; counts: Map<string, number>; color: string }) {
+  const t = useTheme()
+  const [w, setW] = useState(0)
+  const col = (w - GAP * 2) / 3
+  const parts = cls.requiredParts.map(getPart)
+  return (
+    <View onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}>
+      {w > 0 && (
+        <Canvas style={{ position: 'absolute', left: 0, top: 4, width: w, height: PART_H }} pointerEvents="none">
+          {parts.map((p, i) => (
+            <PartArt key={p.id} cls={cls} slot={p.type} trim={color} ghost={!counts.has(p.id)} ghostColor={t.muted} x={i * (col + GAP) + (col - PART_W) / 2} />
+          ))}
+        </Canvas>
+      )}
+      <Row style={{ gap: GAP, flexWrap: 'nowrap' }}>
+        {parts.map((p) => {
+          const got = counts.has(p.id)
+          return (
+            <View key={p.id} style={{ flex: 1, alignItems: 'center', gap: 2, paddingTop: PART_H + 6, paddingBottom: 6, borderRadius: 10, borderWidth: 1.5, borderStyle: got ? 'solid' : 'dashed', borderColor: got ? color : t.border, backgroundColor: got ? `${color}22` : 'transparent' }}>
+              <Text style={{ color: got ? t.text : t.muted, fontFamily: fonts.semibold, fontSize: 11 }}>{slotName(p.type, p.track)}</Text>
+              <Text style={{ color: got ? color : t.muted, fontFamily: fonts.body, fontSize: 10 }}>{got ? 'In hand' : 'Missing'}</Text>
+            </View>
+          )
+        })}
+      </Row>
     </View>
   )
 }
@@ -179,8 +212,9 @@ export function Workshop({
         const built = owned.has(cls.id)
         return (
           <View key={cls.id} style={{ borderRadius: 14, borderWidth: complete && !built ? 2 : 1, borderColor: complete && !built ? c : t.border, backgroundColor: t.surface, padding: 10, gap: 6, opacity: built ? 0.6 : 1 }}>
-            <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-              <View style={{ flexShrink: 1 }}>
+            <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap', gap: 8 }}>
+              <SetBoat cls={cls} share={built ? 1 : have.length / cls.requiredParts.length} />
+              <View style={{ flex: 1 }}>
                 <Text style={{ color: t.text, fontFamily: fonts.title, fontSize: 19 }}>{cls.name}</Text>
                 <Text style={{ color: c, fontFamily: fonts.bold, fontSize: 11, letterSpacing: 1 }}>
                   {cls.rarity.toUpperCase()} · TIER {cls.sizeTier} {cls.track === 'cargo' ? 'CARGO' : 'PASSENGERS'}
@@ -191,11 +225,7 @@ export function Workshop({
               </Text>
             </Row>
             <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>{getAbility(cls.abilityId)?.description}</Text>
-            <Row style={{ gap: 6, flexWrap: 'nowrap' }}>
-              {cls.requiredParts.map((id) => (
-                <Slot key={id} slot={getPart(id).type} track={getPart(id).track} got={counts.has(id)} color={c} />
-              ))}
-            </Row>
+            <Slots cls={cls} counts={counts} color={c} />
             {built ? (
               <Text style={{ color: t.muted, fontFamily: fonts.semibold, fontSize: 12 }}>Built: she's in your fleet</Text>
             ) : complete ? (
