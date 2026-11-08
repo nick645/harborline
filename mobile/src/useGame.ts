@@ -29,6 +29,8 @@ export function useGame() {
   const [finds, setFinds] = useState<Find[]>([])
   // Captains resigning or close to quitting while you're playing.
   const [crewNews, setCrewNews] = useState<string[]>([])
+  // Trips that just left with something sparkling aboard.
+  const [sightings, setSightings] = useState<AwayReport['sightings']>([])
   const ref = useRef<GameState | null>(null)
   /** When the tick last looked for storm alerts; 0 until the first tick. */
   const lastTick = useRef(0)
@@ -87,6 +89,7 @@ export function useGame() {
         ...report.shaken.filter((x) => !report.resigned.some((q) => q.name === x.name)).map((x) => `${x.name} is close to quitting`),
       ]
       if (crew.length) setCrewNews((prev) => [...prev, ...crew].slice(-3))
+      if (report.sightings.length) setSightings((prev) => [...prev, ...report.sightings].slice(-3))
     }, TICK_MS)
     return () => clearInterval(id)
   }, [commit])
@@ -167,5 +170,7 @@ export function useGame() {
     clearFinds: () => setFinds([]),
     crewNews,
     clearCrewNews: () => setCrewNews([]),
+    sightings,
+    clearSightings: () => setSightings([]),
   }
 }

@@ -87,12 +87,17 @@ export async function setFindAlertsWanted(on: boolean): Promise<boolean> {
 
 /**
  * What the fleet will bring home while you're away that's worth a notification: rare, legendary
- * and mythic parts, keepsakes, and captains rising to a new title. The game's rolls are seeded, so running the queued trips
+ * and mythic parts, keepsakes, captains rising to a new title, and something sparkling aboard. The game's rolls are seeded, so running the queued trips
  * forward on a copy says exactly what comes home, and when, if nothing changes.
  */
 function upcomingFinds(state: GameState, now: number): { at: number; title: string; body: string }[] {
   const { report } = settleAway(state, now + HORIZON_MS)
   const titles = report.titles.map((x) => ({ at: x.at, title: `${x.name} is now a ${RATING_TITLES[x.to]}!`, body: `A new title, and ${TITLE_MARKS[x.to].toLowerCase()} to show for it. Come and see.` }))
+  const sightings = report.sightings.map((x) => ({
+    at: x.at,
+    title: x.kind === 'captain' ? `A passenger aboard ${x.boat} looks like a sailor` : `A crate aboard ${x.boat} is sparkling`,
+    body: x.kind === 'captain' ? 'They might sign on for nothing. Go aboard before she docks.' : 'Something in it worth having. Open it before she docks.',
+  }))
   return report.finds.filter((f) => f.keepsake || (f.part && getPart(f.part).rarity !== 'standard'))
     .map((f) => {
       if (f.keepsake) return { at: f.at, title: `${f.boat} brought something home`, body: `${getKeepsake(f.keepsake)?.name}: something new for your house.` }
@@ -101,7 +106,7 @@ function upcomingFinds(state: GameState, now: number): { at: number; title: stri
       const rare = part.rarity === 'mythic' ? 'A mythic find!' : part.rarity === 'legendary' ? 'A legendary find!' : 'A rare find'
       return { at: f.at, title: `${rare} ${f.boat} found ${partName(f.part!)}`, body: set && set.need > 1 ? `${set.have} of ${set.need} for the ${set.boat}.` : 'Open Harborline to see it in your Workshop.' }
     })
-    .concat(titles)
+    .concat(titles, sightings)
 }
 
 /** Replace whatever was scheduled with the alerts due between now and the horizon. */

@@ -596,7 +596,7 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
   )
 }
 
-/** Their sea rating in a line: the number as OVR and a bar (paler while it's a guess), with the room they
+/** Their sea rating in a line: their level (LVL) and a bar (paler while it's a guess), with the room they
  *  could still grow faintly past it once that's known. */
 function SkillLine({ c }: { c: CaptainView }) {
   const t = useTheme()
@@ -604,9 +604,10 @@ function SkillLine({ c }: { c: CaptainView }) {
   const top = c.growth.known === 'unknown' ? r.guess : Math.max(r.guess, c.growth.band[1])
   return (
     <View style={{ gap: 2 }}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityLabel={`Overall ${r.guess}, ${ratingTitle(r.guess)}${r.sure ? '' : ', a guess so far'}`}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityLabel={`Level ${r.guess}, ${ratingTitle(r.guess)}${r.sure ? '' : ', a guess so far'}`}>
       <Text style={{ color: t.accent, fontFamily: fonts.semibold, fontSize: 12 }}>
-        {r.guess} <Text style={{ color: t.muted, fontSize: 10 }}>OVR</Text>
+        <Text style={{ color: t.muted, fontSize: 10 }}>LVL </Text>
+        {r.guess}
       </Text>
       <View style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: t.border, overflow: 'hidden' }}>
         <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.min(100, top)}%`, backgroundColor: t.accent, opacity: 0.25 }} />

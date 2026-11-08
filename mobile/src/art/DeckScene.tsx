@@ -15,6 +15,7 @@ import { STORM, type Light } from './light'
 import { lookFor, type Look, type Prop } from './looks'
 import { Figure, FIGURE_FULL_H } from './Figure'
 import { Walker } from './Walker'
+import { Sparkles } from './Sparkles'
 import { Fall } from './Climate'
 import { CLIMATE_LOOK, GLOOM } from './climateLook'
 import { useSceneClock } from './clock'
@@ -63,9 +64,16 @@ type Props = {
   onOpenCaptain?: () => void
   /** Tap the deck to hear what's being said on it. */
   onDeck?: () => void
+  /** Something aboard worth a look, sparkling gold: a passenger who'd make a captain, or a crate. */
+  special?: 'captain' | 'cargo' | null
+  onSpecial?: () => void
 }
 
-export function DeckScene({ width, light, weather, cls, captain, captainName, hands = 0, handIds = [], climate = 'temperate', outbound = true, onOpenCaptain, onDeck }: Props) {
+/** Where the sparkling passenger stands at the rail, and where the sparkling crate sits on deck. */
+const SPECIAL_PAX = { x: 150, foot: 238, scale: 0.62 }
+const SPECIAL_CRATE = { x: 120, y: 186, w: 40, h: 30 }
+
+export function DeckScene({ width, light, weather, cls, captain, captainName, hands = 0, handIds = [], climate = 'temperate', outbound = true, onOpenCaptain, onDeck, special, onSpecial }: Props) {
   const clock = useSceneClock()
   const s = width / SCENE_W
   const sw = SWELL[weather]
@@ -244,6 +252,22 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
                 )
               })}
 
+            {/* Something worth a look, sparkling gold */}
+            {special === 'captain' && (
+              <Group>
+                <Figure look={{ ...lookFor(`promising-${seed}`), prop: 'spyglass' }} x={SPECIAL_PAX.x} y={SPECIAL_PAX.foot - FIGURE_FULL_H * SPECIAL_PAX.scale} scale={SPECIAL_PAX.scale} clock={clock} wind={weather !== 'calm'} legs rimLight="#ffd66b" />
+                <Sparkles cx={SPECIAL_PAX.x + 17} cy={SPECIAL_PAX.foot - 48} rx={32} ry={54} clock={clock} beaconY={SPECIAL_PAX.foot - FIGURE_FULL_H * SPECIAL_PAX.scale - 14} />
+              </Group>
+            )}
+            {special === 'cargo' && (
+              <Group>
+                <Rect x={SPECIAL_CRATE.x} y={SPECIAL_CRATE.y} width={SPECIAL_CRATE.w} height={SPECIAL_CRATE.h} color={lit('#8a5a3a')} />
+                <Path path={`M${SPECIAL_CRATE.x} ${SPECIAL_CRATE.y} l ${SPECIAL_CRATE.w} ${SPECIAL_CRATE.h} M${SPECIAL_CRATE.x + SPECIAL_CRATE.w} ${SPECIAL_CRATE.y} l ${-SPECIAL_CRATE.w} ${SPECIAL_CRATE.h}`} color={lit('#4a2e22')} style="stroke" strokeWidth={1} />
+                <Rect x={SPECIAL_CRATE.x} y={SPECIAL_CRATE.y + SPECIAL_CRATE.h / 2 - 2} width={SPECIAL_CRATE.w} height={4} color="#e6b85a" />
+                <Sparkles cx={SPECIAL_CRATE.x + SPECIAL_CRATE.w / 2} cy={SPECIAL_CRATE.y + SPECIAL_CRATE.h / 2} rx={36} ry={28} clock={clock} beaconY={SPECIAL_CRATE.y - 16} />
+              </Group>
+            )}
+
             {/* The wheelhouse, open toward you in the right foreground: windows behind, your captain
                 at the helm console with the wheel on its face, the mast and its lamp on the roof */}
             <Group>
@@ -303,6 +327,19 @@ export function DeckScene({ width, light, weather, cls, captain, captainName, ha
           accessibilityRole="button"
           accessibilityLabel="Listen to who's on deck"
           style={{ position: 'absolute', left: 0, top: (RAIL - 40) * s, width: (WH_X - 4) * s, height: (FOOT - RAIL + 40) * s }}
+        />
+      )}
+      {special && onSpecial && (
+        <Pressable
+          onPress={onSpecial}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={special === 'captain' ? 'Talk to the passenger who looks like a sailor' : 'Open the crate that sparkles'}
+          style={
+            special === 'captain'
+              ? { position: 'absolute', left: (SPECIAL_PAX.x - 10) * s, top: (SPECIAL_PAX.foot - FIGURE_FULL_H * SPECIAL_PAX.scale - 10) * s, width: 56 * s, height: (FIGURE_FULL_H * SPECIAL_PAX.scale + 14) * s }
+              : { position: 'absolute', left: (SPECIAL_CRATE.x - 12) * s, top: (SPECIAL_CRATE.y - 12) * s, width: (SPECIAL_CRATE.w + 24) * s, height: (SPECIAL_CRATE.h + 24) * s }
+          }
         />
       )}
       {captain && onOpenCaptain && (

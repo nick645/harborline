@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Captain, GameState, Weather } from './types'
-import { assignRoute, buyBoat, craftBoat, dismissCelebration, quoteVoyage, settle, settleAway, getBoat, isAutomated } from './state'
+import { claimDeckFind, deckFindOn } from './deckFinds'
+import { assignRoute, buyBoat, craftBoat, dismissCelebration, getVoyage, quoteVoyage, settle, settleAway, getBoat, isAutomated } from './state'
 import {
   assignCaptain,
   buyUpgrade,
@@ -607,6 +608,51 @@ describe('morale', () => {
     expect(captainView(c).morale.mood).toBe('quitting')
     c.rank = 'legend'
     expect(captainView(c).morale.steadfast).toBe(true)
+  })
+})
+
+describe('deck finds', () => {
+  // Both starter boats crewed.
+  const crewed = (seed: number) => {
+    const s = harbourGame(seed, T0)
+    const c = generateCaptain(s.rng, `c${s.nextCaptainSeq++}`, [1, 1])
+    s.player.roster.push(c)
+    s.player.ownedBoats[1].captainId = c.id
+    return s
+  }
+
+  it('a passenger who would make a captain signs on for nothing; a crate gives its part; each once', () => {
+    let s = crewed(55)
+    const [a, b] = s.player.ownedBoats
+    s = assignRoute(s, a.id, s.routes[0].id, T0)
+    s = assignRoute(s, b.id, s.routes[0].id, T0)
+    s = structuredClone(s)
+    s.voyages.find((v) => v.boatId === a.id)!.deckFind = { kind: 'captain' }
+    s.voyages.find((v) => v.boatId === b.id)!.deckFind = { kind: 'cargo', part: 'std-cargo-hull' }
+    expect(deckFindOn(s, a.id)).toBe('captain')
+    const coins = s.player.coins
+    const one = claimDeckFind(s, a.id, T0 + 1000)
+    expect(one.result.kind).toBe('captain')
+    expect(one.state.player.roster).toHaveLength(s.player.roster.length + 1)
+    expect(one.state.player.coins).toBe(coins)
+    expect(() => claimDeckFind(one.state, a.id, T0 + 2000)).toThrow()
+    const two = claimDeckFind(one.state, b.id, T0 + 2000)
+    expect(two.result).toEqual({ kind: 'cargo', part: 'std-cargo-hull' })
+    expect(two.state.player.partInventory.filter((p) => p === 'std-cargo-hull').length).toBe(one.state.player.partInventory.filter((p) => p === 'std-cargo-hull').length + 1)
+  })
+
+  it('managed boats never carry one, and hand-run ones only rarely', () => {
+    let n = 0
+    let trips = 0
+    for (let seed = 1; seed <= 60; seed++) {
+      let s = crewed(seed)
+      for (const boat of s.player.ownedBoats) {
+        s = assignRoute(s, boat.id, s.routes[0].id, T0)
+        trips++
+        if (getVoyage(s, boat.id)?.deckFind) n++
+      }
+    }
+    expect(n).toBeLessThan(trips * 0.15)
   })
 })
 

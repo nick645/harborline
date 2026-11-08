@@ -2,7 +2,7 @@
 // the input is never mutated. All timers are absolute timestamps, so catching up after
 // any gap is a single settle pass, never a tick loop.
 
-import type { AwayReport, Boat, Captain, Deckhand, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage, Find, TitleRise } from './types'
+import type { AwayReport, Boat, Captain, Deckhand, GameState, LogKind, PartRarity, PartType, Route, Track, Voyage, Find, TitleRise, Weather } from './types'
 import { BOAT_CLASSES } from './data/boats'
 import { ROUTES, routesFrom } from './data/routes'
 import { NICKNAMES } from './data/nicknames'
@@ -47,7 +47,8 @@ import { LEGEND_ABILITIES, MORALE_CARGO_LOST, MORALE_TITLE, MORALE_BATTERED, MOR
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS } from './data/personas'
 import { leadingRival, leaning, rivalName, termsFee } from './courting'
 import { MANAGER_RIVAL_MAX, RIVALS } from './data/courting'
-import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick } from './rolls'
+import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick, rollWeighted } from './rolls'
+import { CARGO_PART_CHANCE, CRATE_RARITY, PASSENGER_CAPTAIN_CHANCE } from './data/deckFinds'
 import { hooksOf, type TripContext } from './abilities'
 import { routeWeather, weatherSlot } from './weather'
 import { handBerths, handCount, handMods, migrateHands, recordHands, refreshTavern } from './hands'
@@ -700,12 +701,25 @@ function startTrip(s: GameState, boat: Boat, routeId: string, at: number, tripIn
     lost: false,
     weatherAtStart: q.weather,
     partRollResult: null,
+    deckFind: rollDeckFind(s, boat, q.weather),
   })
   boat.state = 'sailing'
   boat.currentRoute = routeId
   boat.etaMs = at + q.durationMs / 2
   boat.dockedAt = null
   boat.autoWaitUntil = undefined
+}
+
+/** Now and then a hand-run trip leaves with something aboard worth a look (data/deckFinds.ts). */
+function rollDeckFind(s: GameState, boat: Boat, weather: Weather): Voyage['deckFind'] {
+  if (isAutomated(s, boat)) return undefined
+  const track = getBoatClass(boat.classId).track
+  if (track === 'passenger') return rollChance(s.rng, PASSENGER_CAPTAIN_CHANCE) ? { kind: 'captain' } : undefined
+  if (!rollChance(s.rng, CARGO_PART_CHANCE)) return undefined
+  const odds = Object.entries(CRATE_RARITY[weather]) as [PartRarity, number][]
+  const rarity = rollWeighted(s.rng, odds.map(([item, weight]) => ({ item, weight })))
+  const part = pickPart(s.rng, s, rarity, track) ?? pickPart(s.rng, s, 'rare', track)
+  return part ? { kind: 'cargo', part } : undefined
 }
 
 function dockBoat(boat: Boat, at: number) {
@@ -810,7 +824,7 @@ export function reservedAbove(s: GameState, id: string): number {
  * them on your list), else with the rival they lean toward most.
  */
 /** What settling turned up for the welcome-back summary (mutated as it goes). */
-type SettleNews = { tripPay: number; signed: string[]; wentElsewhere: string[]; risen: string[]; charted: string[]; titles: TitleRise[]; resigned: AwayReport['resigned']; shaken: AwayReport['shaken'] }
+type SettleNews = { tripPay: number; signed: string[]; wentElsewhere: string[]; risen: string[]; charted: string[]; titles: TitleRise[]; resigned: AwayReport['resigned']; shaken: AwayReport['shaken']; sightings: AwayReport['sightings'] }
 
 function decide(s: GameState, id: string, at: number, news?: SettleNews) {
   const found = seekers(s).find((p) => p.person.id === id)
@@ -899,7 +913,7 @@ function settleInPlace(s: GameState, now: number) {
   const parts: string[] = []
   const keepsakes: string[] = []
   const finds: Find[] = []
-  const news: SettleNews = { tripPay: 0, signed: [], wentElsewhere: [], risen: [], charted: [], titles: [], resigned: [], shaken: [] }
+  const news: SettleNews = { tripPay: 0, signed: [], wentElsewhere: [], risen: [], charted: [], titles: [], resigned: [], shaken: [], sightings: [] }
   // Each trip has at most two events, runs are capped by the fuel tank, and managed boats
   // depart at most once per trip, so this is bounded by the voyages that fit before `now`.
   for (let ev = nextEvent(s, now); ev; ev = nextEvent(s, now)) {
@@ -975,6 +989,7 @@ function settleInPlace(s: GameState, now: number) {
       boat.etaMs = v.startedAt + v.durationMs
     } else {
       s.voyages = s.voyages.filter((x) => x !== v)
+      if (v.deckFind) log(s, ev.at, 'info', v.deckFind.kind === 'captain' ? `A passenger with the look of a sailor stepped ashore from ${boat.nickname} before you met them` : `A crate on ${boat.nickname} went ashore with the cargo, unopened`)
       if (!v.lost) {
         tripsCompleted++
         v.partRollResult = rollTripParts(s, ctx, mods)
@@ -1014,7 +1029,11 @@ function settleInPlace(s: GameState, now: number) {
         revealRefusal(s, boat, ev.at)
         leaving = false
       }
-      if (leaving) startTrip(s, boat, v.routeId, ev.at, v.tripIndex + 1, v.tripsTotal)
+      if (leaving) {
+        startTrip(s, boat, v.routeId, ev.at, v.tripIndex + 1, v.tripsTotal)
+        const next = getVoyage(s, boat.id)
+        if (next?.deckFind) news.sightings.push({ at: ev.at, boatId: boat.id, boat: boat.nickname, kind: next.deckFind.kind })
+      }
       else {
         dockBoat(boat, ev.at)
         // Ashore: anyone who's had enough leaves now.

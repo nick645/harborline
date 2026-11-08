@@ -85,7 +85,7 @@ export function TitleUp({ rise, captain, more, onDone, onOpen }: { rise: TitleRi
               {TITLE_MARKS[rise.to]}
             </Text>
             <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 13, textAlign: 'center' }}>
-              Overall {captain.rating.guess}
+              LVL {captain.rating.guess}
               {rise.to < RATING_TITLES.length - 1 ? ` · ${RATING_TITLES[rise.to + 1]} at ${(rise.to + 1) * 10}` : ' · The top of the ladder'}
             </Text>
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>

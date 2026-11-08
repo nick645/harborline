@@ -36,8 +36,8 @@ export type Props = {
   /** Open the live view of this boat; absent when already on it. */
   onOpen?: () => void
   onOpenCaptain: (captainId: string) => void
-  /** Fish out what's drifting past her at sea; returns what was found (null if it got away). */
-  onFlotsam?: () => import('../../../src/game/flotsam').FlotsamFind | null
+  /** Claim what's sparkling aboard her at sea (a passenger who'd captain, a crate); returns what it was. */
+  onDeckFind?: () => import('../../../src/game/deckFinds').DeckFindResult | null
 }
 
 /** A small drawing of the boat for her card. */
@@ -75,7 +75,7 @@ export function BoatChip({ game, boat, now, onOpen }: { game: GameState; boat: B
       onPress={onOpen}
       accessibilityRole="button"
       accessibilityLabel={`${boat.nickname}, ${status}`}
-      style={({ pressed }) => [styles.chip, { backgroundColor: t.surface, borderColor: boat.state === 'sunk' ? t.bad : attention ? t.accent : t.border, opacity: pressed ? 0.8 : 1 }]}
+      style={({ pressed }) => [styles.chip, { backgroundColor: t.surface, borderColor: boat.state === 'sunk' ? t.bad : v?.deckFind ? '#ffd66b' : attention ? t.accent : t.border, opacity: pressed ? 0.8 : 1 }]}
     >
       <BoatThumb cls={cls} condition={boat.condition} laden={boat.state === 'sailing' || boat.state === 'returning'} />
       <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 17 }}>
@@ -84,6 +84,11 @@ export function BoatChip({ game, boat, now, onOpen }: { game: GameState; boat: B
       <Text numberOfLines={1} style={{ color: boat.state === 'sunk' ? t.bad : t.muted, fontFamily: fonts.body, fontSize: 12 }}>
         {status}
       </Text>
+      {v?.deckFind && (
+        <Text numberOfLines={1} style={{ color: '#ffd66b', fontFamily: fonts.bold, fontSize: 11 }}>
+          ✦ {v.deckFind.kind === 'captain' ? 'A sailor aboard' : 'A crate sparkles'}
+        </Text>
+      )}
       <View style={[styles.condTrack, { backgroundColor: t.surface2, width: '100%' }]}>
         <View style={{ width: `${cond}%`, height: '100%', backgroundColor: condColor }} />
       </View>

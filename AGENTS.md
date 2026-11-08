@@ -204,9 +204,13 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
 
 - Boats at sea (user-approved 2026-11-06): three views, Ship · Deck · Helm. Deck: passengers
   strolling, tap for chatter; Helm: inside the wheelhouse, tap the wheel to steady her and the
-  captain to hear them (`mobile/src/chatter.ts`, known facts only). Flotsam drifts past; tap it
-  for a small find (`src/game/flotsam.ts`: 5–15% of the trip's pay, sometimes a fitting, rarely
-  a keepsake, better in storms, one per boat per 10 min). Numbers are Claude's picks.
+  captain to hear them (`mobile/src/chatter.ts`, known facts only). Numbers are Claude's picks.
+- Deck finds (user-approved 2026-11-07, replacing flotsam): now and then a hand-run trip leaves
+  with something aboard, sparkling gold on deck until claimed, gone if she docks first
+  (`data/deckFinds.ts`, `deckFinds.ts`): passenger boats 3% a passenger who'd make a captain and
+  signs for nothing (30% unusual: rare look, quay's best +2 anchors); cargo boats 4% a crate with
+  a rare part (legendary from rough water, mythic only in storms). Fleet card, a live banner and
+  find alerts point to it. Numbers are Claude's picks. Captains' rating reads as LVL.
 
 - Telling the player (user-approved 2026-11-06): the welcome-back card is a full summary (trips'
   pay and spending, finds by name with set progress, fittings counted, who signed or went to

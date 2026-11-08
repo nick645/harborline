@@ -18,10 +18,9 @@ import { SunkScene } from '../art/SunkScene'
 import { DockScene } from '../art/DockScene'
 import { DeckScene } from '../art/DeckScene'
 import { HelmScene } from '../art/HelmScene'
-import { Flotsam } from '../art/Flotsam'
 import { captainLine, deckLine, steadyLine } from '../chatter'
-import { flotsamKind, flotsamReady } from '../../../src/game/flotsam'
-import { getKeepsake } from '../../../src/game/data/keepsakes'
+import { deckFindOn } from '../../../src/game/deckFinds'
+import { getPart, setProgress } from '../../../src/game/parts'
 import { partName } from '../../../src/game/parts'
 import { lightAt } from '../art/light'
 import { lookFor } from '../art/looks'
@@ -66,11 +65,18 @@ export function BoatScreen(props: BoatProps) {
     setTalk((n) => n + 1)
     setSaid({ who, text })
   }
-  const fishOut = () => {
-    const f = props.onFlotsam?.()
-    if (!f) return
-    const what = f.keepsake ? `${getKeepsake(f.keepsake)?.name}: something new for home!` : f.part ? partName(f.part) : `${coins(f.coins)}c`
-    setSaid({ who: `Fished out ${f.what}`, text: what })
+  const special = atSea && !preview ? deckFindOn(game, boat.id) : null
+  const claim = () => {
+    const r = props.onDeckFind?.()
+    if (!r) return
+    if (r.kind === 'captain') {
+      setSaid({ who: r.unusual ? `${r.name} · someone unusual!` : r.name, text: 'Signed on with your line, for nothing. Find them on your Captains tab.' })
+      return
+    }
+    const part = getPart(r.part)
+    const set = setProgress(game.player.partInventory.concat(r.part), r.part)
+    const rarity = part.rarity === 'mythic' ? 'Mythic' : part.rarity === 'legendary' ? 'Legendary' : 'Rare'
+    setSaid({ who: `In the crate · ${rarity}`, text: `${partName(r.part)}${set && set.need > 1 ? ` · ${set.have} of ${set.need} for the ${set.boat}` : ''}` })
   }
   const showing = (atSea || preview) && !(mode === 'sunk' && !preview)
 
@@ -120,6 +126,8 @@ export function BoatScreen(props: BoatProps) {
                 climate={climate}
                 outbound={mode === 'sailing'}
                 onOpenCaptain={captain ? () => onOpenCaptain(captain.id) : undefined}
+                special={special}
+                onSpecial={claim}
                 onDeck={() => {
                   const l = deckLine(cls.track, wx, where, talk)
                   say(l.who, l.text)
@@ -144,16 +152,11 @@ export function BoatScreen(props: BoatProps) {
                 {mode === 'sunk' ? 'Sunk' : mode === 'docked' ? `Moored at ${getPortDef(homeOf(game)).name}` : `${WEATHER[weather].name}${WEATHER[weather].lossRisk ? ` · ${percent(WEATHER[weather].lossRisk)} risk` : ''}`}
               </Text>
             </View>
-            {/* Something drifting by, while there's a find to be had */}
-            {atSea && !preview && (
-              <Flotsam
-                width={w}
-                height={w / (SCENE_W / SCENE_H)}
-                waterY={view === 'ship' ? 0.86 : view === 'deck' ? 0.5 : 0.42}
-                kind={flotsamKind(game, boat.id)}
-                ready={flotsamReady(game, boat.id, now)}
-                onCollect={fishOut}
-              />
+            {/* Something sparkling aboard: on deck it's there to tap; elsewhere, a nudge to go and look */}
+            {special && view !== 'deck' && (
+              <Pressable onPress={() => setView('deck')} accessibilityRole="button" style={[styles.sparkle, { backgroundColor: 'rgba(29,20,32,0.86)', borderColor: '#ffd66b' }]}>
+                <Text style={{ color: '#ffd66b', fontFamily: fonts.bold, fontSize: 12 }}>✦ {special === 'captain' ? 'A passenger has the look of a sailor' : 'A crate on deck is sparkling'} · On deck ›</Text>
+              </Pressable>
             )}
             {said && (
               <View pointerEvents="none" style={[styles.said, { backgroundColor: 'rgba(29,20,32,0.86)' }]}>
@@ -243,5 +246,6 @@ const styles = StyleSheet.create({
   said: { position: 'absolute', left: 10, right: 10, top: 44, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, gap: 2 },
   pill: { position: 'absolute', left: 10, top: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
   dot: { width: 9, height: 9, borderRadius: 5 },
+  sparkle: { position: 'absolute', left: 10, top: 44, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   track: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
 })

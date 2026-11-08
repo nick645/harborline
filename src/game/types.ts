@@ -112,6 +112,8 @@ export interface Voyage {
   weatherAtStart: Weather | null
   /** Part ids found on this trip, recorded when it docks. */
   partRollResult: string[] | null
+  /** Something aboard worth a look until she docks (data/deckFinds.ts): a passenger who'd make a captain, or a crate with a part. */
+  deckFind?: { kind: 'captain' } | { kind: 'cargo'; part: string }
 }
 
 export interface Part {
@@ -267,8 +269,6 @@ export interface Player {
   celebrations?: TitleRise[]
   /** The harbourmaster is still walking a new player through their first boat and captain. */
   guide?: boolean
-  /** When each boat last fished something out of the water (flotsam.ts). */
-  flotsamAt?: Record<string, number>
   /** Your prospects in the order you want them: coins are set aside from the top down. */
   prospectOrder?: string[]
   /** Prospects you've passed on: they won't be paid for, whoever they lean to. */
@@ -393,6 +393,8 @@ export interface AwayReport {
   risen: string[]
   /** Captains whose rating reached a new title, and when. */
   titles: TitleRise[]
+  /** Trips that left with something aboard worth a look (a passenger, a crate). */
+  sightings: { at: number; boatId: string; boat: string; kind: 'captain' | 'cargo' }[]
   /** Captains who resigned to a rival line, and captains close to quitting. */
   resigned: { name: string; rival: string; at: number }[]
   shaken: { name: string; at: number }[]

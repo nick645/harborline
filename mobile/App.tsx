@@ -10,7 +10,8 @@ import { assignCaptain, moveProspect, passOnProspect, boatToShowTo, buyUpgrade, 
 import { getPart, partName, setProgress, slotName } from '../src/game/parts'
 import { getKeepsake, KEEPSAKES } from '../src/game/data/keepsakes'
 import { getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../src/game/economy'
-import { GameError, quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
+import { PARTS } from '../src/game/data/parts'
+import { GameError, getBoat, isAutomated, quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
 import { HOME_START_PRICE, MELT_COST, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE } from '../src/game/data/economy'
 import { SCOUT_ACTIONS } from '../src/game/data/captains'
 import { COURT_ACTIONS, type CourtAction } from '../src/game/data/courting'
@@ -51,7 +52,7 @@ import { PortsScreen } from './src/screens/PortsScreen'
 import { HomeScreen } from './src/screens/HomeScreen'
 import { placeDecor, styleHome } from '../src/game/home'
 import { chartHidden, endGuide, guideStep, homeLocked } from '../src/game/guide'
-import { collectFlotsam, type FlotsamFind } from '../src/game/flotsam'
+import { claimDeckFind, type DeckFindResult } from '../src/game/deckFinds'
 import { ChartFog } from './src/art/ChartFog'
 import { Harbourmaster } from './src/components/Harbourmaster'
 import { guideLine } from './src/guideLine'
@@ -98,7 +99,7 @@ export default function App() {
 
 function Harbor() {
   const t = useTheme()
-  const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset, finds, clearFinds, crewNews, clearCrewNews } = useGame()
+  const { game, now, act, error, clearError, report, clearReport, alerts, clearAlerts, reset, finds, clearFinds, crewNews, clearCrewNews, sightings, clearSightings } = useGame()
   useSoundscape(game, now, alerts.length)
   const [tab, setTab] = useState<Tab>('fleet')
   const [stack, setStack] = useState<Detail[]>([])
@@ -220,14 +221,14 @@ function Harbor() {
       )
     },
     onFindHands: () => goToPort(homeOf(game), 'tavern'),
-    onFlotsam: () => {
-      let found: FlotsamFind | null = null
+    onDeckFind: () => {
+      let found: DeckFindResult | null = null
       act((g, at) => {
-        const r = collectFlotsam(g, b.id, at)
-        found = r.find
+        const r = claimDeckFind(g, b.id, at)
+        found = r.result
         return r.state
       })
-      if (found) play('find')
+      if (found) play((found as DeckFindResult).kind === 'captain' ? 'signed' : 'find')
       return found
     },
   })
@@ -292,6 +293,28 @@ function Harbor() {
                 )
               })}
               <Muted>Tap to see it in the Workshop</Muted>
+            </Card>
+          </Pressable>
+        )}
+        {sightings.length > 0 && (
+          <Pressable
+            onPress={() => {
+              const id = sightings[sightings.length - 1].boatId
+              clearSightings()
+              setTab('fleet')
+              setStack([{ kind: 'boat', id }])
+            }}
+            accessibilityRole="button"
+            accessibilityHint="Opens the boat"
+          >
+            <Card accent="#ffd66b">
+              {sightings.map((x, i) => (
+                <Body key={i}>
+                  <Text style={{ color: '#ffd66b', fontFamily: fonts.bold }}>✦ </Text>
+                  {x.kind === 'captain' ? `A passenger aboard ${x.boat} has the look of a sailor` : `A crate aboard ${x.boat} is sparkling`}
+                </Body>
+              ))}
+              <Muted>Tap to go aboard before she docks</Muted>
             </Card>
           </Pressable>
         )}
@@ -499,6 +522,42 @@ function Harbor() {
                             const sets = craftableClasses().filter((c) => !g.player.ownedBoats.some((b) => b.classId === c.id))
                             const pick = sets[Math.floor(Math.random() * sets.length)]
                             return { ...g, player: { ...g.player, partInventory: [...g.player.partInventory, ...pick.requiredParts] } }
+                          })
+                        }
+                      />
+                      <Button
+                        small
+                        kind="secondary"
+                        label="Something aboard"
+                        onPress={() =>
+                          act((g, t) => {
+                            // A sparkling find on every hand-run boat at sea: a sailor on passenger boats, a crate on cargo.
+                            // Every docked hand-run boat is crewed if need be and sent out too.
+                            let s = structuredClone(g)
+                            for (const boat of s.player.ownedBoats.filter((b) => b.state === 'idle' && !isAutomated(s, b))) {
+                              if (!boat.captainId) {
+                                const free = s.player.roster.find((c) => c.role === 'sailing' && !s.player.ownedBoats.some((b) => b.captainId === c.id))
+                                const c = free ?? generateCaptain(s.rng, `c${s.nextCaptainSeq++}`, [1, 1])
+                                if (!free) s.player.roster.push(c)
+                                boat.captainId = c.id
+                              }
+                              const route = s.routes.find((r) => {
+                                try {
+                                  return !quoteVoyage(s, boat.id, r.id, t).blocked
+                                } catch {
+                                  return false
+                                }
+                              })
+                              if (route) s = assignRoute(s, boat.id, route.id, t)
+                            }
+                            const at = s.voyages.filter((v) => !isAutomated(s, getBoat(s, v.boatId)))
+                            if (!at.length) throw new GameError('No hand-run boat at sea, and none could be sent out')
+                            for (const v of at) {
+                              const track = getBoatClass(getBoat(s, v.boatId).classId).track
+                              const part = PARTS.find((p) => p.rarity === 'legendary' && p.track === track)!.id
+                              v.deckFind = track === 'passenger' ? { kind: 'captain' } : { kind: 'cargo', part }
+                            }
+                            return s
                           })
                         }
                       />
@@ -719,7 +778,7 @@ function FindAlertsToggle() {
       <Pressable onPress={toggle} accessibilityRole="switch" accessibilityState={{ checked: on }} style={styles.toggleRow}>
         <View style={{ flex: 1, gap: 2 }}>
           <Body style={{ fontWeight: '700' }}>Find alerts</Body>
-          <Muted>A notification when a boat brings home a rare, legendary or mythic part or a keepsake, or a captain rises to a new title, while you're away.</Muted>
+          <Muted>A notification when a boat brings home a rare, legendary or mythic part or a keepsake, a captain rises to a new title, or something sparkles aboard, while you're away.</Muted>
         </View>
         <Switch value={on} onValueChange={() => void toggle()} trackColor={{ true: t.accent, false: t.muted }} ios_backgroundColor={t.muted} importantForAccessibility="no" />
       </Pressable>

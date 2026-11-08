@@ -33,12 +33,12 @@ export function RatingBlock({ c }: { c: CaptainView }) {
     <View style={{ gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
         <Text style={{ fontFamily: fonts.title, fontSize: 40, lineHeight: 42, color: t.accent }}>
-          {r.sure ? '' : '~'}
+          <Text style={{ fontFamily: fonts.bold, fontSize: 15, color: t.muted }}>LVL </Text>
           {r.guess}
         </Text>
         <View style={{ paddingBottom: 5, flexShrink: 1 }}>
           <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 14 }}>
-            {ratingTitle(r.guess)} <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>· overall</Text>
+            {ratingTitle(r.guess)}
           </Text>
           <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
             {r.sure
