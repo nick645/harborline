@@ -323,6 +323,21 @@ function repairPerPoint(state: GameState, boat: Boat): number {
   return repairCostPerPoint(getBoatClass(boat.classId), mult)
 }
 
+/**
+ * How a send could end badly, for a warning before it goes: the worst this weather can do could
+ * sink her on this very trip, or (if it holds) before her run is done; or her hull is low enough
+ * that damage bites harder. What it'd cost to patch her up first.
+ */
+export function sendRisk(state: GameState, boatId: string, routeId: string, t: number, trips: number) {
+  const boat = getBoat(state, boatId)
+  const q = quoteVoyage(state, boatId, routeId, t, 'known')
+  const thisTrip = q.canSink
+  // Trips after the first may sail in other weather; this assumes it holds.
+  const overRun = !thisTrip && trips > 1 && boat.condition - q.worstDamage * trips <= 0
+  const battered = boat.condition < Math.max(...WEAR_MULTIPLIERS.map((w) => w.below))
+  return { thisTrip, overRun, battered, condition: boat.condition, worstDamage: q.worstDamage, weather: q.weather, repair: repairQuote(state, boatId) }
+}
+
 export function repairQuote(state: GameState, boatId: string): number {
   const boat = getBoat(state, boatId)
   return Math.ceil((CONDITION_MAX - boat.condition) * repairPerPoint(state, boat))

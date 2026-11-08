@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameState, Weather } from './types'
 import { SKILL_IDS } from './data/captains'
 import {
+  sendRisk,
   assignRoute,
   buyBoat,
   craftBoat,
@@ -952,5 +953,28 @@ describe('customizing home', () => {
     s.player.coins = 10_000
     s = salvageBoat(s, b.id, T0 + 1000)
     expect(decorUnlocked(s, 'figurehead')).toBe(true)
+  })
+})
+
+describe('warning before a risky send', () => {
+  it('says when a battered boat could sink this trip, or over a run if the weather holds', () => {
+    const s = structuredClone(harbourGame(61, T0))
+    const boat = s.player.ownedBoats[0]
+    const route = ROUTES[2].id
+    const storm = timeWith(s, route, 'storm')
+    const worst = quoteVoyage(s, boat.id, route, storm).worstDamage
+    // Sound hull: nothing to warn of on one trip.
+    expect(sendRisk(s, boat.id, route, storm, 1)).toMatchObject({ thisTrip: false, battered: false })
+    // Low enough that the worst a storm can do sinks her.
+    boat.condition = Math.max(1, worst - 1)
+    const low = sendRisk(s, boat.id, route, storm, 1)
+    expect(low.thisTrip).toBe(true)
+    expect(low.battered).toBe(true)
+    expect(low.repair).toBeGreaterThan(0)
+    // Survives one trip, but not a run of them in the same weather.
+    boat.condition = 100
+    const w100 = quoteVoyage(s, boat.id, route, storm).worstDamage
+    const trips = Math.ceil(100 / w100) + 1
+    expect(sendRisk(s, boat.id, route, storm, trips)).toMatchObject({ thisTrip: false, overRun: true })
   })
 })

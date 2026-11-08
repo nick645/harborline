@@ -11,7 +11,8 @@ import { getPart, partName, setProgress, slotName } from '../src/game/parts'
 import { getKeepsake, KEEPSAKES } from '../src/game/data/keepsakes'
 import { getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../src/game/economy'
 import { PARTS } from '../src/game/data/parts'
-import { GameError, getBoat, isAutomated, quoteVoyage, repairQuote, salvageQuote } from '../src/game/state'
+import { WEATHER } from '../src/game/data/weather'
+import { GameError, getBoat, isAutomated, quoteVoyage, sendRisk, repairQuote, salvageQuote } from '../src/game/state'
 import { HOME_START_PRICE, MELT_COST, SALVAGE_CONDITION, STANDARD_SCRAP_VALUE } from '../src/game/data/economy'
 import { SCOUT_ACTIONS } from '../src/game/data/captains'
 import { COURT_ACTIONS, type CourtAction } from '../src/game/data/courting'
@@ -152,21 +153,37 @@ function Harbor() {
   if (homeShut && tab === 'home') setTab('fleet')
 
   /** Ask first, then act. Resolves to whether the action went ahead. */
-  const ask = async (a: Ask, fn: (g: GameState, at: number) => GameState) => (await confirm(a)) && act(fn)
+  const ask = async (a: Ask, fn: (g: GameState, at: number) => GameState) => (await confirm(a)) === true && act(fn)
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
   const boatById = (id: string) => boats.find((x) => x.id === id)!
   const nameOf = (id: string) => captainViewById(game, id)?.name ?? recruitViewById(game, id)?.name ?? 'them'
-  const send = (b: Boat, routeId: string, trips: number) => {
+  const send = async (b: Boat, routeId: string, trips: number) => {
     const route = game.routes.find((r) => r.id === routeId)!
     const q = quoteVoyage(game, b.id, routeId, now)
-    return ask(
-      {
-        title: `Send ${b.nickname} to ${getPort(route.portB).name}?`,
-        body: `${plural(trips, 'trip')}, about ${coins(q.payout)}c each, then she docks at home and waits.`,
-        label: `Send · ${plural(trips, 'trip')}`,
-      },
-      (g, at) => assignRoute(g, b.id, routeId, at, trips),
-    )
+    const risk = sendRisk(game, b.id, routeId, now, trips)
+    const weather = WEATHER[risk.weather].name.toLowerCase()
+    const captain = b.captainId ? captainViewById(game, b.captainId) : null
+    // Sinking costs more than the boat: her captain is lost if she isn't raised within 6 h.
+    const stakes = captain && !captain.morale.steadfast ? ` ${captain.name.split(' ')[0]} goes down with her, and is lost unless you raise her within 6 hours.` : ''
+    const warning = risk.thisTrip
+      ? `She could sink on this trip. Her hull is at ${risk.condition} and ${weather} seas can take up to ${risk.worstDamage}.${stakes}`
+      : risk.overRun
+        ? `She could sink before her ${trips} trips are done if the ${weather} weather holds: up to ${risk.worstDamage} a trip off a hull at ${risk.condition}.${stakes}`
+        : risk.battered && risk.weather !== 'calm'
+          ? `Her hull is at ${risk.condition}: below 50, the sea does more damage.`
+          : undefined
+    const danger = risk.thisTrip || risk.overRun
+    const canRepair = !!warning && risk.repair > 0 && game.player.coins >= risk.repair
+    const answer = await confirm({
+      title: danger ? `${b.nickname} could sink` : `Send ${b.nickname} to ${getPort(route.portB).name}?`,
+      body: `${getPort(route.portB).name} · ${plural(trips, 'trip')}, about ${coins(q.payout)}c each, then she docks at home and waits.`,
+      warning,
+      danger,
+      alt: canRepair ? `Repair her first, then send · ${coins(risk.repair)}c` : undefined,
+      label: danger ? 'Send her anyway' : `Send · ${plural(trips, 'trip')}`,
+    })
+    if (answer === 'alt') return act((g, at) => assignRoute(repairBoat(g, b.id), b.id, routeId, at, trips))
+    return answer === true && act((g, at) => assignRoute(g, b.id, routeId, at, trips))
   }
 
   const boatProps = (b: Boat): BoatProps => ({

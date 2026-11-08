@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import type { Boat, GameState, Weather } from '../../../src/game/types'
 import { canBeSold, getBoatClass, getPort, handFee, handsNeeded, sellPrice } from '../../../src/game/economy'
-import { adriftDeadline, getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote } from '../../../src/game/state'
+import { adriftDeadline, getVoyage, isAutomated, managerOf, quoteVoyage, repairQuote, salvageQuote, sendRisk } from '../../../src/game/state'
 import { abilityOf } from '../../../src/game/abilities'
 import { availableCaptains, captainViewById, handViewsOn, knownCrewEffect, managersFor } from '../../../src/game/crew'
 import { LOW_CONDITION_THRESHOLD, SALVAGE_CONDITION } from '../../../src/game/data/economy'
@@ -343,12 +343,13 @@ function Docked({ game, boat, now, onAssign }: Props) {
       <Strip>
         {routes.map((r) => {
           const q = quoteVoyage(game, boat.id, r.id, now)
+          const risk = sendRisk(game, boat.id, r.id, now, trips)
           return (
             <View key={r.id} style={{ width: 168 }}>
               <Card
                 style={[
                   styles.routeCard,
-                  { backgroundColor: t.surface2, borderColor: q.canSink ? t.bad : boat.currentRoute === r.id ? t.accent : t.border },
+                  { backgroundColor: t.surface2, borderColor: risk.thisTrip || risk.overRun ? t.bad : boat.currentRoute === r.id ? t.accent : t.border },
                 ]}
               >
                 <Row>
@@ -363,7 +364,7 @@ function Docked({ game, boat, now, onAssign }: Props) {
                   {q.lossRisk > 0 ? ` · ${percent(q.lossRisk)} lose cargo` : ''}
                 </Muted>
                 <Upside weather={q.weather} tier={getBoatClass(boat.classId).sizeTier} automated={isAutomated(game, boat)} />
-                {q.canSink && <Text style={{ color: t.bad, fontSize: 11, fontFamily: fonts.bold }}>Could sink</Text>}
+                <SinkWarning game={game} boatId={boat.id} routeId={r.id} now={now} trips={trips} />
                 {(q.weather === 'rough' || q.weather === 'storm') && <MoraleWarning game={game} boat={boat} />}
                 <Button small label={q.blocked ?? 'Send'} disabled={!!q.blocked} onPress={() => onAssign(r.id, trips)} />
               </Card>
@@ -425,6 +426,18 @@ function MoraleWarning({ game, boat }: { game: GameState; boat: Boat }) {
   return (
     <Text style={{ color: c.morale.mood === 'quitting' ? t.bad : t.warn, fontSize: 11, fontFamily: fonts.bold }}>
       {c.name.split(' ')[0]} is {c.morale.mood === 'quitting' ? 'close to quitting' : 'unsettled'}: rough water wears them down
+    </Text>
+  )
+}
+
+/** On a send card: whether she could sink on this trip, or over the run if the weather holds. */
+export function SinkWarning({ game, boatId, routeId, now, trips }: { game: GameState; boatId: string; routeId: string; now: number; trips: number }) {
+  const t = useTheme()
+  const risk = sendRisk(game, boatId, routeId, now, trips)
+  if (!risk.thisTrip && !risk.overRun) return null
+  return (
+    <Text style={{ color: t.bad, fontSize: 11, fontFamily: fonts.bold }}>
+      {risk.thisTrip ? `⚠ Could sink: hull ${risk.condition}, up to −${risk.worstDamage}` : `⚠ Could sink over ${trips} trips`}
     </Text>
   )
 }

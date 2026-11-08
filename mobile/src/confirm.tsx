@@ -10,18 +10,18 @@ import { ConfirmContext, type Ask } from './confirmContext'
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const t = useTheme()
   const [ask, setAsk] = useState<Ask | null>(null)
-  const resolver = useRef<((ok: boolean) => void) | null>(null)
+  const resolver = useRef<((ok: boolean | 'alt') => void) | null>(null)
 
   const confirm = useCallback(
     (a: Ask) =>
-      new Promise<boolean>((resolve) => {
+      new Promise<boolean | 'alt'>((resolve) => {
         resolver.current?.(false)
         resolver.current = resolve
         setAsk(a)
       }),
     [],
   )
-  const answer = (ok: boolean) => {
+  const answer = (ok: boolean | 'alt') => {
     resolver.current?.(ok)
     resolver.current = null
     setAsk(null)
@@ -35,6 +35,12 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
           <Pressable style={[styles.sheet, { backgroundColor: t.surface, borderColor: ask?.danger ? t.bad : t.accent }]} onPress={() => undefined}>
             <Text style={{ color: t.text, fontFamily: fonts.title, fontSize: 24 }}>{ask?.title}</Text>
             {ask?.body ? <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 14, lineHeight: 20 }}>{ask.body}</Text> : null}
+            {ask?.warning ? (
+              <View style={[styles.warning, { borderColor: t.bad, backgroundColor: 'rgba(255,143,166,0.1)' }]}>
+                <Text style={{ color: t.bad, fontFamily: fonts.semibold, fontSize: 14, lineHeight: 20 }}>⚠ {ask.warning}</Text>
+              </View>
+            ) : null}
+            {ask?.alt ? <Button label={ask.alt} onPress={() => answer('alt')} /> : null}
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Button kind="secondary" label="Cancel" onPress={() => answer(false)} />
@@ -64,5 +70,6 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(16,10,18,0.6)', justifyContent: 'flex-end', padding: 12, paddingBottom: 40 },
   sheet: { borderWidth: 1.5, borderRadius: 18, padding: 18, gap: 12 },
   row: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  warning: { borderWidth: 1, borderRadius: 12, padding: 10 },
   danger: { borderRadius: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
 })
