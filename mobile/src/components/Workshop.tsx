@@ -9,9 +9,8 @@ import { Pressable, Text, View } from 'react-native'
 import { Canvas, Circle, Group, LinearGradient, Path, RadialGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia'
 import type { BoatClass, GameState, PartRarity, PartType, Track } from '../../../src/game/types'
 import { craftableClasses, meltGroups } from '../../../src/game/state'
-import { countParts, getPart, partName, slotName } from '../../../src/game/parts'
+import { countParts, getPart, slotName } from '../../../src/game/parts'
 import { getAbility } from '../../../src/game/abilities'
-import { getBoatClass } from '../../../src/game/economy'
 import { MELT_COST, STANDARD_SCRAP_VALUE } from '../../../src/game/data/economy'
 import { coins } from '../../../src/format'
 import { BoatArt } from '../art/BoatArt'
@@ -108,7 +107,6 @@ export function Workshop({
   const [how, setHow] = useState(false)
   const counts = countParts(game.player.partInventory)
   const standard = [...counts].filter(([id]) => getPart(id).rarity === 'standard').reduce((n, [, c]) => n + c, 0)
-  const rares = [...counts].filter(([id]) => getPart(id).rarity === 'rare')
   const owned = new Set(game.player.ownedBoats.map((b) => b.classId))
   const color = (r: string) => (r === 'mythic' ? t.mythic : r === 'legendary' ? t.legendary : t.rare)
 
@@ -144,9 +142,9 @@ export function Workshop({
         {(how || started.length === 0) && (
           <View style={{ gap: 6 }}>
             {[
-              ['1', 'Sail into bad weather', 'Legendary set pieces wash up in rough water and storms; mythic pieces only in storms. Calm seas give nothing but plain fittings.'],
-              ['2', 'Collect a whole set', "Every legendary or mythic boat needs her own three pieces: a hull, an engine and a specialty part."],
-              ['3', 'Build her here, free', 'Once all three are in, build her: the pieces are the price. These boats are never sold in the shipyard, at any price.'],
+              ['1', 'Sail into bad weather', 'Rare pieces wash up in rough water (and aboard big boats in any weather); legendary pieces in rough water and storms; mythic pieces only in storms. Calm seas give nothing but plain fittings.'],
+              ['2', 'Collect a whole set', 'Every rare, legendary or mythic boat needs her own three pieces: a hull, an engine and a specialty part. Finds lean toward sets you have started.'],
+              ['3', 'Build her here, free', 'Once all three are in, build her: the pieces are the price. These boats are never sold in the Shipyard, at any price.'],
             ].map(([n, head, body]) => (
               <View key={n} style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
@@ -203,28 +201,11 @@ export function Workshop({
             ) : complete ? (
               <Button label={`Build ${cls.name} · free`} onPress={() => onCraft(cls.id)} />
             ) : (
-              <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>{cls.rarity === 'mythic' ? 'Pieces wash up only in storms.' : 'Pieces wash up in rough water and storms.'}</Text>
+              <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>{cls.rarity === 'mythic' ? 'Pieces wash up only in storms.' : cls.rarity === 'legendary' ? 'Pieces wash up in rough water and storms.' : 'Pieces wash up in rough water, or aboard tier 4+ boats.'}</Text>
             )}
           </View>
         )
       })}
-
-      {rares.length > 0 && (
-        <>
-          <Title size={20}>Rare parts</Title>
-          <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12, marginTop: -6 }}>Each unlocks one rare boat in the Shipyard: buy her with coins and the part.</Text>
-          {rares.map(([id, n]) => (
-            <Row key={id} style={{ gap: 8, flexWrap: 'nowrap', borderRadius: 12, borderWidth: 1, borderColor: t.rare, padding: 8 }}>
-              <Text style={{ fontSize: 16, color: t.rare }}>{SLOT_MARK[getPart(id).type]}</Text>
-              <Text style={{ flex: 1, color: t.text, fontFamily: fonts.semibold, fontSize: 13 }}>
-                {partName(id)}
-                {n > 1 ? ` ×${n}` : ''}
-              </Text>
-              <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>→ {getBoatClass(getPart(id).setId).name}</Text>
-            </Row>
-          ))}
-        </>
-      )}
 
       <Title size={20}>The workbench</Title>
       {melts.map((g) => (

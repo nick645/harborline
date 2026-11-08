@@ -68,24 +68,26 @@ type Props = {
 export function ShipyardScene({ width, height: room, light, classes, coins: purse, focused, onFocus, onWorkshop, ready = false }: Props) {
   const clock = useSceneClock()
   const list = useMemo(() => berths(classes), [classes])
+  const bx0 = Math.min(...list.map((b) => b.x))
+  const bx1 = Math.max(...list.map((b) => b.x + b.w))
+  // With few boats the yard draws in: the shed and crane stand just past the outermost berths.
+  const shedShift = Math.max(0, bx0 - 150)
+  const craneShift = Math.min(0, bx1 + 50 - 650)
+  // The frame: the boats, and the whole Workshop shed beside them.
+  const fx0 = Math.max(0, Math.min(bx0 - 70, shedShift + 6))
+  const fx1 = Math.min(YARD_W, bx1 + 70)
   // No taller than the yard itself needs (shed roof to front pier at full width): past that the
   // frame would only add empty sky over smaller boats.
-  const span = Math.min(YARD_W, Math.max(...list.map((b) => b.x + b.w)) + 70) - Math.max(0, Math.min(...list.map((b) => b.x)) - 70)
-  const height = Math.min(room, Math.round((width * (YARD_H - 30)) / span))
+  const height = Math.min(room, Math.round((width * (YARD_H - 30)) / (fx1 - fx0)))
   const night = light.stars > 0
   const lit = (c: string) => mix(c, light.silhouette, light.dim * 0.8)
 
   // The camera: centre (in scene units) and zoom. The whole yard is framed round the boats (the
   // shed and crane at its edges), standing on the bottom of the view with any spare height
   // going to sky; or one boat fills the view.
-  const bx0 = Math.min(...list.map((b) => b.x))
-  const bx1 = Math.max(...list.map((b) => b.x + b.w))
-  // With few boats the yard draws in: the shed and crane stand just past the outermost berths.
-  const shedShift = Math.max(0, bx0 - 150)
-  const craneShift = Math.min(0, bx1 + 50 - 650)
   const whole = (() => {
-    const x0 = Math.max(0, bx0 - 70)
-    const x1 = Math.min(YARD_W, bx1 + 70)
+    const x0 = fx0
+    const x1 = fx1
     const z = Math.min(width / (x1 - x0), height / (YARD_H - 40))
     return { cx: (x0 + x1) / 2, cy: YARD_H - 6 - height / (2 * z), z }
   })()

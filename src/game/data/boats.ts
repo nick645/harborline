@@ -33,9 +33,6 @@ export const TIERS: Record<SizeTier, TierStats> = {
   6: { capacity: 260, legSeconds: 170, fuelPerLeg: 170, fuelTankTrips: 10, price: 3300000 },
 }
 
-/** Rare boats cost this multiple of their tier's common price, plus their rare part. */
-const RARE_PRICE_MULT = 1.5
-
 /** Hull variants give each tier a second common with a different trade-off at the same price. */
 type Variant = 'base' | 'big' | 'fast'
 const VARIANTS: Record<Variant, { capacity: number; legSeconds: number }> = {
@@ -70,17 +67,20 @@ const common = (id: string, name: string, track: Track, tier: SizeTier, variant:
   ...o,
 })
 
-/** A rare boat needs coins plus one specific rare part, `<id>-<slot>`. */
-const rare = (id: string, name: string, track: Track, tier: SizeTier, slot: PartType, o: Overrides = {}): BoatClass => ({
+const fullSet = (id: string) => [`${id}-hull`, `${id}-engine`, `${id}-specialty`]
+
+/**
+ * A rare boat, like every special boat, is built free in the Workshop from her own set of three
+ * rare pieces (user-approved 2026-11-07). `_slot` was the one piece she once needed with coins.
+ */
+const rare = (id: string, name: string, track: Track, tier: SizeTier, _slot: PartType, o: Overrides = {}): BoatClass => ({
   ...hull(id, name, track, tier),
   rarity: 'rare',
-  price: Math.round(TIERS[tier].price * RARE_PRICE_MULT),
+  price: 0,
   abilityId: id,
-  requiredParts: [`${id}-${slot}`],
+  requiredParts: fullSet(id),
   ...o,
 })
-
-const fullSet = (id: string) => [`${id}-hull`, `${id}-engine`, `${id}-specialty`]
 
 const legendary = (id: string, name: string, track: Track, tier: SizeTier, o: Overrides = {}): BoatClass => ({
   ...hull(id, name, track, tier),

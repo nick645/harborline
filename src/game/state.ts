@@ -303,11 +303,11 @@ export function quoteVoyage(state: GameState, boatId: string, routeId: string, t
 /** What the shipyard sells: a harbour with no boats yet picks a starter; after that, the lineup. */
 export function shopClasses(state?: GameState) {
   if (state && !state.player.ownedBoats.length) return BOAT_CLASSES.filter((c) => c.starter)
-  return BOAT_CLASSES.filter((c) => (c.rarity === 'common' && c.price > 0 && !c.starter) || c.rarity === 'rare')
+  return BOAT_CLASSES.filter((c) => c.rarity === 'common' && c.price > 0 && !c.starter)
 }
 
 export function craftableClasses() {
-  return BOAT_CLASSES.filter((c) => c.rarity === 'legendary' || c.rarity === 'mythic')
+  return BOAT_CLASSES.filter((c) => c.rarity !== 'common')
 }
 
 /** What raising a sunk boat costs. If nothing else is afloat it never costs more than the
@@ -426,7 +426,7 @@ function checkFleetRoom(state: GameState, newTier: number) {
 /** Buy a common boat with coins, or a rare boat with coins plus its rare part. */
 export function buyBoat(state: GameState, classId: string, now: number): GameState {
   const cls = getBoatClass(classId)
-  if (cls.rarity === 'legendary' || cls.rarity === 'mythic') throw new GameError(`${cls.name} can only be crafted`)
+  if (cls.rarity !== 'common') throw new GameError(`${cls.name} can only be built from her set`)
   if (cls.price <= 0) throw new GameError('Not for sale')
   if (cls.starter && state.player.ownedBoats.length) throw new GameError('Starter boats are only sold as a first boat')
   if (state.player.coins < cls.price) throw new GameError('Not enough coins')
@@ -442,7 +442,7 @@ export function buyBoat(state: GameState, classId: string, now: number): GameSta
 /** Build a legendary or mythic boat from its full set. Instant and free: the parts are the price. */
 export function craftBoat(state: GameState, classId: string, now: number): GameState {
   const cls = getBoatClass(classId)
-  if (cls.rarity !== 'legendary' && cls.rarity !== 'mythic') throw new GameError(`${cls.name} is bought, not crafted`)
+  if (cls.rarity === 'common') throw new GameError(`${cls.name} is bought, not built`)
   if (!hasParts(state.player.partInventory, cls.requiredParts)) throw new GameError('Set incomplete')
   checkFleetRoom(state, cls.sizeTier)
   const s = structuredClone(state)

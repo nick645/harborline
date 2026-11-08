@@ -88,10 +88,10 @@ function setDone(state: GameState, setId: string): boolean {
 }
 
 /**
- * Pick the set for a legendary or mythic find: an unfinished set, weighted toward sets the
+ * Pick the set for a rare, legendary or mythic find: an unfinished set, weighted toward sets the
  * player already holds pieces of, so the chase closes in instead of stalling one piece short.
  */
-export function pickSet(rng: RngState, state: GameState, rarity: 'legendary' | 'mythic', track: Track | null): string | null {
+export function pickSet(rng: RngState, state: GameState, rarity: 'rare' | 'legendary' | 'mythic', track: Track | null): string | null {
   const held = new Set(state.player.partInventory)
   const candidates = BOAT_CLASSES.filter(
     (c) => c.rarity === rarity && (track === null || c.track === track) && !setDone(state, c.id),
@@ -112,17 +112,13 @@ export function pickPart(
 ): string | null {
   const type = slot ?? rollPick(rng, ['hull', 'engine', 'specialty'] as const)
   if (rarity === 'standard') return `std-${track}-${type}`
-  if (rarity === 'rare') {
-    const pool = PARTS.filter((p) => p.rarity === 'rare' && p.track === track && (!slot || p.type === slot))
-    return pool.length ? rollPick(rng, pool).id : null
-  }
-  // Mythic sets drop for either track; legendary sets follow the boat that found them.
+  // Mythic sets drop for either track; rare and legendary sets follow the boat that found them.
   const setId = pickSet(rng, state, rarity, rarity === 'mythic' ? null : track)
   if (!setId) return null
   return slot ? `${setId}-${slot}` : rollPick(rng, classesById.get(setId)!.requiredParts)
 }
 
-/** Where a part stands in its boat's set: for a legendary or mythic set, how many of its pieces you hold. */
+/** Where a part stands in its boat's set: how many of its pieces you hold. */
 export function setProgress(inventory: string[], partId: string): { boat: string; have: number; need: number } | null {
   const part = getPart(partId)
   if (part.rarity === 'standard') return null

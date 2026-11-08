@@ -378,14 +378,18 @@ describe('parts and drops', () => {
     expect(() => sellBoat(after, after.player.ownedBoats.at(-1)!.id, T0)).toThrow()
   })
 
-  it('buys a rare boat with coins plus its own rare part', () => {
+  it('builds a rare boat free from her set of three, and never sells her', () => {
     const s = harbourGame(1, T0)
     s.player.coins = 5000
     expect(() => buyBoat(s, 'pelican', T0)).toThrow()
-    s.player.partInventory = ['pelican-hull']
-    const after = buyBoat(s, 'pelican', T0)
-    expect(after.player.coins).toBe(5000 - getBoatClass('pelican').price)
+    s.player.partInventory = ['pelican-hull', 'pelican-engine']
+    expect(() => craftBoat(s, 'pelican', T0)).toThrow()
+    s.player.partInventory.push('pelican-specialty')
+    const after = craftBoat(s, 'pelican', T0)
+    expect(after.player.coins).toBe(5000)
     expect(after.player.partInventory).toEqual([])
+    expect(after.player.ownedBoats.some((b) => b.classId === 'pelican')).toBe(true)
+    expect(shopClasses().some((c) => c.rarity !== 'common')).toBe(false)
   })
 
   it('scraps standard parts for coins', () => {

@@ -68,9 +68,9 @@ export function voyagePayout(
   return Math.round(gross - boatClass.fuelPerLeg * 2 * fuelMult)
 }
 
-/** Only boats bought with coins can be sold; crafted boats are kept (or traded, later). */
+/** Only boats bought with coins can be sold; boats built from a set are kept (or traded, later). */
 export function canBeSold(boatClass: BoatClass): boolean {
-  return boatClass.rarity === 'common' || boatClass.rarity === 'rare'
+  return boatClass.rarity === 'common'
 }
 
 export function sellPrice(boatClass: BoatClass): number {
@@ -105,7 +105,7 @@ export function crewDamageMult(boatClass: BoatClass, hands: number, weather: str
 }
 
 export function boatValue(boatClass: BoatClass): number {
-  if (boatClass.rarity === 'common' || boatClass.rarity === 'rare') return boatClass.price
+  if (boatClass.rarity === 'common') return boatClass.price
   return Math.max(0, ...BOAT_CLASSES.filter((c) => c.sizeTier === boatClass.sizeTier && c.rarity === 'common').map((c) => c.price))
 }
 

@@ -137,7 +137,8 @@ function worstDamage(weather: keyof typeof WEATHER, condition: number) {
   return WEATHER[weather].conditionCost * 1.5 * mult
 }
 
-const isCrafted = (classId: string) => ['legendary', 'mythic'].includes(getBoatClass(classId).rarity)
+// Every boat built from a set: rare, legendary and mythic.
+const isCrafted = (classId: string) => getBoatClass(classId).rarity !== 'common'
 const isStarter = (classId: string) => !!getBoatClass(classId).starter
 const roughWater = (w: string) => w === 'rough' || w === 'storm'
 

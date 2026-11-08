@@ -79,8 +79,9 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   reaches UI code: components use `captainView()` and quotes with view `'known'` (the default).
   A test scans `src/App.tsx` and `src/components/` for hidden fields; keep the phone app to the
   same rule.
-- Mythic boats are never purchasable, for any amount, in any form. Legendary/mythic boats are
-  only crafted from their exact part set.
+- Mythic boats are never purchasable, for any amount, in any form. Rare, legendary and mythic
+  boats are only built from their exact three-piece set (rare too since 2026-11-07, user-approved:
+  the Shipyard sells common boats only; rare finds lean toward sets you've started, like legendary).
 - Bump `SAVE_VERSION` in `state.ts` when the save shape changes (old saves then start fresh).
 
 ## Design decisions the user made (they override the spec)
