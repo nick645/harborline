@@ -501,6 +501,30 @@ export interface CourtedView {
 }
 
 /** Everyone you've courted and who is still deciding, soonest to decide first. */
+/**
+ * Where the best captains are looking for work right now, from what you can see of them: the
+ * tavern's unusual ones first, then by reputation, then whoever has longest left to decide.
+ * Anyone you're already courting is in your prospects instead.
+ */
+export function bestOnOffer(state: GameState, now: number, n = 3) {
+  const out: { id: string; name: string; portId: string; place: 'quay' | 'tavern'; reputation: number; rare: boolean; potential: 'legend' | 'mythic' | null; fee: number; decidesIn: number }[] = []
+  const add = (c: Captain, portId: string, place: 'quay' | 'tavern') => {
+    const v = c.courting ? courtingView(c.courting, now) : null
+    if (v?.courted) return
+    const view = captainView(c)
+    out.push({ id: c.id, name: c.name, portId, place, reputation: c.reputation, rare: !!c.rare, potential: view.potential, fee: view.fee, decidesIn: v ? Math.max(0, v.decidesAt - now) : Infinity })
+  }
+  const home = homeOf(state)
+  for (const c of state.recruitPool.recruits) add(c, home, 'quay')
+  if (state.tavern?.captain) add(state.tavern.captain, home, 'tavern')
+  for (const [portId, pool] of Object.entries(state.portPools ?? {})) {
+    for (const c of pool.recruits) add(c, portId, 'quay')
+    if (pool.captain) add(pool.captain, portId, 'tavern')
+  }
+  const rank = (x: (typeof out)[number]) => (x.rare ? 10 : 0) + (x.potential === 'mythic' ? 3 : x.potential === 'legend' ? 2 : 0) + x.reputation
+  return out.sort((a, b) => rank(b) - rank(a) || b.decidesIn - a.decidesIn).slice(0, n)
+}
+
 export function courtedPeople(state: GameState, now: number): CourtedView[] {
   const out: CourtedView[] = []
   const add = (p: Captain | Deckhand, kind: 'captain' | 'hand', portId: string, place: 'quay' | 'tavern') => {

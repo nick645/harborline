@@ -4,7 +4,7 @@ import { Canvas, Group, rect, rrect, Rect } from '@shopify/react-native-skia'
 import type { GameState } from '../../../src/game/types'
 import type { CaptainView } from '../../../src/game/captains'
 import { ratingTitle } from '../../../src/game/data/captains'
-import { boatOfCaptain, boatsNeedingHands, boatToShowTo, courtedPeople, courtingOf, managerRole, prospectBudget, portPeople, quayInfo, recruitViewById, rosterViews } from '../../../src/game/crew'
+import { bestOnOffer, boatOfCaptain, boatsNeedingHands, boatToShowTo, courtedPeople, courtingOf, managerRole, prospectBudget, portPeople, quayInfo, recruitViewById, rosterViews } from '../../../src/game/crew'
 import { termsFee } from '../../../src/game/courting'
 import { COURT_ACTIONS, TERMS_MAX, type CourtAction } from '../../../src/game/data/courting'
 import type { RegionId } from '../../../src/game/data/ports'
@@ -123,6 +123,7 @@ function Courting({
         <Title size={20}>Prospects</Title>
         <Muted>{people.length ? `${people.length} deciding` : ''}</Muted>
       </Row>
+      <Leads game={game} now={now} onOpen={onOpen} />
       {people.length === 0 ? (
         <Muted>None yet. Anyone you start winning over on a quay or in a tavern shows here, with when they'll decide.</Muted>
       ) : (
@@ -212,6 +213,50 @@ function OrderButton({ label, disabled, onPress }: { label: string; disabled: bo
     >
       <Text style={{ color: t.text, fontSize: 12 }}>{label}</Text>
     </Pressable>
+  )
+}
+
+/**
+ * Your watches for scouting, and where the best captains looking for work are right now, from
+ * what you can see of them: tap one to go and meet them.
+ */
+function Leads({ game, now, onOpen }: { game: GameState; now: number; onOpen: (portId: string, place: CaptainsView, id: string) => void }) {
+  const t = useTheme()
+  const best = bestOnOffer(game, now)
+  return (
+    <View style={{ borderRadius: 12, borderWidth: 1, borderColor: t.border, backgroundColor: t.surface, padding: 10, gap: 8 }}>
+      <Watches game={game} now={now} />
+      <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12, marginTop: -4 }}>A watch scouts one captain a little closer: what they're really like at sea.</Text>
+      {best.length > 0 && <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 14 }}>Best on offer now</Text>}
+      {best.map((c) => (
+        <Pressable
+          key={c.id}
+          onPress={() => onOpen(c.portId, c.place, c.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`${c.name}, ${c.reputation} anchors, ${c.place === 'tavern' ? 'in the tavern' : 'on the quay'} at ${getPortDef(c.portId).name}`}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, borderColor: c.rare ? t.legendary : t.border, backgroundColor: t.surface2, padding: 6, opacity: pressed ? 0.8 : 1 })}
+        >
+          <Portrait id={c.id} rare={c.rare} region={getPortDef(c.portId).region} small />
+          <View style={{ flex: 1, gap: 1 }}>
+            <Text numberOfLines={1} style={{ color: t.text, fontFamily: fonts.title, fontSize: 16 }}>
+              {c.rare ? '✦ ' : ''}
+              {c.name}
+            </Text>
+            <Text numberOfLines={1} style={{ color: c.rare ? t.legendary : t.accent, fontFamily: fonts.semibold, fontSize: 12 }}>
+              {'⚓︎'.repeat(c.reputation)} {c.reputation} anchor{c.reputation === 1 ? '' : 's'}
+              {c.rare ? ' · someone unusual' : ''}
+              {c.potential ? ` · ${c.potential === 'mythic' ? 'Mythic' : 'Legend'} in them` : ''}
+            </Text>
+            <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 11 }}>
+              {c.place === 'tavern' ? 'In the tavern' : 'On the quay'} at {getPortDef(c.portId).name} · {coins(c.fee)}c
+              {Number.isFinite(c.decidesIn) ? ` · decides in ${duration(c.decidesIn)}` : ''}
+            </Text>
+          </View>
+          <Text style={{ color: t.accent, fontFamily: fonts.bold, fontSize: 16 }}>›</Text>
+        </Pressable>
+      ))}
+      {best.length === 0 && <Muted>No one new is looking for work in your waters just now. Fresh faces arrive when the watches refill.</Muted>}
+    </View>
   )
 }
 
