@@ -236,3 +236,30 @@ export function RecordPanel({ c }: { c: CaptainView }) {
     </View>
   )
 }
+
+const MOOD_WORDS = { good: 'In good heart', steady: 'Steady', unsettled: 'Unsettled', quitting: 'Close to quitting' } as const
+
+/** Their morale: a meter, how it reads, and what moves it (or that they'll never leave). */
+export function MoraleBlock({ c }: { c: CaptainView }) {
+  const t = useTheme()
+  const m = c.morale
+  const color = m.mood === 'good' ? t.good : m.mood === 'steady' ? t.accent : m.mood === 'unsettled' ? t.warn : t.bad
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={{ color: t.text, fontFamily: fonts.semibold, fontSize: 14 }}>Morale</Text>
+        <View style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: t.border, overflow: 'hidden' }}>
+          <View style={{ width: `${m.value}%`, height: 8, borderRadius: 4, backgroundColor: color }} />
+        </View>
+        <Text style={{ color, fontFamily: fonts.bold, fontSize: 13 }}>{MOOD_WORDS[m.mood]}</Text>
+      </View>
+      <Text style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
+        {m.steadfast
+          ? 'They\'ll never leave you, whatever the sea does.'
+          : m.mood === 'quitting'
+            ? 'One more bad voyage and they could resign to a rival line. Calm, safe voyages steady them.'
+            : 'Sinkings, battered hulls and storms wear it down; calm, safe voyages build it back. At nothing they resign.'}
+      </Text>
+    </View>
+  )
+}

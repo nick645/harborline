@@ -359,6 +359,7 @@ function Docked({ game, boat, now, onAssign }: Props) {
                 </Muted>
                 <Upside weather={q.weather} tier={getBoatClass(boat.classId).sizeTier} automated={isAutomated(game, boat)} />
                 {q.canSink && <Text style={{ color: t.bad, fontSize: 11, fontFamily: fonts.bold }}>Could sink</Text>}
+                {(q.weather === 'rough' || q.weather === 'storm') && <MoraleWarning game={game} boat={boat} />}
                 <Button small label={q.blocked ?? 'Send'} disabled={!!q.blocked} onPress={() => onAssign(r.id, trips)} />
               </Card>
             </View>
@@ -407,6 +408,18 @@ export function Upside({ weather, tier, automated = false }: { weather: Weather;
   return (
     <Text style={{ color: up.length ? t.good : t.muted, fontSize: 11, fontFamily: fonts.semibold, lineHeight: 15 }}>
       {up.length ? up.join(' · ') : 'Safe and steady: no special finds'}
+    </Text>
+  )
+}
+
+/** Rough water wears an unsettled captain down: say so before they're sent into it. */
+function MoraleWarning({ game, boat }: { game: GameState; boat: Boat }) {
+  const t = useTheme()
+  const c = boat.captainId ? captainViewById(game, boat.captainId) : null
+  if (!c || c.morale.steadfast || (c.morale.mood !== 'unsettled' && c.morale.mood !== 'quitting')) return null
+  return (
+    <Text style={{ color: c.morale.mood === 'quitting' ? t.bad : t.warn, fontSize: 11, fontFamily: fonts.bold }}>
+      {c.name.split(' ')[0]} is {c.morale.mood === 'quitting' ? 'close to quitting' : 'unsettled'}: rough water wears them down
     </Text>
   )
 }

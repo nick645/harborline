@@ -43,10 +43,10 @@ import {
   shortHandedMult,
   voyagePayout,
 } from './economy'
-import { LEGEND_ABILITIES, MYTHIC_ABILITIES, RATING_TITLES, TITLE_MARKS } from './data/captains'
+import { LEGEND_ABILITIES, MORALE_CARGO_LOST, MORALE_TITLE, MORALE_BATTERED, MORALE_BATTERED_BELOW, MORALE_MAX, MORALE_SUNK, MORALE_VOYAGE, MORALE_WARN, MYTHIC_ABILITIES, RATING_TITLES, TITLE_MARKS } from './data/captains'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS } from './data/personas'
 import { leadingRival, leaning, rivalName, termsFee } from './courting'
-import { MANAGER_RIVAL_MAX } from './data/courting'
+import { MANAGER_RIVAL_MAX, RIVALS } from './data/courting'
 import { createRng, rollChance, rollConditionLoss, rollDemand, rollPartRarity, rollPick } from './rolls'
 import { hooksOf, type TripContext } from './abilities'
 import { routeWeather, weatherSlot } from './weather'
@@ -74,6 +74,8 @@ import {
   willSail,
   type CaptainMods,
   titleOf,
+  moraleOf,
+  steadfast,
 } from './captains'
 import { fleetCap, scoutLevel, upgradeValue } from './upgrades'
 
@@ -808,7 +810,7 @@ export function reservedAbove(s: GameState, id: string): number {
  * them on your list), else with the rival they lean toward most.
  */
 /** What settling turned up for the welcome-back summary (mutated as it goes). */
-type SettleNews = { tripPay: number; signed: string[]; wentElsewhere: string[]; risen: string[]; charted: string[]; titles: TitleRise[] }
+type SettleNews = { tripPay: number; signed: string[]; wentElsewhere: string[]; risen: string[]; charted: string[]; titles: TitleRise[]; resigned: AwayReport['resigned']; shaken: AwayReport['shaken'] }
 
 function decide(s: GameState, id: string, at: number, news?: SettleNews) {
   const found = seekers(s).find((p) => p.person.id === id)
@@ -897,7 +899,7 @@ function settleInPlace(s: GameState, now: number) {
   const parts: string[] = []
   const keepsakes: string[] = []
   const finds: Find[] = []
-  const news: SettleNews = { tripPay: 0, signed: [], wentElsewhere: [], risen: [], charted: [], titles: [] }
+  const news: SettleNews = { tripPay: 0, signed: [], wentElsewhere: [], risen: [], charted: [], titles: [], resigned: [], shaken: [] }
   // Each trip has at most two events, runs are capped by the fuel tank, and managed boats
   // depart at most once per trip, so this is bounded by the voyages that fit before `now`.
   for (let ev = nextEvent(s, now); ev; ev = nextEvent(s, now)) {
@@ -937,8 +939,9 @@ function settleInPlace(s: GameState, now: number) {
         log(s, ev.at, 'lost', `${boat.nickname} lost her cargo in ${WEATHER[ctx.weather].name.toLowerCase()} seas`)
         if (h.instantReturnOnLoss) {
           s.voyages = s.voyages.filter((x) => x !== v)
-          recordCaptains(s, boat, ctx, ev.at, news)
+          recordCaptains(s, boat, ctx, ev.at, news, true)
           dockBoat(boat, ev.at)
+          resignations(s, ev.at, news)
         } else {
           boat.state = 'returning'
           boat.etaMs = v.startedAt + v.durationMs
@@ -958,6 +961,7 @@ function settleInPlace(s: GameState, now: number) {
         s.voyages = s.voyages.filter((x) => x !== v)
         sunk.push(boat.nickname)
         log(s, ev.at, 'sunk', `${boat.nickname} sank in ${WEATHER[ctx.weather].name.toLowerCase()} seas`)
+        for (const c of captainsAboard(s, boat)) shiftMorale(s, c, MORALE_SUNK, ev.at, news)
         continue
       }
 
@@ -980,7 +984,7 @@ function settleInPlace(s: GameState, now: number) {
           if (getPart(id).rarity !== 'standard') log(s, ev.at, 'part', `${boat.nickname} found ${partName(id)}`)
         }
       }
-      recordCaptains(s, boat, ctx, ev.at, news)
+      recordCaptains(s, boat, ctx, ev.at, news, !!v.lost)
       if (!v.lost) {
         recordHands(s, boat)
         if (ctx.weather === 'storm') {
@@ -1011,10 +1015,16 @@ function settleInPlace(s: GameState, now: number) {
         leaving = false
       }
       if (leaving) startTrip(s, boat, v.routeId, ev.at, v.tripIndex + 1, v.tripsTotal)
-      else dockBoat(boat, ev.at)
+      else {
+        dockBoat(boat, ev.at)
+        // Ashore: anyone who's had enough leaves now.
+        resignations(s, ev.at, news)
+      }
     }
   }
   const captainsLost = loseAdrift(s, now)
+  // Anyone else who's had enough and is ashore (a wreck just raised) leaves too.
+  resignations(s, now, news)
   // Anything else that moved what you know of them (a scout, a signing) shows here.
   noteTitles(s, now, s.player.roster, news)
   return { tripsCompleted, sunk, lost, parts, keepsakes, finds, captainsLost, ...news }
@@ -1124,7 +1134,7 @@ function manageCrew(s: GameState, boat: Boat, manager: Captain, at: number) {
 }
 
 /** Every captain aboard gains the voyage's experience; tell the log what came to light. */
-function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number, summary?: SettleNews) {
+function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number, summary?: SettleNews, lostCargo = false) {
   const revealEvery = hooksOf(boat).traitRevealEvery
   for (const c of captainsAboard(s, boat)) {
     const taken = s.player.roster.flatMap((x) => (x.persona ? [x.persona] : []))
@@ -1150,7 +1160,41 @@ function recordCaptains(s: GameState, boat: Boat, ctx: TripContext, at: number, 
       const who = PERSONAS.find((p) => p.id === c.persona)
       log(s, at, 'captain', `${c.name} is ${news.rankUp.rank === 'mythic' ? 'Mythic' : 'a Legend'} now${who ? `: ${who.name}` : ''}. ${a.name}: ${a.description.toLowerCase()}`)
     }
+    // How the voyage sat with them.
+    const battered = boat.condition < MORALE_BATTERED_BELOW ? MORALE_BATTERED : 0
+    shiftMorale(s, c, (lostCargo ? MORALE_CARGO_LOST : MORALE_VOYAGE[ctx.weather]) + battered, at, summary)
     noteTitles(s, at, [c], summary)
+  }
+}
+
+/** Move a captain's morale, warning you once when they come close to quitting. */
+function shiftMorale(s: GameState, c: Captain, by: number, at: number, summary?: SettleNews) {
+  const before = moraleOf(c)
+  const after = Math.max(steadfast(c) ? 1 : 0, Math.min(MORALE_MAX, before + by))
+  c.morale = after
+  if (before >= MORALE_WARN && after < MORALE_WARN) {
+    log(s, at, 'captain', after === 0 ? `${c.name} has had enough: they'll leave your line once they're ashore` : `${c.name} is close to quitting. Calm, safe voyages would steady them`)
+    summary?.shaken.push({ name: c.name, at })
+  }
+}
+
+/** Captains whose morale ran out resign once ashore, and sign with a rival line. */
+function resignations(s: GameState, at: number, summary?: SettleNews) {
+  for (const c of [...s.player.roster]) {
+    if (steadfast(c) || moraleOf(c) > 0) continue
+    const boat = s.player.ownedBoats.find((b) => b.captainId === c.id || b.mateId === c.id)
+    if (boat && boat.state !== 'idle') continue
+    const rival = rollPick(s.rng, RIVALS)
+    s.player.roster = s.player.roster.filter((x) => x.id !== c.id)
+    for (const b of s.player.ownedBoats) {
+      if (b.captainId === c.id) b.captainId = null
+      if (b.mateId === c.id) b.mateId = null
+      if (b.managedBy === c.id) b.managedBy = null
+    }
+    for (const x of s.player.roster) if (x.hiredBy === c.id) x.hiredBy = null
+    s.player.celebrations = s.player.celebrations?.filter((x) => x.captainId !== c.id)
+    log(s, at, 'captain', `${c.name} resigned and signed with ${rival.name}`)
+    summary?.resigned.push({ name: c.name, rival: rival.name, at })
   }
 }
 
@@ -1168,6 +1212,7 @@ export function noteTitles(s: GameState, at: number, captains: Captain[], summar
     }
     const rise: TitleRise = { captainId: c.id, name: c.name, from: c.titleSeen, to: t, at }
     c.titleSeen = t
+    c.morale = Math.min(MORALE_MAX, moraleOf(c) + MORALE_TITLE)
     ;(s.player.celebrations ??= []).push(rise)
     log(s, at, 'captain', `${c.name} rose to ${RATING_TITLES[t]}: ${TITLE_MARKS[t].toLowerCase()} to show for it`)
     summary?.titles.push(rise)

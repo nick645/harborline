@@ -118,12 +118,30 @@ export async function scheduleAlerts(state: GameState, now: number): Promise<voi
   }
   if (!(await alertsWanted())) return
   await scheduleAdrift(state, now)
+  await scheduleMorale(state, now)
   for (const alert of upcomingAlerts(state, now, now + HORIZON_MS)) {
     const { title, body } = alertText(state, alert)
     await Notifications.scheduleNotificationAsync({
       identifier: `${ALERT_ID}${alert.routeId}-${alert.at}`,
       content: { title, body },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: alert.at },
+    })
+  }
+}
+
+/** Captains coming close to quitting, and resigning, while you're away (the seeded run forward). */
+async function scheduleMorale(state: GameState, now: number) {
+  const { report } = settleAway(state, now + HORIZON_MS)
+  const notes = [
+    ...report.shaken.map((x) => ({ at: x.at, title: `${x.name} is close to quitting`, body: 'Bad voyages have worn them down. Calm, safe trips would steady them.' })),
+    ...report.resigned.map((x) => ({ at: x.at, title: `${x.name} has resigned`, body: `They've signed with ${x.rival}.` })),
+  ]
+  for (const n of notes) {
+    if (n.at <= now) continue
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${ALERT_ID}morale-${n.at}-${n.title.length}`,
+      content: { title: n.title, body: n.body },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: n.at },
     })
   }
 }

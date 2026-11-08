@@ -119,6 +119,7 @@ type RunResult = {
   finalCoins: number
   earnedActive: number
   sinkings: number
+  resignations: number
   lostTrips: number
   rareParts: number
   keepsakes: number
@@ -273,6 +274,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     finalCoins: 0,
     earnedActive: 0,
     sinkings: 0,
+    resignations: 0,
     lostTrips: 0,
     rareParts: 0,
     keepsakes: 0,
@@ -289,6 +291,7 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     const step = settleAway(s, t)
     s = step.state
     res.sinkings += step.report.sunk.length
+    res.resignations += step.report.resigned.length
     res.lostTrips += step.report.lost.length
     res.keepsakes += step.report.keepsakes.length
     for (const id of step.report.parts) {
@@ -317,8 +320,11 @@ function run(seed: number, strat: Strategy, policy: WeatherPolicy = 'ev'): RunRe
     const weatherTurns = Math.ceil((t + 1) / WEATHER_SLOT_MS) * WEATHER_SLOT_MS
     t = Math.min(etas.length ? Math.min(...etas) : Infinity, weatherTurns) + REACTION_MS
   }
-  s = settleAway(s, end).state
-  res.captainsHired = s.player.roster.length - 1
+  const last = settleAway(s, end)
+  s = last.state
+  res.resignations += last.report.resigned.length
+  // Everyone signed: those still here, and those who resigned since (less the first).
+  res.captainsHired = s.player.roster.length + res.resignations - 1
   if (process.env.SIM_TRACE) console.log(s.log.filter((e) => /signed|chose|hired/.test(e.text)).map((e) => `${((e.at - T0) / 60000).toFixed(0)} ${e.text}`).reverse().join('\n'))
   res.crafted = s.player.ownedBoats.filter((b) => isCrafted(b.classId)).length
   res.finalTier = maxTier(s)
@@ -361,6 +367,7 @@ if (MODE === 'storms') {
     row('first set built', results.map((r) => r.firstCraftMin))
     row('sets built', results.map((r) => r.crafted), '  ')
     row('sinkings', results.map((r) => r.sinkings), '  ')
+    row('captains resigned', results.map((r) => r.resignations), '  ')
     row('trips lost to weather', results.map((r) => r.lostTrips), '  ')
     console.log()
   }
@@ -379,6 +386,7 @@ if (MODE === 'storms') {
     row('captains hired', results.map((r) => r.captainsHired), '  ')
     row('coins earned (active)', results.map((r) => r.earnedActive), 'c')
     row('sinkings', results.map((r) => r.sinkings), '  ')
+    row('captains resigned', results.map((r) => r.resignations), '  ')
     row('trips lost to weather', results.map((r) => r.lostTrips), '  ')
     row('rare parts found', results.map((r) => r.rareParts), '  ')
     row('legendary parts found', results.map((r) => r.legendaryParts), '  ')

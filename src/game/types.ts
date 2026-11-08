@@ -144,6 +144,8 @@ export interface Captain {
   id: string
   /** The highest title of theirs you've seen (data/captains.ts RATING_TITLES), for the celebration when it rises. */
   titleSeen?: number
+  /** 0–100 (data/captains.ts MORALE_*); missing means MORALE_START. At 0 they resign. */
+  morale?: number
   name: string
   homePort: string
   /** Public 1–5 anchors. Usually right, sometimes not. */
@@ -391,6 +393,9 @@ export interface AwayReport {
   risen: string[]
   /** Captains whose rating reached a new title, and when. */
   titles: TitleRise[]
+  /** Captains who resigned to a rival line, and captains close to quitting. */
+  resigned: { name: string; rival: string; at: number }[]
+  shaken: { name: string; at: number }[]
   /** Regions charted open. */
   charted: string[]
   /** Names of captains lost at sea waiting for their boat to be raised. */

@@ -583,6 +583,11 @@ function Roster({ game, now, onOpenCaptain }: { game: GameState; now: number; on
               <Text numberOfLines={1} style={{ color: t.muted, fontFamily: fonts.body, fontSize: 12 }}>
                 {where}
               </Text>
+              {!c.morale.steadfast && (c.morale.mood === 'unsettled' || c.morale.mood === 'quitting') && (
+                <Text numberOfLines={1} style={{ color: c.morale.mood === 'quitting' ? t.bad : t.warn, fontFamily: fonts.bold, fontSize: 11 }}>
+                  {c.morale.mood === 'quitting' ? '⚠ Close to quitting' : 'Unsettled'}
+                </Text>
+              )}
             </Pressable>
           )
         })}

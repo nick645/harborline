@@ -128,6 +128,27 @@ export const MYTHIC_CEILING: [number, number] = [96, 100]
 /** Overall skill (the average of the five) that makes a Legend, or a Mythic. */
 export const LEGEND_AT = 90
 
+/**
+ * Morale, 0–100 (numbers are Claude's picks). A voyage moves it by its weather: calm and choppy
+ * build it, rough and storms wear it down, losing the cargo or coming home battered wear it more,
+ * and a sinking under their command hits hardest. Rising to a new title cheers them. At nothing
+ * they resign, once they're back ashore, and sign with a rival line. Bonded captains, Legends
+ * and Mythics never leave.
+ */
+export const MORALE_START = 70
+export const MORALE_MAX = 100
+export const MORALE_VOYAGE: Record<'calm' | 'choppy' | 'rough' | 'storm', number> = { calm: 3, choppy: 2, rough: 0, storm: -1 }
+export const MORALE_CARGO_LOST = -3
+/** Coming home with the hull below this… */
+export const MORALE_BATTERED_BELOW = 30
+/** …costs this much more. */
+export const MORALE_BATTERED = -3
+export const MORALE_SUNK = -40
+export const MORALE_TITLE = 10
+/** Below this they're unsettled (shown on their card); below the next, close to quitting (a warning). */
+export const MORALE_UNSETTLED = 40
+export const MORALE_WARN = 20
+
 /** What a sea rating is called, a title for every ten points (names are Claude's picks). */
 export const RATING_TITLES = ['Landlubber', 'Bilge Rat', 'Greenhand', 'Rope-wise', 'Steady Oar', 'Weatherworn', 'Wavecutter', 'Tidemaster', 'Sea Wolf', 'Stormborn'] as const
 export const titleIndex = (rating: number) => Math.min(RATING_TITLES.length - 1, Math.max(0, Math.floor(rating / 10)))

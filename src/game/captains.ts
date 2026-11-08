@@ -64,6 +64,9 @@ import {
   type SkillId,
   type TraitDef,
   titleIndex,
+  MORALE_START,
+  MORALE_UNSETTLED,
+  MORALE_WARN,
 } from './data/captains'
 import { nextFloat, nextInt, rollChance, rollNormal, rollPick, rollWeighted } from './rolls'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS, PERSONAS, type PersonaDef } from './data/personas'
@@ -672,6 +675,8 @@ export interface CaptainView {
   rating: { guess: number; band: [number, number]; sure: boolean; from: 'skills' | 'reputation' }
   /** Their title by that rating: an index into RATING_TITLES, which also dresses them. */
   title: number
+  /** How they feel about sailing for you: 0–100, how it reads, and whether they'd ever leave. */
+  morale: { value: number; mood: 'good' | 'steady' | 'unsettled' | 'quitting'; steadfast: boolean }
   /** How high they could grow, as far as you know: a band on the 1–100 scale, and how well it's known. */
   growth: { band: [number, number]; known: 'unknown' | 'rough' | 'exact'; ordinaryMax: number }
   /** Badges, earned and still to earn, with progress. */
@@ -713,6 +718,11 @@ export interface CaptainView {
   /** Where they're from, which shows in how they dress. */
   region: import('./data/ports').RegionId
 }
+
+/** Their morale (data/captains.ts MORALE_*). */
+export const moraleOf = (c: Captain) => c.morale ?? MORALE_START
+/** Bonded captains, Legends and Mythics never resign. */
+export const steadfast = (c: Captain) => !!c.bonded || !!c.rank
 
 /** Their title (an index into RATING_TITLES), by their sea rating as far as you know it. */
 export const titleOf = (c: Captain) => titleIndex(ratingOf(c).guess)
@@ -803,6 +813,10 @@ export function captainView(c: Captain): CaptainView {
     })),
     rating: ratingOf(c),
     title: titleOf(c),
+    morale: (() => {
+      const value = moraleOf(c)
+      return { value, mood: value >= 70 ? 'good' : value >= MORALE_UNSETTLED ? 'steady' : value >= MORALE_WARN ? 'unsettled' : 'quitting', steadfast: steadfast(c) } as const
+    })(),
     growth: growthOf(c),
     grade: gradeOf(c),
     gradeIn: Math.max(0, GRADE_KNOWN_AFTER - c.voyageCount),

@@ -189,7 +189,14 @@ mobile/        Expo app; mobile/src/art = Skia scenes, theme.ts = Lantern palett
   anchor, shoulder cord, shoulder boards, sash, epaulettes and medal, storm braid and glow; Legend
   and Mythic personas replace it). Reaching a new title (`noteTitles` in state.ts, by the rating
   you know, once per title) stops the screen for a celebration (`TitleUp.tsx`), logs it, joins
-  the welcome back, and is a find alert while away. Looks and names are Claude's picks. Badges (`data/badges.ts`):
+  the welcome back, and is a find alert while away. Looks and names are Claude's picks.
+- Morale and resigning (user-approved 2026-11-07): every captain has morale 0–100 (start 70). Calm
+  +3 and choppy +2 a voyage, rough 0, storm −1, lost cargo −3, home battered (hull < 30) −3, a
+  sinking under their command −40, a new title +10. Under 40 unsettled, under 20 a warning; at 0
+  they resign once ashore and sign with a rival line. Bonded captains, Legends and Mythics never
+  leave. Shown on the captain page, roster card, send cards, welcome back; storm alerts notify.
+  Numbers are Claude's picks. Sim (6 h): default strategies unchanged; storm modes: bait coins
+  48.8k → 45.2k, tier 2 by 6 h 77% → 71%; all-in 43.1k → 37.9k, 51% → 36%. Badges (`data/badges.ts`):
   Storm Hand, Long Hauler, Market Trader, Steady Keel, Old Salt, Chart-maker, three levels each,
   earned at sea, never hidden. Grades once known: Pearl of the fleet, Seasoned, Able, Driftwood,
   Barnacle. Tabs: Skills, Badges, Record, Log, Orders. Numbers and names are Claude's picks. Sim

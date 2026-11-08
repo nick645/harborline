@@ -24,7 +24,7 @@ import { fleetCap, scoutLevel } from './upgrades'
 import { naturalWeather } from './weather'
 import { getPart } from './parts'
 import { getBoatClass } from './economy'
-import { CEILING_HEADROOM, HIRE_FEE, LEGEND_AT, ORDINARY_CEILING, SCOUT_ACCURACY, SCOUT_BAND_WIDTH, SKILL_IDS, skillToAnchors, WATCHES_BASE } from './data/captains'
+import { CEILING_HEADROOM, HIRE_FEE, LEGEND_AT, MORALE_START, MORALE_WARN, ORDINARY_CEILING, SCOUT_ACCURACY, SCOUT_BAND_WIDTH, SKILL_IDS, skillToAnchors, WATCHES_BASE } from './data/captains'
 import { WEATHER_SLOT_MS } from './data/weather'
 import { ROUTES } from './data/routes'
 import { LEGEND_PERSONAS, MYTHIC_PERSONAS } from './data/personas'
@@ -578,6 +578,35 @@ describe('titles', () => {
     const again = settle(after, T0 + 3000)
     expect(again.player.celebrations).toHaveLength(1)
     expect(dismissCelebration(again, c.id).player.celebrations).toEqual([])
+  })
+})
+
+describe('morale', () => {
+  it('a captain with no morale left resigns to a rival line once ashore; the steadfast never do', () => {
+    let s = harbourGame(53, T0)
+    const a = s.player.roster[0]
+    expect(captainView(a).morale).toMatchObject({ value: MORALE_START, mood: 'good' })
+    s = structuredClone(s)
+    s.player.roster[0].morale = 0
+    // Bonded: stays, whatever.
+    s.player.roster[0].bonded = true
+    expect(settle(s, T0 + 1000).player.roster.map((c) => c.id)).toEqual([a.id])
+    // Not bonded: gone to a rival, off their boat.
+    s.player.roster[0].bonded = false
+    const after = settleAway(s, T0 + 1000)
+    expect(after.state.player.roster).toEqual([])
+    expect(after.state.player.ownedBoats.some((x) => x.captainId === a.id || x.mateId === a.id)).toBe(false)
+    expect(after.report.resigned).toEqual([{ name: a.name, rival: expect.any(String), at: T0 + 1000 }])
+    expect(after.state.log.some((l) => l.text.startsWith(`${a.name} resigned and signed with`))).toBe(true)
+  })
+
+  it('reads as close to quitting below the warning line', () => {
+    const s = harbourGame(54, T0)
+    const c = structuredClone(s.player.roster[0])
+    c.morale = MORALE_WARN - 1
+    expect(captainView(c).morale.mood).toBe('quitting')
+    c.rank = 'legend'
+    expect(captainView(c).morale.steadfast).toBe(true)
   })
 })
 

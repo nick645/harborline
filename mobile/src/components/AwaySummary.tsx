@@ -33,7 +33,7 @@ export function AwaySummary({ report: r, game, now, onDismiss }: { report: AwayR
   const notable = r.finds.filter((f) => f.part && getPart(f.part).rarity !== 'standard')
   const fittings = r.finds.filter((f) => f.part && getPart(f.part).rarity === 'standard').length
   const leaning = courtedPeople(game, now).filter((p) => p.court.forecast === 'you' && p.budget.status !== 'passed')
-  const bad = r.sunk.length + r.lost.length + r.captainsLost.length > 0
+  const bad = r.sunk.length + r.lost.length + r.captainsLost.length + r.resigned.length > 0
   return (
     <Pressable onPress={onDismiss} accessibilityRole="button" accessibilityHint="Dismisses the summary">
       <Card accent={bad ? t.bad : t.accent} style={{ gap: 6 }}>
@@ -106,6 +106,18 @@ export function AwaySummary({ report: r, game, now, onDismiss }: { report: AwayR
             Cargo lost to the weather: {list(r.lost)}
           </Line>
         )}
+        {r.resigned.map((x, i) => (
+          <Line key={`q${i}`} mark="✗" color={t.bad}>
+            <B>{x.name}</B> resigned and signed with {x.rival}
+          </Line>
+        ))}
+        {r.shaken
+          .filter((x) => !r.resigned.some((q) => q.name === x.name))
+          .map((x, i) => (
+            <Line key={`s${i}`} mark="⚠" color={t.warn}>
+              <B>{x.name}</B> is close to quitting: give them calm, safe voyages
+            </Line>
+          ))}
         {r.captainsLost.length > 0 && (
           <Line mark="✗" color={t.bad}>
             Lost at sea: <B>{list(r.captainsLost)}</B>

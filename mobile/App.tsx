@@ -717,7 +717,7 @@ function StormAlertsToggle() {
       <Pressable onPress={toggle} accessibilityRole="switch" accessibilityState={{ checked: on }} style={styles.toggleRow}>
         <View style={{ flex: 1, gap: 2 }}>
           <Body style={{ fontWeight: '700' }}>Storm alerts</Body>
-          <Muted>A notification when a route you have trips queued on turns rough or stormy while you're away.</Muted>
+          <Muted>A notification when a route you have trips queued on turns rough or stormy, or a captain is close to quitting or resigns, while you're away.</Muted>
         </View>
         <Switch value={on} onValueChange={() => void toggle()} trackColor={{ true: t.accent, false: t.muted }} ios_backgroundColor={t.muted} importantForAccessibility="no" />
       </Pressable>

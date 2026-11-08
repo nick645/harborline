@@ -13,7 +13,7 @@ import { homeTavern } from '../homeTavern'
 import { fonts, useTheme } from '../theme'
 import { Body, Button, Card, Measure, Muted, Row, Segments, Tag, Title } from '../components/ui'
 import { Lodestone, RankAbilities, SkillSheet, Standing } from '../components/SkillSheet'
-import { BadgesPanel, RatingBlock, RecordPanel } from '../components/CaptainGrowth'
+import { BadgesPanel, MoraleBlock, RatingBlock, RecordPanel } from '../components/CaptainGrowth'
 
 type Props = {
   game: GameState
@@ -76,6 +76,7 @@ export function CaptainScreen({ game, captainId, now, onOpenBoat, onAshore, onFi
           From {c.homePort} · takes tier {c.sailsTiers[0]}–{c.sailsTiers[1]} boats
         </Muted>
         <RatingBlock c={c} />
+        <MoraleBlock c={c} />
       </Card>
 
       <Segments
