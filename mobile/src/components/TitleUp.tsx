@@ -11,7 +11,7 @@ import type { CaptainView } from '../../../src/game/captains'
 import type { TitleRise } from '../../../src/game/types'
 import { RATING_TITLES, TITLE_MARKS } from '../../../src/game/data/captains'
 import { Figure } from '../art/Figure'
-import { lookFor } from '../art/looks'
+import { storybookLookFor } from '../art/parts/upgrade'
 import { useSceneClock } from '../art/clock'
 import { play } from '../sound/sound'
 import { fonts, useTheme } from '../theme'
@@ -28,7 +28,7 @@ export function TitleUp({ rise, captain, more, onDone, onOpen }: { rise: TitleRi
   const storm = rise.to === 9
   const glow = storm ? '#9aa6ff' : '#f2c75a'
   const [oldW, setOldW] = useState(0)
-  const look = useMemo(() => lookFor(captain.id, captain.rare, captain.region, captain.persona?.id, rise.to), [captain, rise.to])
+  const look = useMemo(() => storybookLookFor(captain.id, captain.rare, captain.region, captain.persona?.id, rise.to), [captain, rise.to])
 
   // The reveal, in beats: the backdrop, the old title struck out, the new one stamping in.
   const fade = useSharedValue(0)

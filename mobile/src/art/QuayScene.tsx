@@ -8,7 +8,7 @@ import { Pressable, View } from 'react-native'
 import { useDerivedValue } from 'react-native-reanimated'
 import { getBoatClass } from '../../../src/game/economy'
 import type { Light } from './light'
-import { lookFor } from './looks'
+import { storybookLookFor } from './parts/upgrade'
 import { REGION_STYLE } from './regionStyle'
 import type { RegionId } from '../../../src/game/data/ports'
 import { FIGURE_FULL_H } from './Figure'
@@ -244,7 +244,7 @@ export function QuayScene({
                   </>
                 )}
                 <Walker
-                  look={lookFor(r.id, false, region)}
+                  look={storybookLookFor(r.id, false, region)}
                   clock={clock}
                   // Pairs drift toward each other to talk; an odd one out paces on their own.
                   x0={i < pairs * 2 ? xs[i] : xs[i] - PACE}

@@ -12,7 +12,7 @@ import { HOME_BUNTING, type DecorId, type DoorStyle, type HouseBuild, type House
 import { House, type HouseLook } from './HouseArt'
 import { houseFrame, roofPeak } from './houseGeometry'
 import type { Light } from './light'
-import { lookFor } from './looks'
+import { storybookLookFor } from './parts/upgrade'
 import { REGION_STYLE } from './regionStyle'
 import { Walker } from './Walker'
 import { useSceneClock } from './clock'
@@ -275,7 +275,7 @@ export function HomeScene({ width, height, light, look }: { width: number; heigh
         {shown.map((c, i) => (
           <Walker
             key={c.id}
-            look={lookFor(c.id, c.rare, c.region, c.persona, c.title)}
+            look={storybookLookFor(c.id, c.rare, c.region, c.persona, c.title)}
             clock={clock}
             x0={16 + i * 66}
             x1={46 + i * 66}

@@ -7,7 +7,8 @@ import { Pressable, View } from 'react-native'
 import { useDerivedValue } from 'react-native-reanimated'
 import type { BoatClass } from '../../../src/game/types'
 import type { Light } from './light'
-import { lookFor, type Look, type Prop } from './looks'
+import { type Look, type Prop } from './looks'
+import { storybookLookFor } from './parts/upgrade'
 import { BoatArt } from './BoatArt'
 import { boatWidth } from './boatGeometry'
 import { FIGURE_FULL_H } from './Figure'
@@ -99,7 +100,7 @@ export function WorkScene({ width, height, light, cls, captains, onOpen }: { wid
 
           {shown.map((c, i) => {
             const [prop, from, to] = JOBS[i]
-            const look: Look = { ...lookFor(c.id, c.rare, c.region, c.persona?.id, c.title), prop }
+            const look: Look = { ...storybookLookFor(c.id, c.rare, c.region, c.persona?.id, c.title), prop }
             return (
               <Walker
                 key={c.id}

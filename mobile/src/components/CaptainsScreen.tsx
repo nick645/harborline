@@ -26,7 +26,7 @@ import { WorkScene } from '../art/WorkScene'
 import { Figure } from '../art/Figure'
 import { useSceneClock } from '../art/clock'
 import { lightAt } from '../art/light'
-import { lookFor } from '../art/looks'
+import { storybookLookFor } from '../art/parts/upgrade'
 import { Lodestone, SkillSheet, Standing } from './SkillSheet'
 import { fonts, useTheme } from '../theme'
 import { Button, Card, Measure, Muted, Row, Segments, Strip, Title } from './ui'
@@ -674,7 +674,7 @@ function Portrait({ id, rare, region, persona, small, title }: { id: string; rar
     <Canvas style={{ width: 56 * k, height: 64 * k }}>
       <Group transform={[{ scale: k }]} clip={rrect(rect(0, 0, 56, 64), 10, 10)}>
         <Rect x={0} y={0} width={56} height={64} color="#433145" />
-        <Figure look={lookFor(id, rare, region, persona, title)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
+        <Figure look={storybookLookFor(id, rare, region, persona, title)} x={-6} y={-8} scale={1.2} clock={clock} rimLight="#ffd27a" />
       </Group>
     </Canvas>
   )

@@ -23,7 +23,7 @@ import { deckFindOn } from '../../../src/game/deckFinds'
 import { getPart, setProgress } from '../../../src/game/parts'
 import { partName } from '../../../src/game/parts'
 import { lightAt } from '../art/light'
-import { lookFor } from '../art/looks'
+import { storybookLookFor } from '../art/parts/upgrade'
 import { fonts, useTheme } from '../theme'
 import { CrewPanel, HullPanel, SendPanel, type Props as BoatProps } from '../components/BoatCard'
 import { Fit, Muted, Row, Segments, Title } from '../components/ui'
@@ -46,7 +46,7 @@ export function BoatScreen(props: BoatProps) {
   const [panel, setPanel] = useState<Panel>(boat.captainId || boat.state === 'sunk' ? 'send' : 'crew')
   // Dev only: preview the scene in any weather.
   const [preview, setPreview] = useState<Weather | null>(null)
-  const look = captain ? lookFor(captain.id, captain.rare, captain.region, captain.persona?.id, captain.title) : null
+  const look = captain ? storybookLookFor(captain.id, captain.rare, captain.region, captain.persona?.id, captain.title) : null
   // At sea, three views: the whole ship, on deck among the passengers, and at the helm.
   const [view, setView] = useState<'ship' | 'deck' | 'helm'>('deck')
   const atSea = mode === 'sailing' || mode === 'returning'

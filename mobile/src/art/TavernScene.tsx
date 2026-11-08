@@ -10,6 +10,7 @@ import { Pressable, View } from 'react-native'
 import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Light } from './light'
 import { lookFor, type Look } from './looks'
+import { storybookLookFor } from './parts/upgrade'
 import { REGION_STYLE } from './regionStyle'
 import type { TavernLook } from '../homeTavern'
 import type { Hanging } from '../../../src/game/data/home'
@@ -327,7 +328,7 @@ export function TavernScene({
               <Oval x={CAPTAIN_X - 16} y={FRONT_FOOT - 112} width={70} height={120} opacity={aura}>
                 <RadialGradient c={vec(CAPTAIN_X + 18, FRONT_FOOT - 50)} r={64} colors={['#f2c75a66', '#f2c75a00']} />
               </Oval>
-              <Walker look={lookFor(captain.id, true)} clock={clock} x0={CAPTAIN_X} x1={CAPTAIN_X + 8} footY={FRONT_FOOT} scale={WALK_SCALE * 1.04} speed={4} pauseMs={7000} offset={900} rimLight="#f2c75a" />
+              <Walker look={storybookLookFor(captain.id, true)} clock={clock} x0={CAPTAIN_X} x1={CAPTAIN_X + 8} footY={FRONT_FOOT} scale={WALK_SCALE * 1.04} speed={4} pauseMs={7000} offset={900} rimLight="#f2c75a" />
               <Path path={sparkle} color="#f2c75a" opacity={sparkleOpacity} />
             </Group>
           )}

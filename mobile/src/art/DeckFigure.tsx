@@ -7,6 +7,7 @@ import { useDerivedValue, type SharedValue } from 'react-native-reanimated'
 import type { Pose } from './boatGeometry'
 import type { Look } from './looks'
 import { shade } from './paint'
+import { BeardArt, HairBack, HairFront, HatPartArt } from './parts/Parts'
 
 type Props = {
   look: Look
@@ -24,6 +25,9 @@ type Props = {
   /** For a hauling pose: where the line runs up to, in the figure's own units (feet at 0,0). */
   lineTo?: { x: number; y: number }
 }
+
+/** Figure's head space (head centred at (28, 39)) onto this one's (centred at (0, -25.2), a third the size). */
+const PART_SPACE = [{ translateX: -28 * 0.3 }, { translateY: -25.2 - 39 * 0.3 }, { scale: 0.3 }]
 
 const HATS: Record<Look['hat'], string> = {
   cap: 'M-4 -27.6 h 8 v -2.2 c 0 -2.4 -8 -2.4 -8 0 Z M2.8 -27.8 h 3.4 v 1 h -3.4 Z',
@@ -118,6 +122,8 @@ export function DeckFigure({ look, pose, x, y, size, aft = false, clock, offset 
     return [{ translateY: 0 }]
   })
   const lean = pose === 'coil' ? 0.35 : pose === 'haul' ? -0.08 : 0
+  const sb = look.parts
+  const hatless = !sb?.hat && (look.hat === 'bare' || look.hat === 'bun' || look.hat === 'none')
   const trousers = lit('#2e2a33')
   const coat = lit(look.coat)
   return (
@@ -141,10 +147,25 @@ export function DeckFigure({ look, pose, x, y, size, aft = false, clock, offset 
             <RoundedRect x={-2.2} y={-28} width={4.4} height={5.4} r={0.8} color="#ffd27a" />
           </>
         ) : (
-          <Circle cx={0} cy={-25.2} r={3.4} color={lit(look.skin)} />
+          <>
+            {sb?.hair && (
+              <Group transform={PART_SPACE}>
+                <HairBack part={sb.hair} look={look} hatless={hatless} />
+              </Group>
+            )}
+            <Circle cx={0} cy={-25.2} r={3.4} color={lit(look.skin)} />
+          </>
         )}
         {look.facialHair === 'beard' && <Path path="M-3 -24.4 C -3 -21, 3 -21, 3 -24.4 Z" color={lit(look.hair)} />}
-        <Path path={HATS[look.hat]} color={lit(look.hatColor)} />
+        {/* Storybook parts: the same drawings as full size, scaled down onto this little head */}
+        {sb && (sb.beard || sb.hair || sb.hat) && (
+          <Group transform={PART_SPACE}>
+            {sb.beard && <BeardArt part={sb.beard} look={look} />}
+            {sb.hair && <HairFront part={sb.hair} look={look} hatless={hatless} />}
+            {sb.hat && <HatPartArt part={sb.hat} look={look} />}
+          </Group>
+        )}
+        {!sb?.hat && <Path path={HATS[look.hat]} color={lit(look.hatColor)} />}
         {look.hat === 'helmet' && <Circle cx={0} cy={-25.4} r={2.4} color="#9ec0cf" opacity={0.7} />}
         {pose === 'wheel' && <Circle cx={7.5} cy={-16.5} r={3.6} color={lit('#8a5a3a')} style="stroke" strokeWidth={1} />}
       </Group>

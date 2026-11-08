@@ -246,8 +246,10 @@ Captain art library (2026-11-07, first batch): `mobile/src/art/parts/` holds mod
 storybook references in `assets/art-references/`. `lookFor()` is unchanged and every existing
 captain looks exactly as before (`parts/looks.test.ts` checks 400 captains against
 `looks.baseline.json`); `storybookLookFor()` adds parts by salted hashes of the id (`~sb-<slot>`),
-never by list position, and is only used in the dev Captain art gallery until switched on.
-Figure draws a part in place of its classic piece; DeckFigure doesn't draw parts yet.
+never by list position. Switched on for every captain since 2026-11-07 (user-approved): roster,
+captain page, boat views, quay, tavern, prospects, title celebrations; townsfolk, passengers,
+hands and yard workers stay classic. Figure draws a part in place of its classic piece;
+DeckFigure draws hair, beards and hats scaled from Figure's space.
 
 ## Working with the user
 
